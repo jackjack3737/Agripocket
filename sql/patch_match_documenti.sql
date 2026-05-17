@@ -1,16 +1,18 @@
--- Fix timeout RAG su tgif_knowledge_base (~11k+ chunk, embedding 3072)
+-- Fix timeout RAG su tgif_knowledge_base (~11k chunk, embedding 3072 Gemini)
+-- HNSW su vector(3072) non e supportato (max 2000): indice su halfvec(3072).
 -- Esegui in Supabase SQL Editor (una volta)
 
 create extension if not exists vector;
 
--- Indice ANN per cosine (se fallisce per dimensioni, vedi nota sotto)
 drop index if exists public.tgif_knowledge_base_embedding_hnsw_idx;
+drop index if exists public.tgif_knowledge_base_embedding_ivfflat_idx;
+
+-- Indice HNSW su halfvec (fino a 4000 dim con pgvector >= 0.7)
 create index tgif_knowledge_base_embedding_hnsw_idx
   on public.tgif_knowledge_base
-  using hnsw (embedding vector_cosine_ops)
+  using hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
   with (m = 16, ef_construction = 64);
 
--- Funzione RAG: prima i K piu vicini (usa indice), poi filtro soglia
 create or replace function public.match_documenti(
   query_embedding vector(3072),
   match_threshold float default 0.2,
@@ -28,9 +30,12 @@ stable
 security definer
 set search_path = public
 as $$
+declare
+  q halfvec(3072);
 begin
   perform set_config('statement_timeout', '45000', true);
   perform set_config('hnsw.ef_search', '64', true);
+  q := query_embedding::halfvec(3072);
 
   return query
   with nearest as (
@@ -39,10 +44,10 @@ begin
       k.patologia,
       k.specie,
       k.soluzione,
-      (1 - (k.embedding <=> query_embedding))::float as sim
+      (1 - (k.embedding::halfvec(3072) <=> q))::float as sim
     from public.tgif_knowledge_base k
     where k.embedding is not null
-    order by k.embedding <=> query_embedding
+    order by k.embedding::halfvec(3072) <=> q
     limit greatest(match_count * 3, 24)
   )
   select
@@ -63,8 +68,5 @@ grant execute on function public.match_documenti(vector, float, int) to service_
 
 notify pgrst, 'reload schema';
 
--- Se HNSW su vector(3072) non e supportato nel tuo piano, usa IVFFlat:
--- drop index if exists public.tgif_knowledge_base_embedding_hnsw_idx;
--- create index tgif_knowledge_base_embedding_ivfflat_idx
---   on public.tgif_knowledge_base
---   using ivfflat (embedding vector_cosine_ops) with (lists = 150);
+-- Fallback se halfvec non disponibile (pgvector vecchio): solo funzione + timeout, senza indice.
+-- La ricerca resta lenta (~8s) ma non va in timeout grazie a statement_timeout 45s.
