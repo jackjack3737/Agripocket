@@ -76,7 +76,10 @@ export async function savePratoProfilo(userId, profile) {
     esposizione: profile.esposizione,
     tipo_terreno: profile.tipo_terreno,
     irrigazione: profile.irrigazione,
-    superficie_mq: parseMqInput(profile.superficie_mq),
+    superficie_mq: (() => {
+      const mq = parseMqInput(profile.superficie_mq);
+      return mq != null ? Math.round(mq) : null;
+    })(),
     localita: profile.localita?.trim() || null,
     onboarding_completato: true,
   };

@@ -287,10 +287,9 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
       if (center) localita = await reverseLocality(center.lat, center.lng);
     }
 
-    const rounded = Math.round(areaSqm * 10) / 10;
     onApply({
       localita: localita || undefined,
-      superficie_mq: rounded,
+      superficie_mq: Math.round(areaSqm),
     });
     setApplyBusy(false);
     onClose();
