@@ -9,6 +9,31 @@ const MAP_CATEGORIA_INTERVENTO = {
   rinnovo: ["SEMENTI"],
 };
 
+/** Fungicidi, diserbanti, insetticidi: tutte le marche; il resto solo BOTTOS. */
+const CATEGORIE_TUTTE_MARCHE = new Set([
+  "FUNGICIDA",
+  "FUNGICIDA BIO",
+  "DISERBANTE SELETTIVO",
+  "DISERBANTE",
+  "DISERBANTE PRE-EMERGENZA",
+  "DISERBANTE PFnPE",
+  "INSETTICIDA",
+  "INSETTICIDA BIO",
+  "INSETTICIDA PFnPE",
+]);
+
+export function consenteTutteMarche(prodotto) {
+  return CATEGORIE_TUTTE_MARCHE.has(String(prodotto?.categoria || "").toUpperCase());
+}
+
+export function filtraPoolMarca(pool) {
+  const ammessi = pool.filter(
+    (p) => consenteTutteMarche(p) || String(p.marca || "").toUpperCase() === "BOTTOS",
+  );
+  if (ammessi.length) return ammessi;
+  return pool.filter((p) => String(p.marca || "").toUpperCase() === "BOTTOS");
+}
+
 const MESI_IT = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
 
 function meseCorrenteCode() {
@@ -81,19 +106,15 @@ export function calcolaDose(prodotto, superficieMq) {
   };
 }
 
-function scoreProdotto(p, { categoriaIntervento, vision, preferMarca = "BOTTOS" }) {
+function scoreProdotto(p, { categoriaIntervento, vision }) {
   let score = 0;
-  if (String(p.marca || "").toUpperCase() === preferMarca) score += 8;
+  const isBottos = String(p.marca || "").toUpperCase() === "BOTTOS";
+  if (isBottos) score += 8;
+  else if (!consenteTutteMarche(p)) score -= 20;
   if (periodoCompatibile(p.periodo_uso)) score += 5;
 
   const blob = `${p.nome} ${p.descrizione} ${p.composizione} ${(p.tag_meteo || []).join(" ")}`.toLowerCase();
-  const problemi = (vision?.problemi_rilevati || [])
-    .map((x) => `${x.problema} ${x.dettaglio}`)
-    .join(" ")
-    .toLowerCase();
-  const mal = (vision?.malattie_sospette || []).join(" ").toLowerCase();
-  const erbe = (vision?.erbette_infestanti || []).join(" ").toLowerCase();
-  const ctx = `${problemi} ${mal} ${erbe}`;
+  const ctx = contestoVision(vision);
 
   if (categoriaIntervento === "diserbo" && /erbette|trifoglio|tarassaco|dicot|foglia larga/.test(ctx + blob))
     score += 6;
@@ -111,8 +132,36 @@ export function filtraProdottiPerIntervento(prodotti, categoriaIntervento) {
   return prodotti.filter((p) => cats.includes(String(p.categoria || "").toUpperCase()));
 }
 
+function contestoVision(vision) {
+  const problemi = (vision?.problemi_rilevati || [])
+    .map((x) => `${x.problema} ${x.dettaglio}`)
+    .join(" ")
+    .toLowerCase();
+  const mal = (vision?.malattie_sospette || []).join(" ").toLowerCase();
+  const erbe = (vision?.erbette_infestanti || []).join(" ").toLowerCase();
+  return `${problemi} ${mal} ${erbe}`;
+}
+
+function restringiPoolTrattamento(pool, vision) {
+  const ctx = contestoVision(vision);
+  if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx)) {
+    const fung = pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase()));
+    if (fung.length) return fung;
+  }
+  if (/insett|afid|larv|trip|coleotter/.test(ctx)) {
+    const ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
+    if (ins.length) return ins;
+  }
+  const bottos = pool.filter((p) => String(p.marca || "").toUpperCase() === "BOTTOS");
+  return bottos.length ? bottos : pool;
+}
+
 export function scegliProdotto(prodotti, { categoriaIntervento, vision }) {
-  const pool = filtraProdottiPerIntervento(prodotti, categoriaIntervento);
+  let grezzo = filtraProdottiPerIntervento(prodotti, categoriaIntervento);
+  if (categoriaIntervento === "trattamento") {
+    grezzo = restringiPoolTrattamento(grezzo, vision);
+  }
+  const pool = filtraPoolMarca(grezzo);
   if (!pool.length) return null;
   const ranked = pool
     .map((p) => ({ p, score: scoreProdotto(p, { categoriaIntervento, vision }) }))
@@ -155,7 +204,10 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
 }
 
 export function catalogoCompattoPerPrompt(prodotti, limit = 80) {
-  return prodotti
+  const eligibili = prodotti.filter(
+    (p) => consenteTutteMarche(p) || String(p.marca || "").toUpperCase() === "BOTTOS",
+  );
+  return eligibili
     .slice(0, limit)
     .map(
       (p) =>

@@ -1,6 +1,7 @@
 import {
   arricchisciInterventoConProdotto,
   catalogoCompattoPerPrompt,
+  consenteTutteMarche,
   loadProdotti,
   mqPrato,
 } from "./prodottiCatalogo.mjs";
@@ -101,7 +102,8 @@ Regole:
 - Date da oggi in avanti, distribuite logicamente (non tutte lo stesso giorno).
 - annulla_ids solo se un lavoro pianificato è chiaramente inutile o dannoso dopo la foto (raro, max 2).
 - modifica per anticipare/posticipare trattamenti in base a gravità visiva.
-- Per trattamento/concime/diserbo/biostimolante preferisci prodotto_suggerito_id dal catalogo Bottos.`;
+- Prodotto: preferisci marca BOTTOS per concimi, biostimolanti, sementi, bagnanti.
+- Per fungicidi, diserbanti e insetticidi puoi usare qualsiasi marca del catalogo (id in elenco).`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -200,7 +202,10 @@ export async function integraFotoNelPiano({
     };
 
     if (raw.prodotto_suggerito_id) {
-      const p = prodotti.find((x) => x.id === Number(raw.prodotto_suggerito_id));
+      let p = prodotti.find((x) => x.id === Number(raw.prodotto_suggerito_id));
+      if (p && !consenteTutteMarche(p) && String(p.marca || "").toUpperCase() !== "BOTTOS") {
+        p = null;
+      }
       if (p) item = arricchisciInterventoConProdotto(item, profilo, [p], vision);
       else item = arricchisciInterventoConProdotto(item, profilo, prodotti, vision);
     } else {
