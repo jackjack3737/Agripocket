@@ -1,0 +1,48 @@
+# URL curate — siti senza sitemap affidabile (BYGL, MSU, UGA, Iowa news)
+# Uso: python turf_knowledge_crawler.py -f urls_usa_finish.txt --skip-crawled
+
+# Michigan State (sezione /turf/ — vecchi path 404)
+https://www.canr.msu.edu/turf/
+https://www.canr.msu.edu/turf/diseases
+https://www.canr.msu.edu/turf/weeds
+https://www.canr.msu.edu/turf/insects
+https://www.canr.msu.edu/turf/resources
+https://www.canr.msu.edu/home_gardening/lawns/index
+https://www.canr.msu.edu/resources/smart_lawn_care_to_protect_pollinators
+
+# Ohio State BYGL
+https://bygl.osu.edu/node/855
+https://bygl.osu.edu/index.php/node/1685
+
+# UGA publications
+https://extension.uga.edu/publications/detail.html?number=C1087-4
+https://extension.uga.edu/publications/detail.html?number=B1233
+
+# Iowa State (main + hortnews)
+https://www.extension.iastate.edu/news/brown-patch-turfgrass
+https://www.extension.iastate.edu/news/pythium-blight-turfgrass
+https://www.extension.iastate.edu/news/gray-leaf-spot-turfgrass
+https://www.extension.iastate.edu/news/red-thread-turfgrass
+https://www.extension.iastate.edu/news/rust-turfgrass
+https://www.extension.iastate.edu/news/dollar-spot-turfgrass
+https://www.extension.iastate.edu/turfgrass/blog/summer-turf-diseases-home-lawns
+https://hortnews.extension.iastate.edu/2014/7-9/dollarspot
+https://hortnews.extension.iastate.edu/2013/6-19/brownpatch
+
+# Rutgers pubs (non in sitemap Drupal)
+https://njaes.rutgers.edu/pubs/fs1239/
+https://njaes.rutgers.edu/pubs/fs386/
+https://njaes.rutgers.edu/pubs/fs384/
+
+# Cornell turf blog
+https://blogs.cornell.edu/turf/2010/07/12/dollar-spot/
+https://blogs.cornell.edu/turf/2009/06/15/brown-patch/
+
+# Texas A&M (malattie / gestione — non in top sitemap sort)
+https://aggieturf.tamu.edu/turfgrass-weeds/diseases/
+https://aggieturf.tamu.edu/turfgrass-weeds/diseases/dollar-spot/
+https://aggieturf.tamu.edu/turfgrass-weeds/diseases/brown-patch/
+https://aggieturf.tamu.edu/turfgrass-management/
+https://aggieturf.tamu.edu/turfgrass-insects/
+https://aggieturf.tamu.edu/texas-turfgrasses/bermudagrass/
+https://aggieturf.tamu.edu/texas-turfgrasses/zoysiagrass/

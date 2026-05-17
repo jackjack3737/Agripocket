@@ -1,0 +1,5 @@
+-- Opzionale: colonna fonte e tipo per filtri RAG (Dashboard Supabase -> SQL)
+-- alter table tgif_knowledge_base add column if not exists fonte text;
+-- alter table tgif_knowledge_base add column if not exists tipo text;
+-- Il crawler attuale mette fonte/tipo nel prefisso del campo soluzione:
+--   [prodotto:https://...] testo...

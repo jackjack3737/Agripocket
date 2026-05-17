@@ -1,0 +1,10 @@
+# Per arricchire il DB in automatico:
+#   python enrich_db.py
+# oppure:
+#   python discover_urls.py
+#   python turf_knowledge_crawler.py -f urls_pending.txt --skip-crawled
+
+# Fonti NC State (alta qualità) — già indicizzate se in crawled_urls.txt
+# https://content.ces.ncsu.edu/brown-patch-in-turf
+# https://content.ces.ncsu.edu/dollar-spot-in-turf
+# ... vedi crawled_urls.txt

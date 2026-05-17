@@ -1,0 +1,11 @@
+https://content.ces.ncsu.edu/anthracnose-in-turf
+https://content.ces.ncsu.edu/powdery-mildew-in-turf
+https://content.ces.ncsu.edu/leaf-spot-in-turf
+https://content.ces.ncsu.edu/gray-snow-mold-in-turf
+https://content.ces.ncsu.edu/slime-mold-in-turf
+https://content.ces.ncsu.edu/spring-dead-spot-in-turf
+https://content.ces.ncsu.edu/pythium-root-rot-in-turf
+https://turf.purdue.edu//wp-content/themes/child_theme/app/flash/turfgrassSelectionTool/index.html
+https://turf.purdue.edu/turf-disease-prediction-tool/
+https://turf.purdue.edu/turfgrass-weeds/
+https://turf.purdue.edu/wp-content/plugins/pu-turf-calculators/public/css/turf-app.css?ver=1.0.0

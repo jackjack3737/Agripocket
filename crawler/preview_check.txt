@@ -1,0 +1,9 @@
+﻿python : usage: sitemap_ingest.py [-h] [--max-urls MAX_URLS] [--max-chunks MAX_CHUNKS]
+In C:\Users\jackj\AppData\Local\Temp\ps-script-df61d9b0-f86f-4bdb-b968-7ef10542f541.ps1:77 car:53
++ ... t\crawler"; python sitemap_ingest.py --preview --max-per-sitemap 400  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (usage: sitemap_...nks MAX_CHUNKS]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+                         [--preview] [--preview-limit PREVIEW_LIMIT]
+sitemap_ingest.py: error: unrecognized arguments: --max-per-sitemap 400

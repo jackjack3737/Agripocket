@@ -1,0 +1,6 @@
+# Re-ingest: in crawled_urls ma assenti dal DB
+https://bygl.osu.edu/node/855
+https://bygl.osu.edu/index.php/node/1685
+https://njaes.rutgers.edu/pubs/fs1239/
+https://njaes.rutgers.edu/pubs/fs386/
+https://extension.uga.edu/publications/detail.html?number=C1087-4

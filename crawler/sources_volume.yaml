@@ -1,0 +1,146 @@
+# Configurazione pipeline volume AgriPocket
+# Filtri URL: almeno un include_keyword nel path/url
+
+chunk_size: 500
+chunk_overlap: 150
+
+# Una keyword "forte" basta; le altre richiedono >=2 nel path (vedi sitemap_ingest.py)
+strong_keywords:
+  - turf
+  - lawn
+  - prato
+  - grass
+  - disease
+  - fungic
+  - pathol
+  - patch
+  - pythium
+  - anthracnose
+  - nematod
+  - fairway
+  - turfgrass
+  - in-turf
+
+include_keywords:
+  - turf
+  - lawn
+  - prato
+  - grass
+  - disease
+  - fungic
+  - pathol
+  - patch
+  - spot
+  - rust
+  - mildew
+  - pythium
+  - anthracnose
+  - biostimol
+  - bioattiv
+  - herbic
+  - insectic
+  - nematod
+  - ipm
+  - trichoderma
+  - bacillus
+  - prodotto
+  - product
+  - pest
+  - plant
+  - garden
+  - yard
+  - landscape
+  - ornamental
+  - green
+  - soil
+  - fertilizer
+  - concim
+
+exclude_path_fragments:
+  - /wp-content/
+  - /wp-json/
+  - /wp-admin/
+  - /feed/
+  - /tag/
+  - /author/
+  - /cart
+  - /checkout
+  - /account
+  - .css
+  - .js
+  - .jpg
+  - .png
+  - /slide/
+  - /search
+
+sitemaps:
+  - https://content.ces.ncsu.edu/sitemap.xml
+  - https://turf.purdue.edu/sitemap.xml
+  - https://extension.umd.edu/sitemap.xml
+  - https://www.extension.iastate.edu/sitemap.xml
+  - https://yardandgarden.extension.iastate.edu/sitemap.xml
+  - https://njaes.rutgers.edu/sitemap.xml
+  # Bottos: solo via product_ingest.py (filtri prodotto)
+  - https://extension.psu.edu/sitemap/sitemap.xml
+  - https://extension.oregonstate.edu/sitemap.xml
+  - https://extension.umn.edu/sitemap.xml
+  - https://hgic.clemson.edu/sitemap.xml
+  # BYGL: no sitemap -> urls_usa_finish.txt
+  - https://aggieturf.tamu.edu/sitemap.xml
+
+# Pagine prodotto / fungicidi (marchi commerciali)
+product_sites:
+  - name: bottos
+    sitemap: https://www.bottos1848.com/sitemap_index.xml
+    path_must_contain:
+      - /categorie/
+      - /prodotto
+      - /product
+      - fungic
+      - bioattiv
+      - prato
+      - turf
+    seed_urls:
+      - https://www.bottos1848.com/categorie/bioattivati/
+      # concimi-prato / semi-prato: URL rimosse (404 sul sito Bottos)
+
+  - name: best_prato
+    domain: bestprato.com
+    # Lista generata da: python discover_bestprato.py (solo fitofarmaci/concimi)
+    url_list_file: urls_bestprato.txt
+    path_exclude:
+      - /attrezzi
+      - /tagliaerba
+      - /robot-
+      - /abbigliamento
+      - -prezzi.html
+      - /wolf-garten
+    path_allow:
+      - /cura-e-protezione/
+      - /concimi-prato-erba/
+      - /sementi-prato
+    path_exclude_extra:
+      - /coltivare-orto/
+    seed_urls:
+      - https://www.bestprato.com/cura-e-protezione/antifungini-fungicidi-prato.html
+      - https://www.bestprato.com/cura-e-protezione.html
+      - https://www.bestprato.com/concimi-prato-erba.html
+      - https://www.bestprato.com/sementi-prato.html
+    skip_path:
+      - /questionario
+      - /professionisti-verde
+      - /ilmioprato
+      - /welcome-
+      - /blackfriday
+      - /premiumcard
+
+# Canali / playlist YouTube (ID canale o URL playlist)
+youtube:
+  video_urls: []
+  # ID video: anche in youtube_seeds.txt
+  seed_videos: []
+
+# PDF da extension (pattern nel path sitemap)
+pdf_url_patterns:
+  - ".pdf"
+  - "/pdf/"

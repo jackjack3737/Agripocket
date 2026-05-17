@@ -1,0 +1,47 @@
+# North Carolina State — pattern *-in-turf
+https://content.ces.ncsu.edu/anthracnose-in-turf
+https://content.ces.ncsu.edu/take-all-patch-in-turf
+https://content.ces.ncsu.edu/powdery-mildew-in-turf
+https://content.ces.ncsu.edu/leaf-spot-in-turf
+https://content.ces.ncsu.edu/melting-out-in-turf
+https://content.ces.ncsu.edu/gray-snow-mold-in-turf
+https://content.ces.ncsu.edu/pink-snow-mold-in-turf
+https://content.ces.ncsu.edu/snow-mold-in-turf
+https://content.ces.ncsu.edu/slime-mold-in-turf
+https://content.ces.ncsu.edu/spring-dead-spot-in-turf
+https://content.ces.ncsu.edu/necrotic-ring-spot-in-turf
+https://content.ces.ncsu.edu/leaf-and-sheath-spot-in-turf
+https://content.ces.ncsu.edu/pythium-root-rot-in-turf
+https://content.ces.ncsu.edu/rhizoctonia-brown-patch-in-turf
+https://content.ces.ncsu.edu/turfgrass-disease-identification
+https://content.ces.ncsu.edu/cultural-practices-to-prevent-turfgrass-diseases
+https://content.ces.ncsu.edu/fungicides-for-turfgrass-disease-control
+
+# Iowa State news / publications
+https://www.extension.iastate.edu/news/brown-patch-turfgrass
+https://www.extension.iastate.edu/news/pythium-blight-turfgrass
+https://www.extension.iastate.edu/news/gray-leaf-spot-turfgrass
+https://www.extension.iastate.edu/news/red-thread-turfgrass
+https://www.extension.iastate.edu/news/rust-turfgrass
+
+# UMD factsheets (alcune passano, altre 403)
+https://extension.umd.edu/resource/turfgrass-diseases-brown-patch-fs-2023-0664
+https://extension.umd.edu/resource/turfgrass-diseases-red-thread-fs-2023-0663
+https://extension.umd.edu/resource/turfgrass-diseases-rust-fs-2023-0662
+https://extension.umd.edu/resource/turfgrass-diseases-gray-leaf-spot-fs-2023-0661
+https://extension.umd.edu/resource/turfgrass-diseases-summer-patch-fs-2023-0660
+https://extension.umd.edu/resource/turfgrass-diseases-large-patch-fs-2023-0659
+
+# Michigan State
+https://www.canr.msu.edu/turfgrass_extension/home-lawn-diseases
+https://www.canr.msu.edu/news/dollar_spot_on_turf
+
+# Penn State extension
+https://extension.psu.edu/dollar-spot-on-turfgrass
+https://extension.psu.edu/brown-patch-on-turfgrass
+https://extension.psu.edu/red-thread-on-turfgrass
+https://extension.psu.edu/rust-on-turfgrass
+https://extension.psu.edu/pythium-blight-on-turfgrass
+https://extension.psu.edu/gray-leaf-spot-on-turfgrass
+https://extension.psu.edu/summer-patch-on-turfgrass
+https://extension.psu.edu/large-patch-on-turfgrass

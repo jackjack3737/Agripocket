@@ -1,0 +1,7 @@
+project_id = "azkpckrybldypqwdksjc"
+
+[api]
+enabled = true
+
+[functions.analizza-prato]
+verify_jwt = true

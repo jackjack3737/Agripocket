@@ -1,0 +1,248 @@
+.chat--photo {
+  max-width: 520px;
+  padding-bottom: 4rem;
+}
+
+.photo-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.photo-hero {
+  margin: 2rem 0 3rem;
+  text-align: center;
+}
+
+.photo-hero__lead {
+  margin: 0 auto 2rem;
+  max-width: 36ch;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.btn-photo-main {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.75rem 2.5rem;
+  border: 2px solid var(--text);
+  border-radius: 50%;
+  width: min(220px, 70vw);
+  height: min(220px, 70vw);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+  box-shadow: 0 8px 32px rgba(20, 20, 19, 0.08);
+}
+
+.btn-photo-main:hover {
+  transform: scale(1.03);
+  box-shadow: 0 12px 40px rgba(20, 20, 19, 0.12);
+}
+
+.btn-photo-main:active {
+  transform: scale(0.98);
+}
+
+.btn-photo-main:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.btn-photo-main__icon {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.photo-loading {
+  margin: 1.5rem 0;
+}
+
+.photo-loading__preview {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+}
+
+.photo-loading__box {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.photo-loading__title {
+  margin: 1rem 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.photo-loading__sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.photo-error {
+  margin-top: 1.5rem;
+}
+
+.photo-retry {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.photo-result__thumb {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border);
+}
+
+.photo-result__meta {
+  margin: 0 0 1.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.lawn-report {
+  margin: 0 0 2rem;
+}
+
+.lawn-report__section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.lawn-report__section:last-child {
+  border-bottom: none;
+}
+
+.lawn-report__section h3 {
+  margin: 0 0 0.65rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.lawn-report__section p {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.photo-new {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.weather-setup {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.weather-setup__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.weather-setup__form .field-block {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+
+.weather-setup__loading {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.weather-card {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.weather-card__main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.weather-card__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.weather-card__temp {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.weather-card__desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.weather-card__advice {
+  flex: 1 1 10rem;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid var(--accent);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.weather-card__advice strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.weather-card__history {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.photo-hero__warn {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: #b45309;
+  text-align: center;
+}
