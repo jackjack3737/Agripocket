@@ -7,10 +7,13 @@ import {
   PRIORITA_LABEL,
   formatDataIt,
   groupInterventi,
+  groupInterventiPerGiorno,
+  haCalendarioStagionale,
   loadInterventi,
   loadUltimaAnalisi,
   setInterventoCompletato,
 } from "../lib/dashboard";
+import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import { supabase } from "../lib/supabase";
 
@@ -72,9 +75,12 @@ export default function Dashboard({ profile, session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState(location.state?.fromAnalysis ? "Piano aggiornato dall'ultima analisi foto." : "");
+  const [generatingPiano, setGeneratingPiano] = useState(false);
 
   const userId = session?.user?.id;
   const groups = groupInterventi(interventi);
+  const giorni = groupInterventiPerGiorno(interventi, { maxGiorni: 60 });
+  const hasPiano = haCalendarioStagionale(interventi);
 
   async function refresh() {
     if (!userId) return;
@@ -109,6 +115,20 @@ export default function Dashboard({ profile, session }) {
       .catch(() => setWeather(null))
       .finally(() => setWeatherLoading(false));
   }, [profile?.localita]);
+
+  async function handleGeneraPiano() {
+    setGeneratingPiano(true);
+    setError("");
+    try {
+      const result = await generaPianoAnnuale();
+      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda.`);
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGeneratingPiano(false);
+    }
+  }
 
   async function toggleIntervento(id, completato) {
     try {
@@ -211,33 +231,83 @@ export default function Dashboard({ profile, session }) {
 
       <section className="dash-calendar">
         <div className="dash-calendar__head">
-          <h2>Calendario interventi</h2>
+          <h2>Calendario lavori</h2>
           <p className="dash-calendar__lead">
-            Priorità agli interventi suggeriti dall&apos;IA dopo l&apos;analisi del prato. Spunta quando li hai
-            eseguiti.
+            Piano giorno per giorno: concimi, diserbi, arieggiatura, taglio, biostimolanti, umettanti e trattamenti.
           </p>
+          <div className="dash-calendar__actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={generatingPiano || !profile?.localita}
+              onClick={handleGeneraPiano}
+            >
+              {generatingPiano
+                ? "Generazione calendario… (1-2 min)"
+                : hasPiano
+                  ? "Rigenera piano annuale"
+                  : "Genera piano annuale completo"}
+            </button>
+            {!profile?.localita ? (
+              <p className="dash-calendar__warn">Imposta la località nel profilo (mappa).</p>
+            ) : null}
+          </div>
         </div>
 
         {loading ? (
           <p className="dash-card__loading">Caricamento piano…</p>
         ) : (
           <>
-            <InterventoSection
-              title="Priorità alta — da fare subito"
-              hint="Problemi urgenti emersi dalla foto o dal meteo."
-              items={groups.alta}
-              onToggle={toggleIntervento}
-            />
-            <InterventoSection
-              title="Prossimi interventi"
-              items={groups.altri}
-              onToggle={toggleIntervento}
-            />
+            {groups.daFoto.length ? (
+              <InterventoSection
+                title="Urgenti dall'analisi foto"
+                hint="Dall'ultima foto."
+                items={groups.daFoto}
+                onToggle={toggleIntervento}
+              />
+            ) : null}
+
+            {giorni.length ? (
+              <div className="dash-day-timeline">
+                <h3 className="dash-calendar-section__title">Agenda giorno per giorno</h3>
+                <p className="dash-calendar-section__hint">Prossimi 60 giorni.</p>
+                {giorni.map(({ data, items }) => (
+                  <section key={data} className="dash-day">
+                    <h4 className="dash-day__date">
+                      <time dateTime={data}>{formatDataIt(data)}</time>
+                      <span className="dash-day__count">{items.length} lavori</span>
+                    </h4>
+                    <ul className="intervento-list">
+                      {items.map((item) => (
+                        <InterventoRow key={item.id} item={item} onToggle={toggleIntervento} />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            ) : null}
+
+            {!giorni.length && groups.altri.length ? (
+              <InterventoSection title="Prossimi interventi" items={groups.altri} onToggle={toggleIntervento} />
+            ) : null}
+
             <InterventoSection title="Completati" items={groups.completati} onToggle={toggleIntervento} />
+
             {!groups.pianificati.length && !groups.completati.length ? (
-              <Link className="btn btn-primary dash-calendar__cta" to="/chat">
-                Fai la prima analisi foto
-              </Link>
+              <div className="dash-calendar__empty-block">
+                <p>Nessun lavoro in calendario.</p>
+                <button
+                  type="button"
+                  className="btn btn-primary dash-calendar__cta"
+                  disabled={generatingPiano || !profile?.localita}
+                  onClick={handleGeneraPiano}
+                >
+                  Genera piano annuale
+                </button>
+                <Link className="btn btn-outline btn-sm" to="/chat">
+                  Oppure analisi foto
+                </Link>
+              </div>
             ) : null}
           </>
         )}

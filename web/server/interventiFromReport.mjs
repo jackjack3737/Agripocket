@@ -27,8 +27,26 @@ function normalizePriorita(p) {
 
 function normalizeCategoria(c) {
   const v = String(c || "altro").toLowerCase();
-  const ok = ["taglio", "irrigazione", "concime", "trattamento", "pulizia", "altro"];
-  return ok.includes(v) ? v : "altro";
+  const ok = [
+    "taglio",
+    "irrigazione",
+    "concime",
+    "trattamento",
+    "pulizia",
+    "diserbo",
+    "arieggiatura",
+    "biostimolante",
+    "umettante",
+    "rinnovo",
+    "altro",
+  ];
+  if (ok.includes(v)) return v;
+  if (/diserb|erbic/.test(v)) return "diserbo";
+  if (/scarific|ariegg|aeraz/.test(v)) return "arieggiatura";
+  if (/biostim/.test(v)) return "biostimolante";
+  if (/umett|surfact/.test(v)) return "umettante";
+  if (/seme|overseed|rinnov/.test(v)) return "rinnovo";
+  return "altro";
 }
 
 /**
@@ -53,7 +71,7 @@ Rispondi SOLO JSON valido:
       "titolo": "breve (max 60 caratteri)",
       "descrizione": "cosa fare e perché (1-2 frasi)",
       "priorita": "alta|media|bassa",
-      "categoria": "taglio|irrigazione|concime|trattamento|pulizia|altro",
+      "categoria": "taglio|irrigazione|concime|trattamento|pulizia|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
       "quando": "oggi|domani|settimana_1|settimana_2|settimana_3|mese_1|mese_2",
       "data_suggerita": "YYYY-MM-DD o null"
     }

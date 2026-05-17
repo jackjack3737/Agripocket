@@ -62,6 +62,11 @@ export const CATEGORIA_LABEL = {
   concime: "Concime",
   trattamento: "Trattamento",
   pulizia: "Pulizia",
+  diserbo: "Diserbo",
+  arieggiatura: "Arieggiatura",
+  biostimolante: "Biostimolante",
+  umettante: "Umettante",
+  rinnovo: "Rinnovo / seme",
   altro: "Altro",
 };
 
@@ -83,5 +88,30 @@ export function groupInterventi(list) {
   const completati = list.filter((i) => i.stato === "completato");
   const alta = pianificati.filter((i) => i.priorita === "alta");
   const altri = pianificati.filter((i) => i.priorita !== "alta");
-  return { alta, altri, completati, pianificati };
+  const daFoto = pianificati.filter((i) => i.fonte === "ia_foto");
+  const daCalendario = pianificati.filter((i) => i.fonte === "calendario_stagionale");
+  return { alta, altri, completati, pianificati, daFoto, daCalendario };
+}
+
+/** Raggruppa interventi pianificati per data_prevista (giorno per giorno). */
+export function groupInterventiPerGiorno(list, { maxGiorni = 90 } = {}) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  const pianificati = list
+    .filter((i) => i.stato === "pianificato" && i.data_prevista)
+    .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
+
+  const byDay = new Map();
+  for (const item of pianificati) {
+    if (item.data_prevista < oggi) continue;
+    if (!byDay.has(item.data_prevista)) byDay.set(item.data_prevista, []);
+    byDay.get(item.data_prevista).push(item);
+  }
+
+  return [...byDay.entries()]
+    .slice(0, maxGiorni)
+    .map(([data, items]) => ({ data, items }));
+}
+
+export function haCalendarioStagionale(list) {
+  return list.some((i) => i.fonte === "calendario_stagionale");
 }
