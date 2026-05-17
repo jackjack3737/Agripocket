@@ -3,6 +3,7 @@ import {
   loadProdotti,
 } from "./prodottiCatalogo.mjs";
 import { integraFotoNelPiano } from "./aggiornaPianoDaFoto.mjs";
+import { aggiornaAnalisiFoto, uploadAnalisiFoto } from "./uploadAnalisiFoto.mjs";
 
 const PRIORITY_ORDER = { alta: 0, media: 1, bassa: 2 };
 
@@ -129,7 +130,9 @@ Rispondi SOLO JSON valido:
 Regole:
 - 4-8 interventi urgenti (prossime 2-6 settimane), ordinati per urgenza.
 - Includi trattamenti/diserbi/concimi se evidenti dalla foto.
-- Titoli concreti (es. "Trattamento fungicida preventivo", "Diserbo selettivo trifoglio").`;
+- Titoli concreti (es. "Trattamento fungicida preventivo", "Diserbo selettivo trifoglio").
+- Se parassiti_sottoprato indica popillia o larve sotto il prato: intervento trattamento con riferimento a insetticida Fly (Bottos) per larve di coleotteri.
+- Concimi/biostimolanti: solo prodotti BOTTOS; fungicidi/diserbanti/insetticidi: qualsiasi marca catalogo.`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -166,7 +169,7 @@ Regole:
 export async function persistAnalisiAndInterventi(
   admin,
   userId,
-  { report, vision, chunksUsed, interventi, profilo },
+  { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType },
   { geminiGenerate, geminiKey } = {},
 ) {
   const { data: analisi, error: analisiErr } = await admin
@@ -185,6 +188,13 @@ export async function persistAnalisiAndInterventi(
       return { analisiId: null, interventi: [], tablesMissing: true, pianoAggiornato: null };
     }
     throw new Error(`Salvataggio analisi: ${analisiErr.message}`);
+  }
+
+  if (imageBase64 && analisi?.id) {
+    const foto = await uploadAnalisiFoto(admin, userId, analisi.id, imageBase64, mimeType);
+    if (foto.foto_url) {
+      await aggiornaAnalisiFoto(admin, analisi.id, foto);
+    }
   }
 
   await admin

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { profileSummary } from "../data/onboardingSteps";
 import { analizzaPratoFoto } from "../lib/analizzaPrato";
+import { setInterventoCompletato } from "../lib/dashboard";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
 import { supabase, updatePratoLocalita } from "../lib/supabase";
 import { fetchMeteoForCity } from "../lib/weatherClient";
@@ -31,6 +32,8 @@ function ReportBody({ markdown }) {
 
 export default function Chat({ profile, session, onProfileUpdate }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const controlloId = searchParams.get("controllo");
   const userId = session?.user?.id;
   const summary = profileSummary(profile);
   const inputRef = useRef(null);
@@ -103,6 +106,13 @@ export default function Chat({ profile, session, onProfileUpdate }) {
       setPreview(previewUrl);
       const result = await analizzaPratoFoto({ base64, mimeType, userId });
       if (result.profile) onProfileUpdate?.(result.profile);
+      if (controlloId) {
+        try {
+          await setInterventoCompletato(controlloId, true);
+        } catch {
+          /* ignore */
+        }
+      }
       setReport(result.report);
       setMeta({
         chunksUsed: result.chunksUsed,
@@ -174,6 +184,12 @@ export default function Chat({ profile, session, onProfileUpdate }) {
         className="photo-input-hidden"
         onChange={onPhotoSelected}
       />
+
+      {controlloId ? (
+        <p className="chat-controllo-banner">
+          Controllo mensile: dopo l&apos;analisi segneremo il lavoro come completato in calendario.
+        </p>
+      ) : null}
 
       {!report && !loading && (
         <section className="photo-hero">

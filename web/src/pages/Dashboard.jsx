@@ -15,6 +15,7 @@ import {
   prossimiInterventi,
   loadInterventi,
   loadUltimaAnalisi,
+  syncControlliMensili,
   setInterventoCompletato,
   setInterventoManualOverride,
   sortInterventiCronologico,
@@ -72,9 +73,10 @@ function InterventoRow({ item, onToggle, onPin }) {
   const done = item.stato === "completato";
   const fito = isInterventoFitofarmaco(item);
   const mostraDose = !fito && item.dose_totale != null && item.dose_unita;
+  const controlloMensile = item.fonte === "controllo_mensile";
   return (
     <li
-      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}`}
+      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}${controlloMensile ? " intervento-row--controllo" : ""}`}
     >
       <label className="intervento-row__check">
         <input
@@ -107,6 +109,7 @@ function InterventoRow({ item, onToggle, onPin }) {
           <p className="intervento-row__prodotto">
             <span className="intervento-row__prodotto-nome">
               {fito ? "Riferimento catalogo: " : ""}
+              {item.titolo?.startsWith("Catalogo —") ? "" : "Principale: "}
               {item.prodotto_nome}
             </span>
             {mostraDose ? (
@@ -116,7 +119,25 @@ function InterventoRow({ item, onToggle, onPin }) {
             ) : null}
           </p>
         ) : null}
-        {item.descrizione ? <p className="intervento-row__desc">{item.descrizione}</p> : null}
+        {item.descrizione ? (
+          <p className="intervento-row__desc">
+            {item.descrizione.includes("Alternative catalogo")
+              ? item.descrizione.split(/(?=Alternative catalogo)/).map((chunk, i) => (
+                  <span key={i} className={i > 0 ? "intervento-row__alt" : undefined}>
+                    {chunk}
+                  </span>
+                ))
+              : item.descrizione}
+          </p>
+        ) : null}
+        {controlloMensile && !done ? (
+          <Link
+            className="btn btn-primary btn-sm intervento-row__foto-cta"
+            to={`/chat?controllo=${item.id}`}
+          >
+            Carica foto controllo mensile
+          </Link>
+        ) : null}
         {onPin && item.fonte === "calendario_stagionale" ? (
           <button
             type="button"
@@ -249,6 +270,7 @@ export default function Dashboard({ profile, session }) {
     setLoading(true);
     setError("");
     try {
+      await syncControlliMensili(userId).catch(() => 0);
       const [list, analisi] = await Promise.all([
         loadInterventi(userId),
         loadUltimaAnalisi(userId).catch(() => null),
@@ -291,7 +313,11 @@ export default function Dashboard({ profile, session }) {
     setError("");
     try {
       const result = await generaPianoAnnuale();
-      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda.`);
+      const extra =
+        result.catalogoAggiunti > 0
+          ? ` (+${result.catalogoAggiunti} voci da catalogo prodotti, priorità media/bassa).`
+          : "";
+      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda.${extra}`);
       await refresh();
     } catch (e) {
       const msg =
@@ -413,6 +439,7 @@ export default function Dashboard({ profile, session }) {
             <PratoRadar
               stats={pratoRadar.stats}
               media={pratoRadar.media}
+              insights={pratoRadar.insights}
               statoLabel={labelStatoPrato(pratoRadar.media)}
               compact
             />

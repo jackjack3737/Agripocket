@@ -145,7 +145,10 @@ Rispondi SOLO JSON valido (italiano), forma:
   "stress_idrici": { "segni": true|false, "note": "" },
   "malattie_sospette": [],
   "erbette_infestanti": [],
-  "query_ricerca_kb": "80-200 caratteri con specie latine e problemi visibili"
+  "parassiti_sottoprato": [
+    { "tipo": "popillia|otiorrinco|altro", "segni": "zone marroni, prato che si stacca, larve visibili o sospette", "gravita": "bassa|media|alta", "note": "" }
+  ],
+  "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili"
 }
 Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce con confidenza bassa e motivo.`;
 
@@ -207,7 +210,8 @@ Knowledge base:
 ${kbContext || "(nessun chunk)"}
 
 Report Markdown in italiano con ## :
-Cosa vedo nella foto, Specie e miscuglio (da visione), Meteo e temperature recenti, Diagnosi e problemi, Taglio e altezza, Feltro/thatch, Foglie e detriti, Irrigazione e stress, Malattie, Piano d'azione, Cosa evitare, Nota agronomica.
+Cosa vedo nella foto, Specie e miscuglio (da visione), Meteo e temperature recenti, Diagnosi e problemi, Parassiti e larve (sotto il tappeto: popillia/maggiolino, otiorrinco, altri), Taglio e altezza, Feltro/thatch, Foglie e detriti, Irrigazione e stress, Malattie, Piano d'azione, Cosa evitare, Nota agronomica.
+Per popillia/larve sotto prato: citare trattamento con insetticida Fly (Bottos) o equivalente da catalogo, senza dose automatica.
 Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se utile. Collega diagnosi + meteo.`;
 
   const report = await geminiGenerate(geminiKey, [{ text: reportPrompt }], {
@@ -231,6 +235,8 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
         chunksUsed: (chunks ?? []).length,
         interventi,
         profilo,
+        imageBase64: img,
+        mimeType,
       },
       { geminiGenerate, geminiKey },
     );

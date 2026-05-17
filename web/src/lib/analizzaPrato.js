@@ -1,5 +1,6 @@
 import { supabase, loadPratoProfilo } from "./supabase";
 import { pollJobUntilDone } from "./pollJob";
+import { uploadFotoAnalisiClient } from "./fotoPrato";
 
 async function callAnalizzaApi(base64, mimeType, token) {
   const res = await fetch("/api/analizza-prato", {
@@ -31,6 +32,14 @@ export async function analizzaPratoFoto({ base64, mimeType = "image/jpeg", userI
   if (!session?.access_token) throw new Error("Accedi per analizzare il prato");
 
   const data = await callAnalizzaApi(base64, mimeType, session.access_token);
+
+  if (data.analisiId && userId) {
+    try {
+      await uploadFotoAnalisiClient(userId, data.analisiId, base64, mimeType);
+    } catch {
+      /* bucket opzionale */
+    }
+  }
 
   let profile = null;
   if (userId) {

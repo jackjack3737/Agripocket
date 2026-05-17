@@ -103,7 +103,8 @@ Regole:
 - annulla_ids solo se un lavoro pianificato è chiaramente inutile o dannoso dopo la foto (raro, max 2).
 - modifica per anticipare/posticipare trattamenti in base a gravità visiva.
 - Prodotto: preferisci marca BOTTOS per concimi, biostimolanti, sementi, bagnanti.
-- Per fungicidi, diserbanti e insetticidi puoi usare qualsiasi marca del catalogo (id in elenco).`;
+- Per fungicidi, diserbanti e insetticidi puoi usare qualsiasi marca del catalogo (id in elenco).
+- Larve sotto prato / popillia: categoria trattamento, riferimento insetticida Fly (Bottos) se in catalogo.`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,

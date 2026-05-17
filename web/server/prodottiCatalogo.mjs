@@ -1,6 +1,10 @@
 /** Catalogo Prodotti (Supabase) + dosi su m² (solo concimi/biostimolanti Bottos, non fitofarmaci). */
 
 import {
+  analizzaParassiti,
+  filtraInsetticidaPerParassita,
+} from "./parassitiPrato.mjs";
+import {
   AVVISO_FITOFARMACO,
   AVVISO_MQ_MANCANTI,
   isInterventoFitofarmaco,
@@ -33,12 +37,12 @@ export function consenteTutteMarche(prodotto) {
   return CATEGORIE_TUTTE_MARCHE.has(String(prodotto?.categoria || "").toUpperCase());
 }
 
+/** Concimi, biostimolanti, umettanti, sementi: solo BOTTOS. Fungicidi/diserbanti/insetticidi: tutte le marche. */
 export function filtraPoolMarca(pool) {
-  const ammessi = pool.filter(
-    (p) => consenteTutteMarche(p) || String(p.marca || "").toUpperCase() === "BOTTOS",
-  );
-  if (ammessi.length) return ammessi;
-  return pool.filter((p) => String(p.marca || "").toUpperCase() === "BOTTOS");
+  return pool.filter((p) => {
+    if (consenteTutteMarche(p)) return true;
+    return String(p.marca || "").toUpperCase() === "BOTTOS";
+  });
 }
 
 const MESI_IT = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
@@ -47,7 +51,19 @@ function meseCorrenteCode() {
   return MESI_IT[new Date().getMonth()];
 }
 
-function periodoCompatibile(periodoUso, meseCode = meseCorrenteCode()) {
+function meseDaData(isoDate) {
+  if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return meseCorrenteCode();
+  return MESI_IT[new Date(`${isoDate}T12:00:00`).getMonth()];
+}
+
+export function isPreEmergenzaAnnualiIntervento(intervento) {
+  const t = `${intervento?.titolo || ""} ${intervento?.descrizione || ""}`.toLowerCase();
+  const annuali = /setaria|digitaria|panico|annualit|sorghetta|crabgrass/i.test(t);
+  const pre = /pre.?emerg|antigermin|pre emergenza|preemergenza/i.test(t);
+  return pre || (annuali && intervento?.categoria === "diserbo" && !/post.?emerg|selettivo foglia|trifoglio|tarassaco/i.test(t));
+}
+
+export function periodoCompatibile(periodoUso, meseCode = meseCorrenteCode()) {
   if (!periodoUso) return true;
   const p = String(periodoUso).toUpperCase();
   if (/TUTTO|ANNO|SEMPRE/.test(p)) return true;
@@ -111,33 +127,52 @@ export function calcolaDose(prodotto, superficieMq) {
   };
 }
 
-function contestoVision(vision) {
+function contestoVision(vision, intervento) {
   const problemi = (vision?.problemi_rilevati || [])
     .map((x) => `${x.problema} ${x.dettaglio}`)
     .join(" ")
     .toLowerCase();
   const mal = (vision?.malattie_sospette || []).join(" ").toLowerCase();
   const erbe = (vision?.erbette_infestanti || []).join(" ").toLowerCase();
-  return `${problemi} ${mal} ${erbe}`;
+  const par = (vision?.parassiti_sottoprato || [])
+    .map((x) => (typeof x === "string" ? x : `${x.tipo} ${x.segni} ${x.note}`))
+    .join(" ")
+    .toLowerCase();
+  const intTxt = `${intervento?.titolo || ""} ${intervento?.descrizione || ""}`.toLowerCase();
+  return `${problemi} ${mal} ${erbe} ${par} ${intTxt}`;
 }
 
-function scoreProdotto(p, { categoriaIntervento, vision }) {
+export function scoreProdotto(p, { categoriaIntervento, vision, intervento, profilo }) {
   let score = 0;
   const isBottos = String(p.marca || "").toUpperCase() === "BOTTOS";
+  const fito = consenteTutteMarche(p);
   if (isBottos) score += 8;
-  else if (!consenteTutteMarche(p)) score -= 20;
-  if (periodoCompatibile(p.periodo_uso)) score += 5;
+  else if (!fito) score -= 50;
+
+  const meseCode = meseDaData(intervento?.data_prevista);
+  if (periodoCompatibile(p.periodo_uso, meseCode)) score += 5;
 
   const blob = `${p.nome} ${p.descrizione} ${p.composizione} ${(p.tag_meteo || []).join(" ")}`.toLowerCase();
-  const ctx = contestoVision(vision);
+  const ctx = contestoVision(vision, intervento);
+  const intTxt = `${intervento?.titolo || ""} ${intervento?.descrizione || ""}`.toLowerCase();
+  const parassiti = analizzaParassiti({ vision, intervento, localita: profilo?.localita });
 
-  if (categoriaIntervento === "diserbo" && /erbette|trifoglio|tarassaco|dicot|foglia larga/.test(ctx + blob))
+  if (categoriaIntervento === "diserbo" && isPreEmergenzaAnnualiIntervento(intervento)) {
+    if (String(p.categoria || "").toUpperCase() === "DISERBANTE PRE-EMERGENZA") score += 18;
+    if (/setaria|digitaria|panico|annualit|pre.?emerg|antigermin/.test(blob)) score += 10;
+    if (/post.?emerg|selettivo|foglia larga|dicot/.test(blob)) score -= 8;
+  } else if (categoriaIntervento === "diserbo" && /erbette|trifoglio|tarassaco|dicot|foglia larga/.test(ctx + intTxt + blob))
     score += 6;
   if (categoriaIntervento === "trattamento") {
     if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx)) {
       if (/fungh|oidio|patogen|trichoderma|bacillus/.test(blob)) score += 10;
     }
-    if (/insett|afid|larv/.test(ctx) && /insett|afid/.test(blob)) score += 8;
+    if (/insett|afid|larv|popillia|maggiolino|otiorrinco|bruco/.test(ctx + intTxt)) {
+      if (/insett|afid|larv/.test(blob)) score += 8;
+      if (parassiti.popillia && /\bfly\b|popillia|maggiolino|coleotter/.test(blob)) score += 22;
+      if (parassiti.larveSottoprato && /\bfly\b|larv|nematocid/.test(blob)) score += 12;
+      if (parassiti.rilevati.some((r) => r.id === "otiorrinco") && /otiorrinco|talpa/.test(blob)) score += 15;
+    }
   }
   if (categoriaIntervento === "concime" && /giall|cloros|nutriz|concim|azoto/.test(ctx + blob)) score += 5;
   if (categoriaIntervento === "biostimolante" && /stress|debole|ripresa/.test(ctx + blob)) score += 4;
@@ -151,40 +186,124 @@ export function filtraProdottiPerIntervento(prodotti, categoriaIntervento) {
   return prodotti.filter((p) => cats.includes(String(p.categoria || "").toUpperCase()));
 }
 
-function restringiPoolTrattamento(pool, vision) {
-  const ctx = contestoVision(vision);
-  if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx)) {
+function restringiPoolDiserbo(pool, intervento) {
+  if (!isPreEmergenzaAnnualiIntervento(intervento)) return pool;
+  const pre = pool.filter((p) => String(p.categoria || "").toUpperCase() === "DISERBANTE PRE-EMERGENZA");
+  if (pre.length) return pre;
+  const match = pool.filter((p) =>
+    /setaria|digitaria|panico|pre.?emerg|antigermin|annualit/i.test(
+      `${p.nome} ${p.descrizione} ${p.composizione}`,
+    ),
+  );
+  return match.length ? match : pool;
+}
+
+function restringiPoolTrattamento(pool, vision, intervento, profilo) {
+  const ctx = contestoVision(vision, intervento);
+  const parassiti = analizzaParassiti({ vision, intervento, localita: profilo?.localita });
+
+  if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx) && !parassiti.larveSottoprato) {
     const fung = pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase()));
     if (fung.length) return fung;
   }
-  if (/insett|afid|larv|trip|coleotter/.test(ctx)) {
-    const ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
+
+  if (/insett|afid|larv|trip|coleotter|popillia|maggiolino|otiorrinco|bruco|sottoprato/.test(ctx)) {
+    let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
+    ins = filtraInsetticidaPerParassita(ins, parassiti);
     if (ins.length) return ins;
   }
-  const bottos = pool.filter((p) => String(p.marca || "").toUpperCase() === "BOTTOS");
-  return bottos.length ? bottos : pool;
+
+  if (parassiti.larveSottoprato) {
+    let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
+    ins = filtraInsetticidaPerParassita(ins, parassiti);
+    if (ins.length) return ins;
+  }
+
+  return pool.filter((p) => consenteTutteMarche(p));
 }
 
-export function scegliProdotto(prodotti, { categoriaIntervento, vision }) {
-  let grezzo = filtraProdottiPerIntervento(prodotti, categoriaIntervento);
-  if (categoriaIntervento === "trattamento") {
-    grezzo = restringiPoolTrattamento(grezzo, vision);
+export function rankProdotti(prodotti, opts) {
+  let grezzo = filtraProdottiPerIntervento(prodotti, opts.categoriaIntervento);
+  if (opts.categoriaIntervento === "trattamento") {
+    grezzo = restringiPoolTrattamento(grezzo, opts.vision, opts.intervento, opts.profilo);
+  }
+  if (opts.categoriaIntervento === "diserbo") {
+    grezzo = restringiPoolDiserbo(grezzo, opts.intervento);
   }
   const pool = filtraPoolMarca(grezzo);
-  if (!pool.length) return null;
-  const ranked = pool
-    .map((p) => ({ p, score: scoreProdotto(p, { categoriaIntervento, vision }) }))
-    .sort((a, b) => b.score - a.score);
-  return ranked[0]?.p ?? pool[0];
+  return pool
+    .map((p) => ({ p, score: scoreProdotto(p, opts) }))
+    .sort((a, b) => b.score - a.score || String(a.p.nome).localeCompare(String(b.p.nome)));
+}
+
+/** Tutti i prodotti con punteggio vicino al migliore (non solo il primo). */
+export function scegliProdottiSimili(prodotti, opts, { max = 8, sogliaPunti = 5 } = {}) {
+  const ranked = rankProdotti(prodotti, opts);
+  if (!ranked.length) return [];
+  const top = ranked[0].score;
+  return ranked
+    .filter((r) => top - r.score <= sogliaPunti)
+    .slice(0, max)
+    .map((r) => r.p);
+}
+
+function motiviPunteggio(p, opts, score) {
+  const motivi = [];
+  const isBottos = String(p.marca || "").toUpperCase() === "BOTTOS";
+  if (isBottos) motivi.push("marca Bottos (+8)");
+  else if (consenteTutteMarche(p)) motivi.push("categoria ammessa tutte le marche");
+  const meseCode = meseDaData(opts.intervento?.data_prevista);
+  if (periodoCompatibile(p.periodo_uso, meseCode)) motivi.push(`periodo d'uso ok per ${meseCode}`);
+  const intTxt = `${opts.intervento?.titolo || ""} ${opts.intervento?.descrizione || ""}`.toLowerCase();
+  if (opts.categoriaIntervento === "concime" && /liquido|liquid|nutri|npk/.test(intTxt + String(p.nome).toLowerCase())) {
+    motivi.push("coerente con concimazione liquida");
+  }
+  const par = analizzaParassiti({ vision: opts.vision, intervento: opts.intervento, localita: opts.profilo?.localita });
+  if (par.popillia && /\bfly\b/i.test(String(p.nome))) {
+    motivi.push("idoneo per larve popillia (Fly)");
+  }
+  if (!motivi.length) motivi.push(`punteggio totale ${score}`);
+  return motivi;
+}
+
+function formattaOpzioniCatalogo(prodotti, profilo, fito) {
+  const mq = superficieMqVerificata(profilo);
+  const righe = prodotti.map((p, i) => {
+    let extra = "";
+    if (!fito && !isProdottoFitofarmaco(p) && mq) {
+      const dose = calcolaDose(p, mq);
+      if (dose) extra = ` — ${dose.dose_display} su ${mq} m²`;
+    }
+    return `${i + 1}) ${p.nome} (${p.categoria}, ${p.marca || "?"})${extra}`;
+  });
+  return `Alternative catalogo (${prodotti.length}): ${righe.join("; ")}.`;
+}
+
+export function scegliProdotto(prodotti, opts) {
+  return scegliProdottiSimili(prodotti, opts, { max: 1 })[0] ?? null;
 }
 
 export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, vision) {
   const mq = superficieMqVerificata(profilo);
   const fito = isInterventoFitofarmaco(intervento.categoria);
-  const prodotto = scegliProdotto(prodotti, {
-    categoriaIntervento: intervento.categoria,
-    vision,
-  });
+  const opts = { categoriaIntervento: intervento.categoria, vision, intervento, profilo };
+  const simili = scegliProdottiSimili(prodotti, opts);
+  const prodotto = simili[0] ?? null;
+  const ranked = rankProdotti(prodotti, opts);
+  const topScore = ranked[0]?.score ?? 0;
+
+  const blocchi = [];
+  if (prodotto && simili.length > 1) {
+    const perché = motiviPunteggio(prodotto, opts, topScore).join(", ");
+    blocchi.push(
+      `Principale (punteggio ${topScore}): ${prodotto.nome} — ${perché}. Non è l'unico prodotto valido.`,
+    );
+    blocchi.push(formattaOpzioniCatalogo(simili, profilo, fito));
+  } else if (prodotto && simili.length === 1) {
+    blocchi.push(
+      `Prodotto catalogo: ${prodotto.nome} (${motiviPunteggio(prodotto, opts, topScore).join(", ")}).`,
+    );
+  }
 
   if (fito) {
     const hint = prodotto
@@ -199,7 +318,7 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
       dose_per_mq: null,
       dose_display: null,
       avviso_fitofarmaco: true,
-      descrizione: [intervento.descrizione, hint, AVVISO_FITOFARMACO].filter(Boolean).join(" ").slice(0, 900),
+      descrizione: [intervento.descrizione, hint, ...blocchi, AVVISO_FITOFARMACO].filter(Boolean).join(" ").slice(0, 1200),
     };
   }
 
@@ -216,11 +335,11 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
       ...intervento,
       prodotto_id: prodotto.id,
       prodotto_nome: prodotto.nome,
-      descrizione: [intervento.descrizione, AVVISO_MQ_MANCANTI].filter(Boolean).join(" ").slice(0, 900),
+      descrizione: [intervento.descrizione, ...blocchi, AVVISO_MQ_MANCANTI].filter(Boolean).join(" ").slice(0, 1200),
     };
   }
 
-  const extra = `Prodotto: ${prodotto.nome} (${prodotto.marca || "BOTTOS"}). ${dose.testo}.`;
+  const extra = `Dose principale (${prodotto.nome}): ${dose.testo}.`;
   return {
     ...intervento,
     prodotto_id: prodotto.id,
@@ -230,14 +349,12 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
     dose_per_mq: dose.dose_per_mq,
     dose_display: dose.dose_display,
     avviso_fitofarmaco: false,
-    descrizione: [intervento.descrizione, extra].filter(Boolean).join(" ").slice(0, 900),
+    descrizione: [intervento.descrizione, extra, ...blocchi].filter(Boolean).join(" ").slice(0, 1200),
   };
 }
 
 export function catalogoCompattoPerPrompt(prodotti, limit = 80) {
-  const eligibili = prodotti.filter(
-    (p) => consenteTutteMarche(p) || String(p.marca || "").toUpperCase() === "BOTTOS",
-  );
+  const eligibili = filtraPoolMarca(prodotti);
   return eligibili
     .slice(0, limit)
     .map(

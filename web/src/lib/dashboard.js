@@ -46,14 +46,72 @@ export async function loadInterventi(userId) {
 export async function loadUltimaAnalisi(userId) {
   const { data, error } = await supabase
     .from("prato_analisi")
-    .select("id, created_at, chunks_used, vision_json")
+    .select("id, created_at, chunks_used, vision_json, foto_url")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error(formatDbError(error));
+  if (error) {
+    if (error.message?.includes("foto_url")) {
+      const fallback = await supabase
+        .from("prato_analisi")
+        .select("id, created_at, chunks_used, vision_json")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fallback.error) throw new Error(formatDbError(fallback.error));
+      return fallback.data;
+    }
+    throw new Error(formatDbError(error));
+  }
   return data;
+}
+
+function addMonthsYyyyMm(yyyyMm, delta) {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Inserisce controlli mensili foto mancanti (12 mesi avanti). */
+export async function syncControlliMensili(userId) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  const list = await loadInterventi(userId);
+  const mesiPresenti = new Set(
+    list.filter((i) => i.fonte === "controllo_mensile").map((i) => (i.data_prevista || "").slice(0, 7)),
+  );
+
+  const rows = [];
+  let monthKey = oggi.slice(0, 7);
+  for (let i = 0; i < 12; i++) {
+    if (i > 0) monthKey = addMonthsYyyyMm(monthKey, 1);
+    if (mesiPresenti.has(monthKey)) continue;
+    const data = `${monthKey}-12`;
+    if (data < oggi) continue;
+    rows.push({
+      user_id: userId,
+      titolo: "Controllo mensile — foto del prato",
+      descrizione:
+        "Carica una foto aggiornata del prato (analisi visiva + aggiornamento esagono). Tocca «Carica foto».",
+      priorita: "media",
+      categoria: "altro",
+      stato: "pianificato",
+      data_prevista: data,
+      ordine: 50,
+      fonte: "controllo_mensile",
+    });
+  }
+
+  if (!rows.length) return 0;
+
+  const { error } = await supabase.from("prato_interventi").insert(rows);
+  if (error) {
+    if (error.message?.includes("fonte")) return 0;
+    throw new Error(formatDbError(error));
+  }
+  return rows.length;
 }
 
 export async function setInterventoManualOverride(id, manualOverride) {

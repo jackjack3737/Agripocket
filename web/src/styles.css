@@ -162,6 +162,80 @@ h1 {
 
 .home-actions {
   margin-top: 3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.page.home {
+  position: relative;
+  min-height: 70vh;
+}
+
+.home--has-photo {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: #f5f5f5;
+}
+
+.home--has-photo .hero .eyebrow,
+.home--has-photo .lead,
+.home--has-photo .home-photo-hint {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.home--has-photo h1 {
+  color: #fff;
+}
+
+.home-hero {
+  position: relative;
+  z-index: 1;
+}
+
+.home-photo-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.35rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  font-size: 0.72rem;
+  color: #1b5e20;
+  max-width: 200px;
+}
+
+.home-photo-badge img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.home-photo-hint {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.home--has-photo .btn-outline {
+  border-color: rgba(255, 255, 255, 0.7);
+  color: #fff;
+}
+
+.chat-controllo-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #0d47a1;
 }
 
 .btn {

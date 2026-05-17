@@ -243,15 +243,151 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
   const values = Object.values(stats);
   const media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
 
+  const insights = buildAllAxisInsights({
+    stats,
+    sources,
+    vision,
+    interventi,
+    weather,
+    oggi,
+    hasVision: !!fromVision,
+    visionAge: analisi?.created_at,
+    freshness: vWeight,
+  });
+
   return {
     stats,
     media,
     sources,
+    insights,
     hasVision: !!fromVision,
     hasInterventi: interventi.length > 0,
     visionAge: analisi?.created_at ?? null,
     freshness: vWeight,
   };
+}
+
+function lavoriApertiPerCategorie(interventi, categorie, oggi) {
+  return interventi.filter(
+    (i) =>
+      i.stato === "pianificato" &&
+      categorie.includes(i.categoria) &&
+      i.data_prevista &&
+      i.data_prevista <= oggi,
+  );
+}
+
+function livello(score) {
+  if (score >= 75) return "buono";
+  if (score >= 55) return "discreto";
+  return "basso";
+}
+
+/**
+ * @returns {{ score: number, perche: string[], migliora: string[] }}
+ */
+export function buildAxisInsight(key, ctx) {
+  const { stats, sources, vision, interventi, weather, oggi, hasVision, visionAge, freshness } = ctx;
+  const score = stats[key] ?? 50;
+  const perche = [];
+  const migliora = [];
+  const lv = livello(score);
+
+  if (!hasVision && !interventi.length) {
+    perche.push("Valore stimato: manca una foto recente e pochi dati in calendario.");
+    migliora.push("Carica una foto del prato e completa i lavori in agenda.");
+    return { score, perche, migliora };
+  }
+
+  if (sources[key]?.vision != null) {
+    perche.push(`Ultima foto: indicatore ~${sources[key].vision}/100.`);
+  }
+  if (sources[key]?.interventi != null) {
+    perche.push(`Calendario lavori: ~${sources[key].interventi}/100 (spunte e ritardi).`);
+  }
+  if (key === "idratazione" && sources[key]?.meteo != null) {
+    perche.push(`Meteo attuale: ~${sources[key].meteo}/100 (umidità e temperature).`);
+  }
+
+  if (visionAge) {
+    const giorni = giorniTra(new Date(visionAge).toISOString().slice(0, 10), oggi);
+    if (giorni > 30) perche.push(`Foto di ${giorni} giorni fa — aggiorna con controllo mensile.`);
+    else if (freshness < 0.35) perche.push("Foto non recentissima: peso ridotto sull'analisi visiva.");
+  }
+
+  const problems = testoProblemi(vision);
+
+  if (key === "idratazione") {
+    if (vision?.stress_idrici?.segni) perche.push("Segni di stress idrico nella foto.");
+    if (weather?.advice?.status) perche.push(`Meteo: ${weather.advice.status}.`);
+    if (lv === "basso") {
+      migliora.push("Irriga in modo regolare al mattino; valuta agente umettante in estate.");
+      if (lavoriApertiPerCategorie(interventi, ["irrigazione", "umettante"], oggi).length) {
+        migliora.push("Completa irrigazione/umettante in scadenza nel calendario.");
+      }
+    } else migliora.push("Mantieni irrigazione costante; evita ristagni.");
+  }
+
+  if (key === "nutrizione") {
+    if (/giall|cloros|nutriz|carenza/.test(problems)) perche.push("Possibile carenza nutrizionale visibile.");
+    if (lv === "basso") {
+      migliora.push("Programma concimazione (NPK / microelementi) nei periodi indicati.");
+      if (lavoriApertiPerCategorie(interventi, ["concime", "biostimolante"], oggi).length) {
+        migliora.push("Esegui concimi o biostimolanti in agenda.");
+      }
+    } else migliora.push("Continua concimazioni di mantenimento secondo calendario.");
+  }
+
+  if (key === "copertura") {
+    if (/calv|dirad|patch|vuot|ralo/.test(problems)) perche.push("Zone diradate o calve in foto.");
+    if (lv === "basso") migliora.push("Valuta rinnovo/overseeding e concimi di ripresa.");
+    else migliora.push("Monitora zone rade; semina chirurgica se necessario.");
+  }
+
+  if (key === "salute_fogliare") {
+    if (vision?.feltro_thatch?.presente) perche.push("Feltro/thatch rilevato.");
+    if (vision?.foglie_debris?.eccesso_foglie) perche.push("Troppo detrito fogliare.");
+    if (/necros|macchl|fungh/.test(problems)) perche.push("Segni fogliari o sospetto patogeno.");
+    if (lv === "basso") migliora.push("Arieggiatura leggera, raccolta foglie, eventuale fungicida se confermato.");
+    else migliora.push("Mantieni taglio corretto e pulizia superficie.");
+  }
+
+  if (key === "difesa") {
+    if ((vision?.malattie_sospette || []).length) perche.push("Malattie sospette in analisi.");
+    if ((vision?.erbette_infestanti || []).length) perche.push("Erbette infestanti segnalate.");
+    if (/larv|popillia|insett|parassit/.test(problems)) perche.push("Rischio parassiti/larve (es. popillia).");
+    if (lv === "basso") {
+      migliora.push("Valuta trattamento fitosanitario mirato (es. Fly per larve sotto prato).");
+      if (lavoriApertiPerCategorie(interventi, ["trattamento", "diserbo"], oggi).length) {
+        migliora.push("Completa trattamenti in scadenza.");
+      }
+    } else migliora.push("Monitoraggio mensile con foto; intervieni solo se compaiono danni.");
+  }
+
+  if (key === "manutenzione") {
+    if (vision?.taglio?.giudizio === "troppo_basso") perche.push("Taglio troppo basso.");
+    if (vision?.taglio?.giudizio === "troppo_alto") perche.push("Erba troppo alta al taglio.");
+    if (lv === "basso") {
+      migliora.push("Riprendi tagli regolari, scarifica/arieggia se c'è feltro.");
+      if (lavoriApertiPerCategorie(interventi, ["taglio", "arieggiatura", "pulizia"], oggi).length) {
+        migliora.push("Spunta taglio e pulizia in calendario.");
+      }
+    } else migliora.push("Mantieni frequenza taglio e scarifica stagionale.");
+  }
+
+  if (!migliora.length) {
+    migliora.push(lv === "buono" ? "Ottimo livello: continua così." : "Segui il calendario per stabilizzare il valore.");
+  }
+
+  return { score, perche, migliora };
+}
+
+function buildAllAxisInsights(ctx) {
+  const out = {};
+  for (const { key } of PRATO_STAT_AXES) {
+    out[key] = buildAxisInsight(key, ctx);
+  }
+  return out;
 }
 
 export function labelStatoPrato(media) {
