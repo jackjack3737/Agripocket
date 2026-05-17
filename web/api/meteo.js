@@ -1,4 +1,5 @@
 import { fetchWeatherBundle } from "../server/weatherCore.mjs";
+import { loadServerEnv } from "../server/serverEnv.mjs";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -16,7 +17,8 @@ export default async function handler(req, res) {
     return;
   }
   try {
-    const bundle = await fetchWeatherBundle(city, process.env.OPENWEATHER_API_KEY);
+    const env = loadServerEnv();
+    const bundle = await fetchWeatherBundle(city, env.OPENWEATHER_API_KEY);
     res.status(200).json(bundle);
   } catch (e) {
     res.status(500).json({ error: e.message || String(e) });

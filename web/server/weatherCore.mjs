@@ -1,9 +1,37 @@
-/** Meteo agronomico — da AgriManager (OpenWeather) + storico temperature (Open-Meteo) */
+/** Meteo agronomico — Open-Meteo (gratuito) + OpenWeather opzionale se c'è API key */
 
 const IT_MONTHS = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
   "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
 ];
+
+const WMO_IT = {
+  0: "sereno",
+  1: "prevalentemente sereno",
+  2: "parzialmente nuvoloso",
+  3: "coperto",
+  45: "nebbia",
+  48: "nebbia con brina",
+  51: "pioggerella leggera",
+  53: "pioggerella",
+  55: "pioggerella intensa",
+  61: "pioggia leggera",
+  63: "pioggia moderata",
+  65: "pioggia forte",
+  71: "neve leggera",
+  73: "neve moderata",
+  75: "neve forte",
+  80: "rovesci",
+  95: "temporale",
+};
+
+function wmoCategory(code) {
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow";
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain";
+  if ([95, 96, 99].includes(code)) return "Thunderstorm";
+  if ([45, 48].includes(code)) return "Mist";
+  return "Clear";
+}
 
 /** @param {import('openweather').Weather | null} weather */
 export function getAgronomicAdvice(weather) {
@@ -29,9 +57,53 @@ export function getAgronomicAdvice(weather) {
   return { status: "Tempo favorevole", advice: "Buono per taglio e concime.", color: "#2E7D32" };
 }
 
-async function geocodeCity(city, apiKey) {
-  const q = encodeURIComponent(city.trim());
-  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${q}&limit=1&appid=${apiKey}`;
+async function geocodeOpenMeteo(city) {
+  const q = city.trim();
+  const url =
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}` +
+    `&count=5&language=it`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Geocoding meteo: ${res.status}`);
+  const data = await res.json();
+  const hit =
+    data.results?.find((r) => r.country_code === "IT") ||
+    data.results?.[0];
+  if (!hit) throw new Error(`Località non trovata: ${city}`);
+  return {
+    lat: hit.latitude,
+    lon: hit.longitude,
+    name: hit.name,
+    country: hit.country_code ?? "IT",
+    admin1: hit.admin1,
+  };
+}
+
+async function fetchCurrentOpenMeteo(lat, lon, placeName) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+    `&timezone=auto`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Meteo attuale non disponibile");
+  const data = await res.json();
+  const c = data.current;
+  if (!c) throw new Error("Meteo attuale non disponibile");
+  const code = c.weather_code ?? 0;
+  const main = wmoCategory(code);
+  return {
+    name: placeName,
+    main: {
+      temp: c.temperature_2m,
+      feels_like: c.apparent_temperature ?? c.temperature_2m,
+      humidity: c.relative_humidity_2m ?? 0,
+    },
+    weather: [{ main, description: WMO_IT[code] ?? "variabile" }],
+    wind: { speed: (c.wind_speed_10m ?? 0) / 3.6 },
+  };
+}
+
+async function geocodeOpenWeather(city, apiKey) {
+  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city.trim())}&limit=1&appid=${apiKey}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Geocoding meteo: ${res.status}`);
   const data = await res.json();
@@ -39,7 +111,7 @@ async function geocodeCity(city, apiKey) {
   return { lat: data[0].lat, lon: data[0].lon, name: data[0].name, country: data[0].country };
 }
 
-async function fetchCurrentWeather(city, apiKey) {
+async function fetchCurrentOpenWeather(city, apiKey) {
   const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=it`;
   const res = await fetch(url);
   const data = await res.json();
@@ -47,7 +119,6 @@ async function fetchCurrentWeather(city, apiKey) {
   return data;
 }
 
-/** Ultimi N giorni: min/max °C (Open-Meteo, gratuito) */
 async function fetchRecentTemperatures(lat, lon, days = 14) {
   const end = new Date();
   const start = new Date();
@@ -73,15 +144,17 @@ async function fetchRecentTemperatures(lat, lon, days = 14) {
   }));
 
   const temps = rows.flatMap((r) => [r.tMax, r.tMin].filter((t) => t != null));
-  const avgMax = rows.reduce((s, r) => s + (r.tMax ?? 0), 0) / rows.length;
-  const avgMin = rows.reduce((s, r) => s + (r.tMin ?? 0), 0) / rows.length;
-  const maxAbs = Math.max(...temps);
-  const minAbs = Math.min(...temps);
-  const frostDays = rows.filter((r) => r.tMin != null && r.tMin <= 2).length;
-  const hotDays = rows.filter((r) => r.tMax != null && r.tMax >= 30).length;
-  const rainyDays = rows.filter((r) => r.rainMm >= 5).length;
-
-  return { days: rows.length, rows, avgMax, avgMin, maxAbs, minAbs, frostDays, hotDays, rainyDays };
+  return {
+    days: rows.length,
+    rows,
+    avgMax: rows.reduce((s, r) => s + (r.tMax ?? 0), 0) / rows.length,
+    avgMin: rows.reduce((s, r) => s + (r.tMin ?? 0), 0) / rows.length,
+    maxAbs: Math.max(...temps),
+    minAbs: Math.min(...temps),
+    frostDays: rows.filter((r) => r.tMin != null && r.tMin <= 2).length,
+    hotDays: rows.filter((r) => r.tMax != null && r.tMax >= 30).length,
+    rainyDays: rows.filter((r) => r.rainMm >= 5).length,
+  };
 }
 
 export function formatWeatherForPrompt(bundle) {
@@ -103,36 +176,46 @@ export function formatWeatherForPrompt(bundle) {
         last5.map((r) => `${r.date}: ${r.tMin?.toFixed(0)}–${r.tMax?.toFixed(0)}°C`).join("; "),
     );
   }
-  const monthName = IT_MONTHS[new Date().getMonth()];
-  lines.push(`Mese corrente: ${monthName}.`);
+  lines.push(`Mese corrente: ${IT_MONTHS[new Date().getMonth()]}.`);
   return lines.join("\n");
 }
 
 /**
  * @param {string} city - città o CAP
- * @param {string} [apiKey]
+ * @param {string} [apiKey] - OpenWeather opzionale
  */
 export async function fetchWeatherBundle(city, apiKey) {
-  const key = apiKey?.trim();
-  if (!key) throw new Error("Manca OPENWEATHER_API_KEY (crawler/.env o variabili Vercel)");
   if (!city?.trim()) throw new Error("Inserisci città o CAP");
 
-  const geo = await geocodeCity(city, key);
-  const current = await fetchCurrentWeather(city, key);
+  const key = apiKey?.trim();
+  let geo;
+  let current;
+
+  if (key) {
+    try {
+      geo = await geocodeOpenWeather(city, key);
+      current = await fetchCurrentOpenWeather(city, key);
+    } catch {
+      geo = await geocodeOpenMeteo(city);
+      current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
+    }
+  } else {
+    geo = await geocodeOpenMeteo(city);
+    current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
+  }
+
   const history = await fetchRecentTemperatures(geo.lat, geo.lon, 14);
   const advice = getAgronomicAdvice(current);
+  const location = geo.admin1
+    ? `${current.name}, ${geo.admin1}`
+    : `${current.name}${geo.country ? `, ${geo.country}` : ""}`;
 
   return {
-    location: `${current.name}${geo.country ? `, ${geo.country}` : ""}`,
+    location,
     geo,
     current,
     history,
     advice,
-    summaryText: formatWeatherForPrompt({
-      current,
-      history,
-      advice,
-      location: current.name,
-    }),
+    summaryText: formatWeatherForPrompt({ current, history, advice, location }),
   };
 }

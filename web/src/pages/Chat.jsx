@@ -57,8 +57,10 @@ export default function Chat({ profile, session, onProfileUpdate }) {
     try {
       const bundle = await fetchMeteoForCity(city);
       setWeather(bundle);
-    } catch {
+      setError("");
+    } catch (err) {
       setWeather(null);
+      setError(err.message || "Meteo non disponibile per questa località");
     } finally {
       setWeatherLoading(false);
     }
