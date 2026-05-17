@@ -182,6 +182,30 @@ async function geminiEmbed(text: string, apiKey: string): Promise<number[]> {
   return values;
 }
 
+async function queryKnowledgeBase(
+  admin: ReturnType<typeof createClient>,
+  embedding: number[],
+) {
+  const attempts = [
+    { match_count: 6, match_threshold: 0.22 },
+    { match_count: 4, match_threshold: 0.18 },
+  ];
+  let lastErr: { message?: string } | null = null;
+  for (const params of attempts) {
+    const { data, error } = await admin.rpc("match_documenti", {
+      ...params,
+      query_embedding: embedding,
+    });
+    if (!error) return data ?? [];
+    lastErr = error;
+    const msg = String(error.message ?? "");
+    if (!/timeout|timed out|57014/i.test(msg)) break;
+  }
+  throw new Error(
+    `Knowledge base: ${lastErr?.message ?? "errore ricerca"}. Esegui sql/patch_match_documenti.sql in Supabase.`,
+  );
+}
+
 async function geminiGenerate(
   apiKey: string,
   parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>,
@@ -347,13 +371,7 @@ Max 3 specie_probabili.`;
 
     const embedding = await geminiEmbed(searchText.slice(0, 8000), geminiKey);
 
-    const { data: chunks, error: rpcErr } = await admin.rpc("match_documenti", {
-      match_count: 14,
-      match_threshold: 0.2,
-      query_embedding: embedding,
-    });
-
-    if (rpcErr) throw new Error(`Knowledge base: ${rpcErr.message}`);
+    const chunks = await queryKnowledgeBase(admin, embedding);
 
     const kbContext = (chunks ?? [])
       .map((c: { soluzione?: string; patologia?: string; specie?: string; somiglianza?: number }, i: number) => {

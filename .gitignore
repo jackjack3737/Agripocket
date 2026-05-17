@@ -16,5 +16,6 @@ venv/
 Thumbs.db
 *.log
 .cursor/
+crawler/sources_drive/
 Ground/
 preventivo/

@@ -130,7 +130,7 @@ erbette_infestanti, query_ricerca_kb. Includi taglio basso, feltro, troppe fogli
     emb = genera_embedding(search[:8000], get_embed_cfg())
     chunks = admin.rpc(
         "match_documenti",
-        {"match_count": 14, "match_threshold": 0.2, "query_embedding": emb},
+        {"match_count": 8, "match_threshold": 0.22, "query_embedding": emb},
     ).execute()
 
     kb = ""

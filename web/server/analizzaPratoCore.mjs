@@ -20,6 +20,28 @@ function profileText(p) {
   return parts.length ? parts.join("\n") : "Profilo prato: minimo.";
 }
 
+async function queryKnowledgeBase(admin, embedding) {
+  const attempts = [
+    { match_count: 6, match_threshold: 0.22 },
+    { match_count: 4, match_threshold: 0.18 },
+  ];
+  let lastErr = null;
+  for (const params of attempts) {
+    const { data, error } = await admin.rpc("match_documenti", {
+      ...params,
+      query_embedding: embedding,
+    });
+    if (!error) return data ?? [];
+    lastErr = error;
+    const msg = String(error.message || "");
+    if (!/timeout|timed out|57014/i.test(msg)) break;
+  }
+  throw new Error(
+    `Knowledge base: ${lastErr?.message || "errore ricerca"}. ` +
+      "Esegui sql/patch_match_documenti.sql nel SQL Editor Supabase."
+  );
+}
+
 async function geminiEmbed(text, apiKey) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
@@ -164,12 +186,7 @@ Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce 
     .join("\n");
 
   const embedding = await geminiEmbed(searchText.slice(0, 8000), geminiKey);
-  const { data: chunks, error: rpcErr } = await admin.rpc("match_documenti", {
-    match_count: 14,
-    match_threshold: 0.2,
-    query_embedding: embedding,
-  });
-  if (rpcErr) throw new Error(`Knowledge base: ${rpcErr.message}`);
+  const chunks = await queryKnowledgeBase(admin, embedding);
 
   const kbContext = (chunks ?? [])
     .map((c, i) => {

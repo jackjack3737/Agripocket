@@ -1,5 +1,15 @@
 -- Dashboard: ultima analisi + calendario interventi
--- Esegui in Supabase SQL Editor dopo prato_profilo.sql
+-- Esegui in Supabase SQL Editor dopo prato_profilo.sql / usersagropocket.sql
+
+create or replace function public.set_usersagropocket_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
 
 create table if not exists public.prato_analisi (
   id uuid primary key default gen_random_uuid(),

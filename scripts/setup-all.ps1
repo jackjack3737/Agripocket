@@ -48,6 +48,14 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "[ok] Database pronto (localita)"
 }
 
+node (Join-Path $root "scripts\verify-dashboard.mjs")
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "[!!] Esegui sql/prato_dashboard.sql nel SQL Editor Supabase"
+  Write-Host "     oppure: `$env:SUPABASE_DB_PASSWORD='...'; python scripts/apply_prato_dashboard.py"
+} else {
+  Write-Host "[ok] Database pronto (dashboard)"
+}
+
 Write-Host ""
 Write-Host "http://localhost:5173 — API foto: /api/analizza-prato · meteo: /api/meteo"
 Set-Location (Join-Path $root "web")
