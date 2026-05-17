@@ -22,6 +22,25 @@ import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import { supabase } from "../lib/supabase";
 
+function formattaDoseIntervento(totale, unita, perMq) {
+  const u = (unita || "g").toLowerCase();
+  let val = Number(totale);
+  let label = u;
+  if (u === "ml" && val >= 1000) {
+    val = val / 1000;
+    label = "L";
+  } else if (u === "g" && val >= 1000) {
+    val = val / 1000;
+    label = "kg";
+  }
+  const tot = `${val >= 10 ? Math.round(val) : val.toFixed(1)} ${label}`;
+  if (perMq != null) {
+    const pm = Number(perMq);
+    return `${tot} totali (${pm} ${u}/m²)`;
+  }
+  return tot;
+}
+
 function ImportanzaIndicatore({ priorita }) {
   const level = PRIORITY_LEVEL[priorita] ?? 2;
   const label = PRIORITA_LABEL[priorita] || "Media";
@@ -63,6 +82,16 @@ function InterventoRow({ item, onToggle }) {
           <ImportanzaIndicatore priorita={item.priorita} />
         </div>
         <p className="intervento-row__title">{item.titolo}</p>
+        {item.prodotto_nome ? (
+          <p className="intervento-row__prodotto">
+            <span className="intervento-row__prodotto-nome">{item.prodotto_nome}</span>
+            {item.dose_totale != null && item.dose_unita ? (
+              <span className="intervento-row__dose">
+                {formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
         {item.descrizione ? <p className="intervento-row__desc">{item.descrizione}</p> : null}
       </div>
     </li>
@@ -135,7 +164,20 @@ export default function Dashboard({ profile, session }) {
   const [ultimaAnalisi, setUltimaAnalisi] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [banner, setBanner] = useState(location.state?.fromAnalysis ? "Piano aggiornato dall'ultima analisi foto." : "");
+  const [banner, setBanner] = useState(() => {
+    if (!location.state?.fromAnalysis) return "";
+    const p = location.state.pianoAggiornato;
+    if (p?.inseritiCalendario || p?.aggiornatiCalendario) {
+      const parts = [];
+      if (p.inseritiCalendario) parts.push(`${p.inseritiCalendario} lavori aggiunti al calendario`);
+      if (p.aggiornatiCalendario) parts.push(`${p.aggiornatiCalendario} aggiornati`);
+      return `Analisi foto: ${parts.join(", ")}. Prodotti e dosi calcolati sui m² del prato.`;
+    }
+    const n = location.state.interventiCount;
+    return n
+      ? `Analisi foto: ${n} interventi in agenda con prodotti e dosi sui m².`
+      : "Piano aggiornato dall'ultima analisi foto.";
+  });
   const [generatingPiano, setGeneratingPiano] = useState(false);
 
   const userId = session?.user?.id;

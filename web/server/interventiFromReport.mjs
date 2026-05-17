@@ -1,3 +1,9 @@
+import {
+  arricchisciInterventoConProdotto,
+  loadProdotti,
+} from "./prodottiCatalogo.mjs";
+import { integraFotoNelPiano } from "./aggiornaPianoDaFoto.mjs";
+
 const PRIORITY_ORDER = { alta: 0, media: 1, bassa: 2 };
 
 const QUANDO_DAYS = {
@@ -25,7 +31,7 @@ function normalizePriorita(p) {
   return "media";
 }
 
-function normalizeCategoria(c) {
+export function normalizeCategoria(c) {
   const v = String(c || "altro").toLowerCase();
   const ok = [
     "taglio",
@@ -46,7 +52,42 @@ function normalizeCategoria(c) {
   if (/biostim/.test(v)) return "biostimolante";
   if (/umett|surfact/.test(v)) return "umettante";
   if (/seme|overseed|rinnov/.test(v)) return "rinnovo";
+  if (/fungic|patogen/.test(v)) return "trattamento";
   return "altro";
+}
+
+function rowIntervento(userId, analisiId, i, fonte) {
+  return {
+    user_id: userId,
+    analisi_id: analisiId,
+    titolo: i.titolo,
+    descrizione: i.descrizione || null,
+    priorita: i.priorita,
+    categoria: i.categoria,
+    stato: "pianificato",
+    data_prevista: i.data_prevista,
+    ordine: i.ordine,
+    fonte,
+    prodotto_id: i.prodotto_id ?? null,
+    prodotto_nome: i.prodotto_nome ?? null,
+    dose_totale: i.dose_totale ?? null,
+    dose_unita: i.dose_unita ?? null,
+    dose_per_mq: i.dose_per_mq ?? null,
+  };
+}
+
+async function insertInterventi(admin, rows) {
+  if (!rows.length) return [];
+  const { data, error } = await admin.from("prato_interventi").insert(rows).select("*");
+  if (!error) return data ?? [];
+
+  if (/prodotto_|dose_/.test(error.message || "")) {
+    const slim = rows.map(({ prodotto_id, prodotto_nome, dose_totale, dose_unita, dose_per_mq, ...r }) => r);
+    const retry = await admin.from("prato_interventi").insert(slim).select("*");
+    if (retry.error) throw new Error(`Salvataggio interventi: ${retry.error.message}`);
+    return retry.data ?? [];
+  }
+  throw new Error(`Salvataggio interventi: ${error.message}`);
 }
 
 /**
@@ -56,7 +97,7 @@ function normalizeCategoria(c) {
  * @param {string} geminiKey
  */
 export async function extractInterventiFromReport(report, vision, geminiGenerate, geminiKey) {
-  const prompt = `Sei un agronomo. Dal report e dalla visione foto, estrai gli interventi da calendarizzare per il proprietario del prato.
+  const prompt = `Sei un agronomo. Dal report e dalla visione foto, estrai gli interventi URGENTI da calendarizzare.
 
 Report:
 ${report.slice(0, 6000)}
@@ -79,10 +120,9 @@ Rispondi SOLO JSON valido:
 }
 
 Regole:
-- 4-8 interventi, ordinati per urgenza (problemi IA con gravità alta prima).
-- "priorita": alta = rischio danno prato / problema grave in foto; media = manutenzione importante; bassa = prevenzione.
-- Basati su "Piano d'azione" e problemi rilevati nella visione.
-- Titoli concreti (es. "Alza taglio a 5 cm", "Irrigazione profonda mattina").`;
+- 4-8 interventi urgenti (prossime 2-6 settimane), ordinati per urgenza.
+- Includi trattamenti/diserbi/concimi se evidenti dalla foto.
+- Titoli concreti (es. "Trattamento fungicida preventivo", "Diserbo selettivo trifoglio").`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -98,7 +138,7 @@ Regole:
   }
 
   const list = Array.isArray(parsed?.interventi) ? parsed.interventi : [];
-  return list
+  const base = list
     .filter((i) => i?.titolo?.trim())
     .map((item, idx) => ({
       titolo: String(item.titolo).trim().slice(0, 120),
@@ -109,12 +149,19 @@ Regole:
       ordine: idx,
     }))
     .sort((a, b) => PRIORITY_ORDER[a.priorita] - PRIORITY_ORDER[b.priorita]);
+
+  return base;
 }
 
 /**
- * Salva analisi + interventi (sostituisce pianificati IA non completati).
+ * Salva analisi, interventi urgenti (con prodotti/dosi su m²) e aggiorna il piano stagionale.
  */
-export async function persistAnalisiAndInterventi(admin, userId, { report, vision, chunksUsed, interventi }) {
+export async function persistAnalisiAndInterventi(
+  admin,
+  userId,
+  { report, vision, chunksUsed, interventi, profilo },
+  { geminiGenerate, geminiKey } = {},
+) {
   const { data: analisi, error: analisiErr } = await admin
     .from("prato_analisi")
     .insert({
@@ -128,7 +175,7 @@ export async function persistAnalisiAndInterventi(admin, userId, { report, visio
 
   if (analisiErr) {
     if (analisiErr.code === "PGRST205") {
-      return { analisiId: null, interventi: [], tablesMissing: true };
+      return { analisiId: null, interventi: [], tablesMissing: true, pianoAggiornato: null };
     }
     throw new Error(`Salvataggio analisi: ${analisiErr.message}`);
   }
@@ -140,29 +187,44 @@ export async function persistAnalisiAndInterventi(admin, userId, { report, visio
     .eq("fonte", "ia_foto")
     .eq("stato", "pianificato");
 
-  if (!interventi?.length) {
-    return { analisiId: analisi.id, interventi: [], tablesMissing: false };
+  const prodotti = await loadProdotti(admin);
+  let arricchiti = (interventi ?? []).map((i) =>
+    arricchisciInterventoConProdotto(i, profilo, prodotti, vision),
+  );
+
+  let saved = [];
+  if (arricchiti.length) {
+    const rows = arricchiti.map((i) => rowIntervento(userId, analisi.id, i, "ia_foto"));
+    saved = await insertInterventi(admin, rows);
   }
 
-  const rows = interventi.map((i) => ({
-    user_id: userId,
-    analisi_id: analisi.id,
-    titolo: i.titolo,
-    descrizione: i.descrizione || null,
-    priorita: i.priorita,
-    categoria: i.categoria,
-    stato: "pianificato",
-    data_prevista: i.data_prevista,
-    ordine: i.ordine,
-    fonte: "ia_foto",
-  }));
+  let pianoAggiornato = null;
+  if (geminiGenerate && geminiKey) {
+    try {
+      pianoAggiornato = await integraFotoNelPiano({
+        admin,
+        userId,
+        analisiId: analisi.id,
+        profilo,
+        vision,
+        report,
+        interventiUrgenti: arricchiti,
+        geminiGenerate,
+        geminiKey,
+      });
+    } catch (e) {
+      console.warn("[analizza-prato] integra piano:", e.message);
+    }
+  }
 
-  const { data: saved, error: intErr } = await admin
-    .from("prato_interventi")
-    .insert(rows)
-    .select("*");
+  const tutti = [...saved];
+  if (pianoAggiornato?.inseriti?.length) tutti.push(...pianoAggiornato.inseriti);
 
-  if (intErr) throw new Error(`Salvataggio interventi: ${intErr.message}`);
-
-  return { analisiId: analisi.id, interventi: saved ?? [], tablesMissing: false };
+  return {
+    analisiId: analisi.id,
+    interventi: tutti,
+    tablesMissing: false,
+    pianoAggiornato,
+    urgenti: saved,
+  };
 }

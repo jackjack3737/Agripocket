@@ -218,15 +218,22 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
   let interventi = [];
   let analisiId = null;
   let dashboardReady = false;
+  let saved = null;
 
   try {
     interventi = await extractInterventiFromReport(report, vision, geminiGenerate, geminiKey);
-    const saved = await persistAnalisiAndInterventi(admin, userData.user.id, {
-      report,
-      vision,
-      chunksUsed: (chunks ?? []).length,
-      interventi,
-    });
+    saved = await persistAnalisiAndInterventi(
+      admin,
+      userData.user.id,
+      {
+        report,
+        vision,
+        chunksUsed: (chunks ?? []).length,
+        interventi,
+        profilo,
+      },
+      { geminiGenerate, geminiKey },
+    );
     analisiId = saved.analisiId;
     interventi = saved.interventi;
     dashboardReady = !saved.tablesMissing;
@@ -242,5 +249,6 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
     interventi,
     analisiId,
     dashboardReady,
+    pianoAggiornato: saved?.pianoAggiornato ?? null,
   };
 }

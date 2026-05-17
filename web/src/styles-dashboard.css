@@ -594,6 +594,25 @@
   font-weight: 500;
 }
 
+.intervento-row__prodotto {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: baseline;
+}
+
+.intervento-row__prodotto-nome {
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.intervento-row__dose {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .intervento-row__desc {
   margin: 0;
   font-size: 0.82rem;

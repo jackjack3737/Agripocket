@@ -108,6 +108,8 @@ export default function Chat({ profile, session, onProfileUpdate }) {
         chunksUsed: result.chunksUsed,
         vision: result.vision,
         weatherUsed: result.weatherUsed,
+        pianoAggiornato: result.pianoAggiornato,
+        interventiCount: result.interventi?.length ?? 0,
       });
     } catch (err) {
       setError(err.message || "Analisi non riuscita");
@@ -231,7 +233,15 @@ export default function Chat({ profile, session, onProfileUpdate }) {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => navigate("/dashboard", { state: { fromAnalysis: true } })}
+              onClick={() =>
+                navigate("/dashboard", {
+                  state: {
+                    fromAnalysis: true,
+                    pianoAggiornato: meta?.pianoAggiornato,
+                    interventiCount: meta?.interventiCount,
+                  },
+                })
+              }
             >
               Vai alla dashboard
             </button>
