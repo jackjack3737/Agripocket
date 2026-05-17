@@ -40,6 +40,9 @@ export async function analizzaPratoFoto({ base64, mimeType = "image/jpeg", userI
     vision: data.vision ?? null,
     chunksUsed: data.chunksUsed ?? 0,
     weatherUsed: data.weatherUsed ?? false,
+    interventi: data.interventi ?? [],
+    analisiId: data.analisiId ?? null,
+    dashboardReady: data.dashboardReady ?? false,
     profile,
   };
 }

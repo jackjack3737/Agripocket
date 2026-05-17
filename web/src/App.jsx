@@ -4,6 +4,7 @@ import { supabase, loadPratoProfilo } from "./lib/supabase";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Chat from "./pages/Chat";
+import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 
 export default function App() {
@@ -80,6 +81,18 @@ export default function App() {
         }
       />
       <Route
+        path="/dashboard"
+        element={
+          !session ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            <Dashboard profile={profile} session={session} />
+          )
+        }
+      />
+      <Route
         path="/chat"
         element={
           !session ? (
@@ -95,7 +108,7 @@ export default function App() {
         path="*"
         element={
           <Navigate
-            to={!session ? "/login" : needsOnboarding ? "/onboarding" : "/chat"}
+            to={!session ? "/login" : needsOnboarding ? "/onboarding" : "/dashboard"}
             replace
           />
         }

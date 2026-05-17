@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { profileSummary } from "../data/onboardingSteps";
 import { analizzaPratoFoto } from "../lib/analizzaPrato";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
@@ -30,6 +30,7 @@ function ReportBody({ markdown }) {
 }
 
 export default function Chat({ profile, session, onProfileUpdate }) {
+  const navigate = useNavigate();
   const userId = session?.user?.id;
   const summary = profileSummary(profile);
   const inputRef = useRef(null);
@@ -133,6 +134,9 @@ export default function Chat({ profile, session, onProfileUpdate }) {
           {summary ? <p className="profile-chip">{summary}</p> : null}
         </div>
         <div className="chat-header-actions">
+          <Link className="btn btn-ghost btn-sm" to="/dashboard">
+            Dashboard
+          </Link>
           <Link className="btn btn-ghost btn-sm" to="/onboarding">
             Profilo
           </Link>
@@ -223,9 +227,18 @@ export default function Chat({ profile, session, onProfileUpdate }) {
             {meta?.chunksUsed ? `, ${meta.chunksUsed} fonti KB` : ""}
           </p>
           <ReportBody markdown={report} />
-          <button type="button" className="btn btn-primary photo-new" onClick={openCamera}>
-            Nuova foto
-          </button>
+          <div className="photo-result__actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate("/dashboard", { state: { fromAnalysis: true } })}
+            >
+              Vai alla dashboard
+            </button>
+            <button type="button" className="btn btn-ghost photo-new" onClick={openCamera}>
+              Nuova foto
+            </button>
+          </div>
         </section>
       )}
     </div>

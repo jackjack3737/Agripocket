@@ -54,7 +54,7 @@ export default function Onboarding({ userId, onComplete }) {
     try {
       const saved = await savePratoProfilo(userId, answers);
       onComplete(saved);
-      nav("/chat", { replace: true });
+      nav("/dashboard", { replace: true });
     } catch (e) {
       setError(e.message || "Errore di salvataggio");
     } finally {

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { extractInterventiFromReport, persistAnalisiAndInterventi } from "./interventiFromReport.mjs";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
@@ -197,10 +198,32 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
     temperature: 0.4,
   });
 
+  let interventi = [];
+  let analisiId = null;
+  let dashboardReady = false;
+
+  try {
+    interventi = await extractInterventiFromReport(report, vision, geminiGenerate, geminiKey);
+    const saved = await persistAnalisiAndInterventi(admin, userData.user.id, {
+      report,
+      vision,
+      chunksUsed: (chunks ?? []).length,
+      interventi,
+    });
+    analisiId = saved.analisiId;
+    interventi = saved.interventi;
+    dashboardReady = !saved.tablesMissing;
+  } catch (e) {
+    console.warn("[analizza-prato] dashboard/interventi:", e.message);
+  }
+
   return {
     report,
     vision,
     chunksUsed: (chunks ?? []).length,
     weatherUsed: !!weatherBlock && !weatherBlock.startsWith("Meteo: non"),
+    interventi,
+    analisiId,
+    dashboardReady,
   };
 }

@@ -13,8 +13,8 @@ export default function Home({ session }) {
       </header>
       <div className="home-actions">
         {session ? (
-          <Link className="btn btn-primary" to="/onboarding">
-            Profilo prato
+          <Link className="btn btn-primary" to="/dashboard">
+            Vai alla dashboard
           </Link>
         ) : (
           <Link className="btn btn-primary" to="/login">

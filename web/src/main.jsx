@@ -7,6 +7,7 @@ import "./styles-map.css";
 import "./styles-animations.css";
 import "./styles-grass-exam.css";
 import "./styles-chat-photo.css";
+import "./styles-dashboard.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
