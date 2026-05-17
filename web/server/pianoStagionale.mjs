@@ -248,7 +248,8 @@ export async function persistPianoStagionale(admin, userId, interventi) {
     .delete()
     .eq("user_id", userId)
     .eq("fonte", "calendario_stagionale")
-    .eq("stato", "pianificato");
+    .eq("stato", "pianificato")
+    .eq("manual_override", false);
 
   if (!interventi.length) return { count: 0, tablesMissing: false };
 

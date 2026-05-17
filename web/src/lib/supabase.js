@@ -82,6 +82,7 @@ export async function savePratoProfilo(userId, profile) {
     })(),
     localita: profile.localita?.trim() || null,
     onboarding_completato: true,
+    disclaimer_accettato_at: profile.disclaimer_accettato ? new Date().toISOString() : null,
   };
   const { data, error } = await supabase
     .from("prato_profilo")

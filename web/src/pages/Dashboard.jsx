@@ -16,11 +16,18 @@ import {
   loadInterventi,
   loadUltimaAnalisi,
   setInterventoCompletato,
+  setInterventoManualOverride,
   sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import { supabase } from "../lib/supabase";
+import {
+  AVVISO_FITOFARMACO,
+  AVVISO_MQ_MANCANTI,
+  isInterventoFitofarmaco,
+  superficieMqVerificata,
+} from "../lib/sicurezzaClient";
 
 function formattaDoseIntervento(totale, unita, perMq) {
   const u = (unita || "g").toLowerCase();
@@ -61,10 +68,14 @@ function ImportanzaIndicatore({ priorita }) {
   );
 }
 
-function InterventoRow({ item, onToggle }) {
+function InterventoRow({ item, onToggle, onPin }) {
   const done = item.stato === "completato";
+  const fito = isInterventoFitofarmaco(item);
+  const mostraDose = !fito && item.dose_totale != null && item.dose_unita;
   return (
-    <li className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}`}>
+    <li
+      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}`}
+    >
       <label className="intervento-row__check">
         <input
           type="checkbox"
@@ -80,12 +91,25 @@ function InterventoRow({ item, onToggle }) {
           </time>
           <span className="intervento-pill intervento-pill--cat">{CATEGORIA_LABEL[item.categoria] || "Altro"}</span>
           <ImportanzaIndicatore priorita={item.priorita} />
+          {item.manual_override ? (
+            <span className="intervento-pill intervento-pill--pin" title="Non viene rimosso alla rigenerazione del piano">
+              Fissato
+            </span>
+          ) : null}
         </div>
         <p className="intervento-row__title">{item.titolo}</p>
+        {fito ? (
+          <p className="intervento-row__avviso intervento-row__avviso--fito" role="note">
+            {AVVISO_FITOFARMACO}
+          </p>
+        ) : null}
         {item.prodotto_nome ? (
           <p className="intervento-row__prodotto">
-            <span className="intervento-row__prodotto-nome">{item.prodotto_nome}</span>
-            {item.dose_totale != null && item.dose_unita ? (
+            <span className="intervento-row__prodotto-nome">
+              {fito ? "Riferimento catalogo: " : ""}
+              {item.prodotto_nome}
+            </span>
+            {mostraDose ? (
               <span className="intervento-row__dose">
                 {formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
               </span>
@@ -93,12 +117,22 @@ function InterventoRow({ item, onToggle }) {
           </p>
         ) : null}
         {item.descrizione ? <p className="intervento-row__desc">{item.descrizione}</p> : null}
+        {onPin && item.fonte === "calendario_stagionale" ? (
+          <button
+            type="button"
+            className={`intervento-row__pin${item.manual_override ? " intervento-row__pin--on" : ""}`}
+            onClick={() => onPin(item.id, !item.manual_override)}
+            title="Mantieni questo lavoro quando rigeneri il piano annuale"
+          >
+            {item.manual_override ? "✓ Mantieni al rigenera" : "Mantieni al rigenera"}
+          </button>
+        ) : null}
       </div>
     </li>
   );
 }
 
-function MeseAccordion({ mese, open, onToggle, onToggleIntervento }) {
+function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinIntervento }) {
   return (
     <section className={`dash-month${open ? " dash-month--open" : ""}`}>
       <button
@@ -125,7 +159,12 @@ function MeseAccordion({ mese, open, onToggle, onToggleIntervento }) {
               </h4>
               <ul className="intervento-list">
                 {items.map((item) => (
-                  <InterventoRow key={item.id} item={item} onToggle={onToggleIntervento} />
+                  <InterventoRow
+                    key={item.id}
+                    item={item}
+                    onToggle={onToggleIntervento}
+                    onPin={onPinIntervento}
+                  />
                 ))}
               </ul>
             </section>
@@ -136,7 +175,7 @@ function MeseAccordion({ mese, open, onToggle, onToggleIntervento }) {
   );
 }
 
-function InterventoSection({ title, hint, items, onToggle, empty }) {
+function InterventoSection({ title, hint, items, onToggle, onPin, empty }) {
   if (!items.length && !empty) return null;
   return (
     <section className="dash-calendar-section">
@@ -145,7 +184,7 @@ function InterventoSection({ title, hint, items, onToggle, empty }) {
       {items.length ? (
         <ul className="intervento-list">
           {items.map((item) => (
-            <InterventoRow key={item.id} item={item} onToggle={onToggle} />
+            <InterventoRow key={item.id} item={item} onToggle={onToggle} onPin={onPin} />
           ))}
         </ul>
       ) : (
@@ -171,11 +210,11 @@ export default function Dashboard({ profile, session }) {
       const parts = [];
       if (p.inseritiCalendario) parts.push(`${p.inseritiCalendario} lavori aggiunti al calendario`);
       if (p.aggiornatiCalendario) parts.push(`${p.aggiornatiCalendario} aggiornati`);
-      return `Analisi foto: ${parts.join(", ")}. Prodotti e dosi calcolati sui m² del prato.`;
+      return `Analisi foto: ${parts.join(", ")}. Calendario aggiornato (fitofarmaci senza dose automatica).`;
     }
     const n = location.state.interventiCount;
     return n
-      ? `Analisi foto: ${n} interventi in agenda con prodotti e dosi sui m².`
+      ? `Analisi foto: ${n} interventi in agenda. I fitofarmaci mostrano solo riferimenti di catalogo.`
       : "Piano aggiornato dall'ultima analisi foto.";
   });
   const [generatingPiano, setGeneratingPiano] = useState(false);
@@ -188,6 +227,8 @@ export default function Dashboard({ profile, session }) {
   const autoPianoStarted = useRef(false);
   const meseCorrente = new Date().toISOString().slice(0, 7);
   const [mesiAperti, setMesiAperti] = useState(() => new Set([meseCorrente]));
+
+  const mqVerificati = superficieMqVerificata(profile);
 
   const pratoRadar = useMemo(
     () => computePratoStats({ interventi, analisi: ultimaAnalisi, weather }),
@@ -285,6 +326,21 @@ export default function Dashboard({ profile, session }) {
     }
   }
 
+  async function togglePinIntervento(id, manualOverride) {
+    try {
+      const updated = await setInterventoManualOverride(id, manualOverride);
+      if (!updated) {
+        setError("Aggiorna il database (sql/patch_sicurezza_beta.sql) per usare «Mantieni al rigenera».");
+        return;
+      }
+      setInterventi((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, manual_override: !!manualOverride } : i))
+      );
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function logout() {
     await supabase.auth.signOut();
     window.location.href = "/";
@@ -324,6 +380,13 @@ export default function Dashboard({ profile, session }) {
       ) : null}
 
       {error ? <p className="form-msg form-msg--error">{error}</p> : null}
+
+      {!mqVerificati ? (
+        <p className="dash-safety-banner" role="alert">
+          {AVVISO_MQ_MANCANTI}{" "}
+          <Link to="/onboarding">Aggiorna profilo</Link>
+        </p>
+      ) : null}
 
       <div className="dash-grid">
         <section className="dash-card dash-card--weather">
@@ -400,7 +463,8 @@ export default function Dashboard({ profile, session }) {
         <div className="dash-calendar__head">
           <h2>Calendario lavori</h2>
           <p className="dash-calendar__lead">
-            Piano giorno per giorno: concimi, diserbi, arieggiatura, taglio, biostimolanti, umettanti e trattamenti.
+            Piano giorno per giorno. I fitofarmaci (diserbi, fungicidi, insetticidi) non hanno dose automatica: usa
+            «Mantieni al rigenera» per i lavori da non cancellare.
           </p>
           <div className="dash-calendar__actions">
             <button
@@ -449,6 +513,7 @@ export default function Dashboard({ profile, session }) {
                     open={mesiAperti.has(mese.monthKey)}
                     onToggle={() => toggleMese(mese.monthKey)}
                     onToggleIntervento={toggleIntervento}
+                    onPinIntervento={togglePinIntervento}
                   />
                 ))}
               </div>
@@ -460,14 +525,25 @@ export default function Dashboard({ profile, session }) {
                 hint="Piano in agenda."
                 items={prossimi}
                 onToggle={toggleIntervento}
+                onPin={togglePinIntervento}
               />
             ) : null}
 
             {!mesi.length && !prossimi.length && groups.senzaData.length ? (
-              <InterventoSection title="Prossimi interventi" items={groups.senzaData} onToggle={toggleIntervento} />
+              <InterventoSection
+                title="Prossimi interventi"
+                items={groups.senzaData}
+                onToggle={toggleIntervento}
+                onPin={togglePinIntervento}
+              />
             ) : null}
 
-            <InterventoSection title="Completati" items={groups.completati} onToggle={toggleIntervento} />
+            <InterventoSection
+              title="Completati"
+              items={groups.completati}
+              onToggle={toggleIntervento}
+              onPin={togglePinIntervento}
+            />
 
             {!groups.pianificati.length && !groups.completati.length ? (
               <div className="dash-calendar__empty-block">

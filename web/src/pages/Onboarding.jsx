@@ -5,6 +5,7 @@ import StepGuide from "../components/StepGuide";
 import StepProgress from "../components/StepProgress";
 import { EXTRA_STEP, ONBOARDING_STEPS } from "../data/onboardingSteps";
 import { formatMqInput, parseMqInput } from "../lib/parseMq";
+import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
 import { savePratoProfilo } from "../lib/supabase";
 import LawnMapModal from "../components/LawnMapModal";
 
@@ -18,12 +19,27 @@ const EMPTY = {
   marca_seme: "",
   superficie_mq: "",
   localita: "",
+  disclaimer_accettato: false,
 };
 
-export default function Onboarding({ userId, onComplete }) {
+function profileToAnswers(p) {
+  if (!p) return { ...EMPTY };
+  return {
+    uso: p.uso ?? null,
+    esposizione: p.esposizione ?? null,
+    tipo_terreno: p.tipo_terreno ?? null,
+    irrigazione: p.irrigazione ?? null,
+    marca_seme: p.marca_seme || "",
+    superficie_mq: p.superficie_mq != null ? formatMqInput(p.superficie_mq) : "",
+    localita: p.localita || "",
+    disclaimer_accettato: !!p.disclaimer_accettato_at,
+  };
+}
+
+export default function Onboarding({ userId, initialProfile, onComplete }) {
   const nav = useNavigate();
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState(EMPTY);
+  const [answers, setAnswers] = useState(() => profileToAnswers(initialProfile));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mapOpen, setMapOpen] = useState(false);
@@ -45,8 +61,17 @@ export default function Onboarding({ userId, onComplete }) {
   }
 
   async function finish() {
-    if (answers.superficie_mq?.trim() && parseMqInput(answers.superficie_mq) == null) {
-      setError("Superficie non valida. Usa numeri e la virgola per i decimali (es. 125,5).");
+    const mq = parseMqInput(answers.superficie_mq);
+    if (mq == null || mq <= 0) {
+      setError("Indica la superficie del prato in m² (obbligatorio per dosi e calendario).");
+      return;
+    }
+    if (!answers.localita?.trim()) {
+      setError("Indica la località del prato (città o CAP).");
+      return;
+    }
+    if (!answers.disclaimer_accettato) {
+      setError("Devi accettare il disclaimer legale per usare AgriPocket.");
       return;
     }
     setSaving(true);
@@ -81,6 +106,12 @@ export default function Onboarding({ userId, onComplete }) {
     stepData && value ? stepData.options.find((o) => o.value === value) : null;
   const bgImage = selectedOption?.image ?? null;
 
+  const extraReady =
+    isExtra &&
+    answers.disclaimer_accettato &&
+    answers.localita?.trim() &&
+    parseMqInput(answers.superficie_mq) != null;
+
   return (
     <div className="onboarding-shell">
       {bgImage ? (
@@ -93,9 +124,7 @@ export default function Onboarding({ userId, onComplete }) {
       ) : null}
       {bgImage ? <div className="onboarding-bg-overlay" aria-hidden /> : null}
 
-      <div
-        className={`page onboarding${bgImage ? " onboarding--has-bg" : ""}`}
-      >
+      <div className={`page onboarding${bgImage ? " onboarding--has-bg" : ""}`}>
         <div className="onboarding-content">
           <StepProgress current={step} total={totalSteps} />
 
@@ -153,7 +182,7 @@ export default function Onboarding({ userId, onComplete }) {
                     />
                   </label>
                   <label className="field-block">
-                    Superficie (m²)
+                    Superficie (m²) <span className="field-required">*</span>
                     <p className="field-block-hint">{EXTRA_STEP.mqHint}</p>
                     <input
                       type="text"
@@ -161,6 +190,7 @@ export default function Onboarding({ userId, onComplete }) {
                       placeholder="es. 120 oppure 125,5"
                       value={answers.superficie_mq}
                       onChange={(e) => setField("superficie_mq", e.target.value)}
+                      required
                     />
                   </label>
                 </section>
@@ -172,6 +202,21 @@ export default function Onboarding({ userId, onComplete }) {
                     onChange={(e) => setField("marca_seme", e.target.value)}
                   />
                 </label>
+                <section className="disclaimer-block">
+                  <h2 className="field-group__title">Disclaimer legale</h2>
+                  <p className="disclaimer-block__text">{DISCLAIMER_LEGALE}</p>
+                  <label className="disclaimer-block__check">
+                    <input
+                      type="checkbox"
+                      checked={answers.disclaimer_accettato}
+                      onChange={(e) => setField("disclaimer_accettato", e.target.checked)}
+                    />
+                    <span>
+                      Ho letto e accetto il disclaimer. Comprendo che AgriPocket non sostituisce un
+                      professionista.
+                    </span>
+                  </label>
+                </section>
               </>
             )}
           </div>
@@ -189,7 +234,7 @@ export default function Onboarding({ userId, onComplete }) {
             <button
               type="button"
               className={`btn btn-primary${!isExtra && value ? " btn-primary--ready" : ""}`}
-              disabled={(!isExtra && !value) || saving}
+              disabled={(!isExtra && !value) || (isExtra && !extraReady) || saving}
               onClick={next}
             >
               {saving ? "…" : isExtra ? "Vai all'agronomo" : "Avanti"}

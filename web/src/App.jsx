@@ -59,7 +59,9 @@ export default function App() {
     );
   }
 
-  const needsOnboarding = session && (!profile || !profile.onboarding_completato);
+  const needsOnboarding =
+    session &&
+    (!profile || !profile.onboarding_completato || !profile.disclaimer_accettato_at);
 
   return (
     <Routes>
@@ -73,6 +75,7 @@ export default function App() {
           ) : (
             <Onboarding
               userId={session.user.id}
+              initialProfile={profile}
               onComplete={(p) => {
                 setProfile(p);
               }}

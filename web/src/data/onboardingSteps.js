@@ -156,9 +156,9 @@ export const EXTRA_STEP = {
   intro:
     "Non ti chiediamo il tipo di erba: lo riconosciamo dalla prima foto con l'intelligenza artificiale (specie botaniche, non categorie generiche).",
   whatToDo:
-    "Aggiungi luogo e metri quadri del prato: servono per il meteo e per i consigli su dose e irrigazione. Puoi scriverli a mano oppure usare la mappa (compila entrambi in un colpo).",
+    "Aggiungi luogo e metri quadri del prato (obbligatori): servono per meteo, calendario e dosi di concimi/biostimolanti. Accetta il disclaimer legale per continuare.",
   localitaHint: "Città o CAP — es. Bologna, 40100",
-  mqHint: "Puoi usare la virgola: es. 120 oppure 125,5 m²",
+  mqHint: "Obbligatorio — es. 120 oppure 125,5 m² (virgola per i decimali)",
   mqMapHint: "Apri mappa: cerca l'indirizzo, disegna il prato e conferma — riempie luogo e m² insieme.",
 };
 

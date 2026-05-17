@@ -203,8 +203,11 @@ export default function Chat({ profile, session, onProfileUpdate }) {
           {preview ? <img src={preview} alt="" className="photo-loading__preview" /> : null}
           <div className="photo-loading__box">
             <div className="spinner" aria-hidden />
-            <p className="photo-loading__title">Analisi in corso...</p>
+            <p className="photo-loading__title">Analisi in corso…</p>
             <p className="photo-loading__sub">
+              Può richiedere 1–2 minuti. Non chiudere la pagina.
+            </p>
+            <p className="photo-loading__sub photo-loading__sub--muted">
               Visione + meteo {profile?.localita} + knowledge base
             </p>
           </div>

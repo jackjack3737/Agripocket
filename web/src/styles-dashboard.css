@@ -630,3 +630,95 @@
 .photo-result__actions .btn-primary {
   width: 100%;
 }
+
+.dash-safety-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #5d4037;
+}
+
+.dash-safety-banner a {
+  font-weight: 600;
+}
+
+.intervento-row__avviso {
+  margin: 0.35rem 0 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.intervento-row__avviso--fito {
+  background: #ffebee;
+  border: 1px solid #ffcdd2;
+  color: #b71c1c;
+}
+
+.intervento-pill--pin {
+  background: #e3f2fd;
+  color: #1565c0;
+  font-size: 0.68rem;
+}
+
+.intervento-row--pinned {
+  border-left: 3px solid #1565c0;
+}
+
+.intervento-row__pin {
+  margin-top: 0.45rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.intervento-row__pin--on {
+  border-style: solid;
+  border-color: #1565c0;
+  color: #1565c0;
+  background: #e3f2fd;
+}
+
+.disclaimer-block {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.disclaimer-block__text {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted);
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.disclaimer-block__check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.disclaimer-block__check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.field-required {
+  color: #c62828;
+}

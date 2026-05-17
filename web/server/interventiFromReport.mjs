@@ -57,7 +57,7 @@ export function normalizeCategoria(c) {
 }
 
 function rowIntervento(userId, analisiId, i, fonte) {
-  return {
+  const row = {
     user_id: userId,
     analisi_id: analisiId,
     titolo: i.titolo,
@@ -73,7 +73,14 @@ function rowIntervento(userId, analisiId, i, fonte) {
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
+    manual_override: false,
   };
+  if (i.avviso_fitofarmaco) {
+    row.dose_totale = null;
+    row.dose_unita = null;
+    row.dose_per_mq = null;
+  }
+  return row;
 }
 
 async function insertInterventi(admin, rows) {

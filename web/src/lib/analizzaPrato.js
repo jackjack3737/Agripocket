@@ -1,4 +1,5 @@
 import { supabase, loadPratoProfilo } from "./supabase";
+import { pollJobUntilDone } from "./pollJob";
 
 async function callAnalizzaApi(base64, mimeType, token) {
   const res = await fetch("/api/analizza-prato", {
@@ -11,6 +12,11 @@ async function callAnalizzaApi(base64, mimeType, token) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Analisi non riuscita");
+
+  if (data.async && data.jobId) {
+    return pollJobUntilDone(data.jobId, { maxWaitMs: 180000 });
+  }
+
   return data;
 }
 

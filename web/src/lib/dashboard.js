@@ -56,6 +56,16 @@ export async function loadUltimaAnalisi(userId) {
   return data;
 }
 
+export async function setInterventoManualOverride(id, manualOverride) {
+  const patch = { manual_override: !!manualOverride };
+  const { data, error } = await supabase.from("prato_interventi").update(patch).eq("id", id).select().single();
+  if (error) {
+    if (error.message?.includes("manual_override")) return null;
+    throw new Error(formatDbError(error));
+  }
+  return data;
+}
+
 export async function setInterventoCompletato(id, completato) {
   const { data, error } = await supabase
     .from("prato_interventi")

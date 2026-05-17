@@ -5,7 +5,13 @@
   "framework": "vite",
   "functions": {
     "api/analizza-prato.js": {
-      "maxDuration": 60
+      "maxDuration": 120
+    },
+    "api/genera-piano.js": {
+      "maxDuration": 120
+    },
+    "api/job-status.js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [

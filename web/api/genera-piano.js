@@ -1,9 +1,30 @@
+import { waitUntil } from "@vercel/functions";
 import { generaPianoStagionale } from "../server/pianoStagionale.mjs";
 import { loadServerEnv } from "../server/serverEnv.mjs";
+import { createJob, updateJob, adminClient } from "../server/jobs.mjs";
+import { createClient } from "@supabase/supabase-js";
 
 export const config = {
   maxDuration: 120,
 };
+
+async function runGeneraPianoJob(jobId, authHeader, env) {
+  const admin = adminClient(env);
+  try {
+    await updateJob(admin, jobId, { status: "processing" });
+    const result = await generaPianoStagionale({ authHeader, env });
+    await updateJob(admin, jobId, {
+      status: "completed",
+      result,
+      error_message: null,
+    });
+  } catch (e) {
+    await updateJob(admin, jobId, {
+      status: "failed",
+      error_message: e.message || String(e),
+    });
+  }
+}
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -26,8 +47,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await generaPianoStagionale({ authHeader: auth, env: loadServerEnv() });
-    res.status(200).json(result);
+    const env = loadServerEnv();
+    const supabaseUser = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: auth } },
+    });
+    const { data: userData, error: userErr } = await supabaseUser.auth.getUser();
+    if (userErr || !userData?.user) {
+      res.status(401).json({ error: "Sessione non valida" });
+      return;
+    }
+
+    const admin = adminClient(env);
+    const { job, tablesMissing } = await createJob(admin, userData.user.id, "genera_piano", {});
+
+    if (tablesMissing || !job) {
+      const result = await generaPianoStagionale({ authHeader: auth, env });
+      res.status(200).json({ ...result, async: false });
+      return;
+    }
+
+    waitUntil(runGeneraPianoJob(job.id, auth, env));
+
+    res.status(202).json({
+      async: true,
+      jobId: job.id,
+      status: "pending",
+      message: "Generazione calendario avviata. Attendi…",
+    });
   } catch (e) {
     console.error("[genera-piano]", e);
     res.status(500).json({ error: e.message || String(e) });

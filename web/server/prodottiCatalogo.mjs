@@ -1,4 +1,12 @@
-/** Catalogo Prodotti (Supabase) + dosi su m² prato. */
+/** Catalogo Prodotti (Supabase) + dosi su m² (solo concimi/biostimolanti Bottos, non fitofarmaci). */
+
+import {
+  AVVISO_FITOFARMACO,
+  AVVISO_MQ_MANCANTI,
+  isInterventoFitofarmaco,
+  isProdottoFitofarmaco,
+  superficieMqVerificata,
+} from "./sicurezzaProdotti.mjs";
 
 const MAP_CATEGORIA_INTERVENTO = {
   diserbo: ["DISERBANTE SELETTIVO", "DISERBANTE", "DISERBANTE PRE-EMERGENZA", "DISERBANTE PFnPE"],
@@ -9,7 +17,6 @@ const MAP_CATEGORIA_INTERVENTO = {
   rinnovo: ["SEMENTI"],
 };
 
-/** Fungicidi, diserbanti, insetticidi: tutte le marche; il resto solo BOTTOS. */
 const CATEGORIE_TUTTE_MARCHE = new Set([
   "FUNGICIDA",
   "FUNGICIDA BIO",
@@ -60,10 +67,8 @@ export async function loadProdotti(admin) {
   return data ?? [];
 }
 
-export function mqPrato(profilo, fallback = 100) {
-  const n = Number(profilo?.superficie_mq);
-  if (Number.isFinite(n) && n > 0) return Math.round(n);
-  return fallback;
+export function mqPrato(profilo) {
+  return superficieMqVerificata(profilo);
 }
 
 function formattaQuantita(valore, unita, { perMq = false } = {}) {
@@ -75,13 +80,13 @@ function formattaQuantita(valore, unita, { perMq = false } = {}) {
   return { valore: +valore.toFixed(0), unita: u };
 }
 
-/**
- * Dose in DB = per m². Totale = dose × mq.
- */
+/** Dose in DB = per m². Richiede mq verificati. Null per fitofarmaci (chiamare solo se non fitofarmaco). */
 export function calcolaDose(prodotto, superficieMq) {
-  const mq = Math.max(1, Number(superficieMq) || 100);
-  const unit = (prodotto?.unita_misura || "g").toLowerCase();
+  const mq = Number(superficieMq);
+  if (!Number.isFinite(mq) || mq <= 0) return null;
+  if (isProdottoFitofarmaco(prodotto)) return null;
 
+  const unit = (prodotto?.unita_misura || "g").toLowerCase();
   let perMq = Number(prodotto?.dose_fogliare) || 0;
   let via = "fogliare";
   if (perMq <= 0) {
@@ -106,6 +111,16 @@ export function calcolaDose(prodotto, superficieMq) {
   };
 }
 
+function contestoVision(vision) {
+  const problemi = (vision?.problemi_rilevati || [])
+    .map((x) => `${x.problema} ${x.dettaglio}`)
+    .join(" ")
+    .toLowerCase();
+  const mal = (vision?.malattie_sospette || []).join(" ").toLowerCase();
+  const erbe = (vision?.erbette_infestanti || []).join(" ").toLowerCase();
+  return `${problemi} ${mal} ${erbe}`;
+}
+
 function scoreProdotto(p, { categoriaIntervento, vision }) {
   let score = 0;
   const isBottos = String(p.marca || "").toUpperCase() === "BOTTOS";
@@ -118,8 +133,12 @@ function scoreProdotto(p, { categoriaIntervento, vision }) {
 
   if (categoriaIntervento === "diserbo" && /erbette|trifoglio|tarassaco|dicot|foglia larga/.test(ctx + blob))
     score += 6;
-  if (categoriaIntervento === "trattamento" && /fungh|marcium|patogen|oidio|fusarium|rhizoctonia/.test(ctx + blob))
-    score += 6;
+  if (categoriaIntervento === "trattamento") {
+    if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx)) {
+      if (/fungh|oidio|patogen|trichoderma|bacillus/.test(blob)) score += 10;
+    }
+    if (/insett|afid|larv/.test(ctx) && /insett|afid/.test(blob)) score += 8;
+  }
   if (categoriaIntervento === "concime" && /giall|cloros|nutriz|concim|azoto/.test(ctx + blob)) score += 5;
   if (categoriaIntervento === "biostimolante" && /stress|debole|ripresa/.test(ctx + blob)) score += 4;
 
@@ -130,16 +149,6 @@ export function filtraProdottiPerIntervento(prodotti, categoriaIntervento) {
   const cats = MAP_CATEGORIA_INTERVENTO[categoriaIntervento];
   if (!cats?.length) return [];
   return prodotti.filter((p) => cats.includes(String(p.categoria || "").toUpperCase()));
-}
-
-function contestoVision(vision) {
-  const problemi = (vision?.problemi_rilevati || [])
-    .map((x) => `${x.problema} ${x.dettaglio}`)
-    .join(" ")
-    .toLowerCase();
-  const mal = (vision?.malattie_sospette || []).join(" ").toLowerCase();
-  const erbe = (vision?.erbette_infestanti || []).join(" ").toLowerCase();
-  return `${problemi} ${mal} ${erbe}`;
 }
 
 function restringiPoolTrattamento(pool, vision) {
@@ -170,36 +179,58 @@ export function scegliProdotto(prodotti, { categoriaIntervento, vision }) {
 }
 
 export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, vision) {
-  const mq = mqPrato(profilo);
+  const mq = superficieMqVerificata(profilo);
+  const fito = isInterventoFitofarmaco(intervento.categoria);
   const prodotto = scegliProdotto(prodotti, {
     categoriaIntervento: intervento.categoria,
     vision,
   });
+
+  if (fito) {
+    const hint = prodotto
+      ? `Riferimento catalogo (non prescrizione): ${prodotto.nome} — ${prodotto.composizione || prodotto.categoria}.`
+      : "";
+    return {
+      ...intervento,
+      prodotto_id: prodotto?.id ?? null,
+      prodotto_nome: prodotto?.nome ?? null,
+      dose_totale: null,
+      dose_unita: null,
+      dose_per_mq: null,
+      dose_display: null,
+      avviso_fitofarmaco: true,
+      descrizione: [intervento.descrizione, hint, AVVISO_FITOFARMACO].filter(Boolean).join(" ").slice(0, 900),
+    };
+  }
+
   if (!prodotto) {
     return {
       ...intervento,
-      descrizione: [intervento.descrizione, mq !== Number(profilo?.superficie_mq) ? `(Superficie stimata: ${mq} m²)` : null]
-        .filter(Boolean)
-        .join(" ")
-        .slice(0, 500),
+      descrizione: [intervento.descrizione, !mq ? AVVISO_MQ_MANCANTI : null].filter(Boolean).join(" ").slice(0, 500),
     };
   }
 
   const dose = calcolaDose(prodotto, mq);
-  const extra = dose
-    ? `Prodotto: ${prodotto.nome} (${prodotto.marca || "—"}). ${dose.testo}.`
-    : `Prodotto: ${prodotto.nome}.`;
-  const desc = [intervento.descrizione, extra].filter(Boolean).join(" ").slice(0, 900);
+  if (!dose) {
+    return {
+      ...intervento,
+      prodotto_id: prodotto.id,
+      prodotto_nome: prodotto.nome,
+      descrizione: [intervento.descrizione, AVVISO_MQ_MANCANTI].filter(Boolean).join(" ").slice(0, 900),
+    };
+  }
 
+  const extra = `Prodotto: ${prodotto.nome} (${prodotto.marca || "BOTTOS"}). ${dose.testo}.`;
   return {
     ...intervento,
     prodotto_id: prodotto.id,
     prodotto_nome: prodotto.nome,
-    dose_totale: dose?.dose_totale ?? null,
-    dose_unita: dose?.dose_unita ?? null,
-    dose_per_mq: dose?.dose_per_mq ?? null,
-    dose_display: dose?.dose_display ?? null,
-    descrizione: desc,
+    dose_totale: dose.dose_totale,
+    dose_unita: dose.dose_unita,
+    dose_per_mq: dose.dose_per_mq,
+    dose_display: dose.dose_display,
+    avviso_fitofarmaco: false,
+    descrizione: [intervento.descrizione, extra].filter(Boolean).join(" ").slice(0, 900),
   };
 }
 

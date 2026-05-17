@@ -1,7 +1,46 @@
+import { createClient } from "@supabase/supabase-js";
 import { loadCrawlerEnv } from "./server/loadEnv.mjs";
 import { analizzaPrato } from "./server/analizzaPratoCore.mjs";
 import { generaPianoStagionale } from "./server/pianoStagionale.mjs";
 import { fetchWeatherBundle } from "./server/weatherCore.mjs";
+import { createJob, updateJob, adminClient, getJobForUser } from "./server/jobs.mjs";
+
+async function authUser(req, env) {
+  const auth = req.headers.authorization || "";
+  if (!auth || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;
+  const sb = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: auth } },
+  });
+  const { data } = await sb.auth.getUser();
+  return data?.user ?? null;
+}
+
+async function runGeneraPianoJob(jobId, authHeader, env) {
+  const admin = adminClient(env);
+  try {
+    await updateJob(admin, jobId, { status: "processing" });
+    const result = await generaPianoStagionale({ authHeader, env });
+    await updateJob(admin, jobId, { status: "completed", result, error_message: null });
+  } catch (e) {
+    await updateJob(admin, jobId, { status: "failed", error_message: e.message || String(e) });
+  }
+}
+
+async function runAnalizzaJob(jobId, body, authHeader, env) {
+  const admin = adminClient(env);
+  try {
+    await updateJob(admin, jobId, { status: "processing" });
+    const result = await analizzaPrato({
+      imageBase64: body.imageBase64,
+      mimeType: body.mimeType || "image/jpeg",
+      authHeader,
+      env,
+    });
+    await updateJob(admin, jobId, { status: "completed", result, error_message: null });
+  } catch (e) {
+    await updateJob(admin, jobId, { status: "failed", error_message: e.message || String(e) });
+  }
+}
 
 /** API analisi prato + meteo integrata in Vite */
 export function analizzaPratoPlugin() {
@@ -28,6 +67,62 @@ export function analizzaPratoPlugin() {
           const bundle = await fetchWeatherBundle(city, env.OPENWEATHER_API_KEY);
           res.statusCode = 200;
           res.end(JSON.stringify(bundle));
+        } catch (e) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message || String(e) }));
+        }
+      });
+
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/job-status")) return next();
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/json");
+
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+        if (req.method !== "GET") {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+
+        const url = new URL(req.url, "http://localhost");
+        const jobId = url.searchParams.get("jobId");
+        if (!jobId) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ error: "Parametro jobId richiesto" }));
+          return;
+        }
+
+        try {
+          const user = await authUser(req, env);
+          if (!user) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: "Non autenticato" }));
+            return;
+          }
+          const admin = adminClient(env);
+          const job = await getJobForUser(admin, jobId, user.id);
+          if (!job) {
+            res.statusCode = 404;
+            res.end(JSON.stringify({ error: "Job non trovato" }));
+            return;
+          }
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              id: job.id,
+              tipo: job.tipo,
+              status: job.status,
+              result: job.result,
+              error: job.error_message,
+              updatedAt: job.updated_at,
+            }),
+          );
         } catch (e) {
           res.statusCode = 500;
           res.end(JSON.stringify({ error: e.message || String(e) }));
@@ -67,16 +162,42 @@ export function analizzaPratoPlugin() {
               return;
             }
 
-            console.log("[analizza-prato] analisi avviata…");
-            const result = await analizzaPrato({
-              imageBase64: body.imageBase64,
-              mimeType: body.mimeType || "image/jpeg",
-              authHeader: auth,
-              env,
+            const user = await authUser(req, env);
+            if (!user) {
+              res.statusCode = 401;
+              res.end(JSON.stringify({ error: "Sessione non valida" }));
+              return;
+            }
+
+            const admin = adminClient(env);
+            const { job, tablesMissing } = await createJob(admin, user.id, "analizza_foto", {
+              mimeType: body?.mimeType,
             });
-            console.log("[analizza-prato] completata, chunks:", result.chunksUsed);
-            res.statusCode = 200;
-            res.end(JSON.stringify(result));
+
+            if (tablesMissing || !job) {
+              console.log("[analizza-prato] sync (no prato_jobs)…");
+              const result = await analizzaPrato({
+                imageBase64: body.imageBase64,
+                mimeType: body.mimeType || "image/jpeg",
+                authHeader: auth,
+                env,
+              });
+              res.statusCode = 200;
+              res.end(JSON.stringify({ ...result, async: false }));
+              return;
+            }
+
+            console.log("[analizza-prato] job async", job.id);
+            runAnalizzaJob(job.id, body, auth, env).catch(console.error);
+            res.statusCode = 202;
+            res.end(
+              JSON.stringify({
+                async: true,
+                jobId: job.id,
+                status: "pending",
+                message: "Analisi foto avviata. Attendi…",
+              }),
+            );
           } catch (e) {
             console.error("[analizza-prato]", e);
             res.statusCode = 500;
@@ -112,11 +233,35 @@ export function analizzaPratoPlugin() {
         }
 
         try {
-          console.log("[genera-piano] avvio calendario annuale…");
-          const result = await generaPianoStagionale({ authHeader: auth, env });
-          console.log("[genera-piano] ok,", result.count, "interventi");
-          res.statusCode = 200;
-          res.end(JSON.stringify(result));
+          const user = await authUser(req, env);
+          if (!user) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: "Sessione non valida" }));
+            return;
+          }
+
+          const admin = adminClient(env);
+          const { job, tablesMissing } = await createJob(admin, user.id, "genera_piano", {});
+
+          if (tablesMissing || !job) {
+            console.log("[genera-piano] sync (no prato_jobs)…");
+            const result = await generaPianoStagionale({ authHeader: auth, env });
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ...result, async: false }));
+            return;
+          }
+
+          console.log("[genera-piano] job async", job.id);
+          runGeneraPianoJob(job.id, auth, env).catch(console.error);
+          res.statusCode = 202;
+          res.end(
+            JSON.stringify({
+              async: true,
+              jobId: job.id,
+              status: "pending",
+              message: "Generazione calendario avviata. Attendi…",
+            }),
+          );
         } catch (e) {
           console.error("[genera-piano]", e);
           res.statusCode = 500;
@@ -126,7 +271,7 @@ export function analizzaPratoPlugin() {
 
       if (env.GEMINI_API_KEY) {
         console.log(
-          "[agripocket] API: /api/analizza-prato · /api/genera-piano · meteo: /api/meteo?city=...",
+          "[agripocket] API: /api/analizza-prato · /api/genera-piano · /api/job-status · meteo: /api/meteo?city=...",
         );
       } else {
         console.warn("[agripocket] Manca crawler/.env — foto prato non funzionerà");
