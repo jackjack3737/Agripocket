@@ -1,21 +1,46 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
+import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
 import { profileSummary } from "../data/onboardingSteps";
 import {
   CATEGORIA_LABEL,
   PRIORITA_LABEL,
+  PRIORITY_LEVEL,
   formatDataIt,
   groupInterventi,
-  groupInterventiPerGiorno,
+  groupInterventiPerMese,
   haCalendarioStagionale,
+  prossimiInterventi,
   loadInterventi,
   loadUltimaAnalisi,
   setInterventoCompletato,
+  sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import { supabase } from "../lib/supabase";
+
+function ImportanzaIndicatore({ priorita }) {
+  const level = PRIORITY_LEVEL[priorita] ?? 2;
+  const label = PRIORITA_LABEL[priorita] || "Media";
+  return (
+    <span
+      className={`importanza importanza--${priorita || "media"}`}
+      title={`Importanza: ${label}`}
+      aria-label={`Importanza ${label}`}
+    >
+      <span className="importanza__label">Importanza</span>
+      <span className="importanza__bar" aria-hidden>
+        {[1, 2, 3].map((i) => (
+          <span key={i} className={`importanza__seg${i <= level ? " importanza__seg--on" : ""}`} />
+        ))}
+      </span>
+      <span className="importanza__testo">{label}</span>
+    </span>
+  );
+}
 
 function InterventoRow({ item, onToggle }) {
   const done = item.stato === "completato";
@@ -31,18 +56,54 @@ function InterventoRow({ item, onToggle }) {
       </label>
       <div className="intervento-row__body">
         <div className="intervento-row__top">
-          <span className={`intervento-pill intervento-pill--${item.priorita}`}>
-            {PRIORITA_LABEL[item.priorita]}
-          </span>
-          <span className="intervento-pill intervento-pill--cat">{CATEGORIA_LABEL[item.categoria] || "Altro"}</span>
           <time className="intervento-row__date" dateTime={item.data_prevista || undefined}>
             {formatDataIt(item.data_prevista)}
           </time>
+          <span className="intervento-pill intervento-pill--cat">{CATEGORIA_LABEL[item.categoria] || "Altro"}</span>
+          <ImportanzaIndicatore priorita={item.priorita} />
         </div>
         <p className="intervento-row__title">{item.titolo}</p>
         {item.descrizione ? <p className="intervento-row__desc">{item.descrizione}</p> : null}
       </div>
     </li>
+  );
+}
+
+function MeseAccordion({ mese, open, onToggle, onToggleIntervento }) {
+  return (
+    <section className={`dash-month${open ? " dash-month--open" : ""}`}>
+      <button
+        type="button"
+        className="dash-month__head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span className="dash-month__label">{mese.label}</span>
+        <span className="dash-month__meta">
+          {mese.total} lavori · {mese.giorni.length} {mese.giorni.length === 1 ? "giorno" : "giorni"}
+        </span>
+        <span className="dash-month__chevron" aria-hidden>
+          {open ? "−" : "+"}
+        </span>
+      </button>
+      {open ? (
+        <div className="dash-month__body">
+          {mese.giorni.map(({ data, items }) => (
+            <section key={data} className="dash-day">
+              <h4 className="dash-day__date">
+                <time dateTime={data}>{formatDataIt(data)}</time>
+                <span className="dash-day__count">{items.length} lavori</span>
+              </h4>
+              <ul className="intervento-list">
+                {items.map((item) => (
+                  <InterventoRow key={item.id} item={item} onToggle={onToggleIntervento} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -79,8 +140,26 @@ export default function Dashboard({ profile, session }) {
 
   const userId = session?.user?.id;
   const groups = groupInterventi(interventi);
-  const giorni = groupInterventiPerGiorno(interventi, { maxGiorni: 60 });
+  const mesi = groupInterventiPerMese(interventi);
+  const prossimi = prossimiInterventi(interventi);
   const hasPiano = haCalendarioStagionale(interventi);
+  const autoPianoStarted = useRef(false);
+  const meseCorrente = new Date().toISOString().slice(0, 7);
+  const [mesiAperti, setMesiAperti] = useState(() => new Set([meseCorrente]));
+
+  const pratoRadar = useMemo(
+    () => computePratoStats({ interventi, analisi: ultimaAnalisi, weather }),
+    [interventi, ultimaAnalisi, weather]
+  );
+
+  function toggleMese(monthKey) {
+    setMesiAperti((prev) => {
+      const next = new Set(prev);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+  }
 
   async function refresh() {
     if (!userId) return;
@@ -105,6 +184,14 @@ export default function Dashboard({ profile, session }) {
   }, [userId]);
 
   useEffect(() => {
+    if (loading || !userId || !profile?.localita || interventi.length > 0 || generatingPiano) return;
+    if (autoPianoStarted.current) return;
+    autoPianoStarted.current = true;
+    setBanner("Creazione automatica del piano annuale… (1-2 minuti, non chiudere la pagina)");
+    handleGeneraPiano();
+  }, [loading, userId, profile?.localita, interventi.length, generatingPiano]);
+
+  useEffect(() => {
     if (!profile?.localita) {
       setWeather(null);
       return;
@@ -124,7 +211,12 @@ export default function Dashboard({ profile, session }) {
       setBanner(`Calendario annuale creato: ${result.count} lavori in agenda.`);
       await refresh();
     } catch (e) {
-      setError(e.message);
+      const msg =
+        e.name === "AbortError"
+          ? "Generazione troppo lunga. Riprova con «Genera piano annuale»."
+          : e.message;
+      setError(msg);
+      autoPianoStarted.current = false;
     } finally {
       setGeneratingPiano(false);
     }
@@ -134,14 +226,16 @@ export default function Dashboard({ profile, session }) {
     try {
       await setInterventoCompletato(id, completato);
       setInterventi((prev) =>
-        prev.map((i) =>
-          i.id === id
-            ? {
-                ...i,
-                stato: completato ? "completato" : "pianificato",
-                data_completamento: completato ? new Date().toISOString().slice(0, 10) : null,
-              }
-            : i
+        sortInterventiCronologico(
+          prev.map((i) =>
+            i.id === id
+              ? {
+                  ...i,
+                  stato: completato ? "completato" : "pianificato",
+                  data_completamento: completato ? new Date().toISOString().slice(0, 10) : null,
+                }
+              : i
+          )
         )
       );
     } catch (e) {
@@ -203,7 +297,38 @@ export default function Dashboard({ profile, session }) {
           {weather ? <WeatherCard bundle={weather} compact /> : null}
         </section>
 
-        <section className="dash-card dash-card--profile">
+        <section className="dash-card dash-card--radar">
+          <h2 className="dash-card__title">Stato prato</h2>
+          <p className="dash-card__sub">
+            Esagono aggiornato da foto e lavori in calendario (spunta = migliora).
+          </p>
+          {loading ? (
+            <p className="dash-card__loading">Calcolo stato…</p>
+          ) : (
+            <PratoRadar
+              stats={pratoRadar.stats}
+              media={pratoRadar.media}
+              statoLabel={labelStatoPrato(pratoRadar.media)}
+              compact
+            />
+          )}
+          {ultimaAnalisi?.created_at ? (
+            <p className="dash-card__meta dash-card__meta--radar">
+              Ultima foto:{" "}
+              {new Date(ultimaAnalisi.created_at).toLocaleDateString("it-IT", {
+                day: "numeric",
+                month: "short",
+              })}
+              {!pratoRadar.hasInterventi ? " · aggiungi lavori o spunta il calendario" : null}
+            </p>
+          ) : (
+            <p className="dash-card__meta dash-card__meta--radar">
+              <Link to="/chat">Carica una foto</Link> per aggiornare l&apos;esagono.
+            </p>
+          )}
+        </section>
+
+        <section className="dash-card dash-card--profile dash-card--wide">
           <h2 className="dash-card__title">Profilo prato</h2>
           <ul className="dash-profile-list">
             {profile?.localita ? <li>📍 {profile.localita}</li> : null}
@@ -254,8 +379,10 @@ export default function Dashboard({ profile, session }) {
           </div>
         </div>
 
-        {loading ? (
-          <p className="dash-card__loading">Caricamento piano…</p>
+        {loading || generatingPiano ? (
+          <p className="dash-card__loading">
+            {generatingPiano ? "Creazione piano annuale in corso… 1-2 minuti" : "Caricamento piano…"}
+          </p>
         ) : (
           <>
             {groups.daFoto.length ? (
@@ -267,28 +394,35 @@ export default function Dashboard({ profile, session }) {
               />
             ) : null}
 
-            {giorni.length ? (
-              <div className="dash-day-timeline">
-                <h3 className="dash-calendar-section__title">Agenda giorno per giorno</h3>
-                <p className="dash-calendar-section__hint">Prossimi 60 giorni.</p>
-                {giorni.map(({ data, items }) => (
-                  <section key={data} className="dash-day">
-                    <h4 className="dash-day__date">
-                      <time dateTime={data}>{formatDataIt(data)}</time>
-                      <span className="dash-day__count">{items.length} lavori</span>
-                    </h4>
-                    <ul className="intervento-list">
-                      {items.map((item) => (
-                        <InterventoRow key={item.id} item={item} onToggle={toggleIntervento} />
-                      ))}
-                    </ul>
-                  </section>
+            {mesi.length ? (
+              <div className="dash-month-timeline">
+                <h3 className="dash-calendar-section__title">Piano mese per mese</h3>
+                <p className="dash-calendar-section__hint">
+                  {prossimi.length} lavori · apri un mese per vedere i giorni e le attività.
+                </p>
+                {mesi.map((mese) => (
+                  <MeseAccordion
+                    key={mese.monthKey}
+                    mese={mese}
+                    open={mesiAperti.has(mese.monthKey)}
+                    onToggle={() => toggleMese(mese.monthKey)}
+                    onToggleIntervento={toggleIntervento}
+                  />
                 ))}
               </div>
             ) : null}
 
-            {!giorni.length && groups.altri.length ? (
-              <InterventoSection title="Prossimi interventi" items={groups.altri} onToggle={toggleIntervento} />
+            {!mesi.length && prossimi.length ? (
+              <InterventoSection
+                title="Prossimi lavori"
+                hint="Piano in agenda."
+                items={prossimi}
+                onToggle={toggleIntervento}
+              />
+            ) : null}
+
+            {!mesi.length && !prossimi.length && groups.senzaData.length ? (
+              <InterventoSection title="Prossimi interventi" items={groups.senzaData} onToggle={toggleIntervento} />
             ) : null}
 
             <InterventoSection title="Completati" items={groups.completati} onToggle={toggleIntervento} />

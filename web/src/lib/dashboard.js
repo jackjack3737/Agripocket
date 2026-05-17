@@ -7,7 +7,29 @@ function formatDbError(error) {
   return error?.message || "Errore";
 }
 
-const PRIORITY_ORDER = { alta: 0, media: 1, bassa: 2 };
+/** Livello importanza 1–3 (solo visualizzazione, non per ordinare). */
+export const PRIORITY_LEVEL = { alta: 3, media: 2, bassa: 1 };
+
+function compareCronologico(a, b) {
+  const da = String(a.data_prevista || "");
+  const db = String(b.data_prevista || "");
+  if (da !== db) {
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db);
+  }
+  const oa = a.ordine ?? 0;
+  const ob = b.ordine ?? 0;
+  if (oa !== ob) return oa - ob;
+  return String(a.id || "").localeCompare(String(b.id || ""));
+}
+
+export function sortInterventiCronologico(list) {
+  return [...list].sort((a, b) => {
+    if (a.stato !== b.stato) return a.stato === "pianificato" ? -1 : 1;
+    return compareCronologico(a, b);
+  });
+}
 
 export async function loadInterventi(userId) {
   const { data, error } = await supabase
@@ -18,19 +40,13 @@ export async function loadInterventi(userId) {
     .order("ordine", { ascending: true });
 
   if (error) throw new Error(formatDbError(error));
-  const list = data ?? [];
-  return list.sort((a, b) => {
-    if (a.stato !== b.stato) return a.stato === "pianificato" ? -1 : 1;
-    const pd = (PRIORITY_ORDER[a.priorita] ?? 1) - (PRIORITY_ORDER[b.priorita] ?? 1);
-    if (pd !== 0) return pd;
-    return String(a.data_prevista || "").localeCompare(String(b.data_prevista || ""));
-  });
+  return sortInterventiCronologico(data ?? []);
 }
 
 export async function loadUltimaAnalisi(userId) {
   const { data, error } = await supabase
     .from("prato_analisi")
-    .select("id, created_at, chunks_used")
+    .select("id, created_at, chunks_used, vision_json")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -84,21 +100,20 @@ export function formatDataIt(iso) {
 }
 
 export function groupInterventi(list) {
-  const pianificati = list.filter((i) => i.stato === "pianificato");
-  const completati = list.filter((i) => i.stato === "completato");
-  const alta = pianificati.filter((i) => i.priorita === "alta");
-  const altri = pianificati.filter((i) => i.priorita !== "alta");
+  const pianificati = sortInterventiCronologico(list.filter((i) => i.stato === "pianificato"));
+  const completati = sortInterventiCronologico(list.filter((i) => i.stato === "completato"));
   const daFoto = pianificati.filter((i) => i.fonte === "ia_foto");
   const daCalendario = pianificati.filter((i) => i.fonte === "calendario_stagionale");
-  return { alta, altri, completati, pianificati, daFoto, daCalendario };
+  const senzaData = pianificati.filter((i) => !i.data_prevista);
+  return { completati, pianificati, daFoto, daCalendario, senzaData };
 }
 
 /** Raggruppa interventi pianificati per data_prevista (giorno per giorno). */
-export function groupInterventiPerGiorno(list, { maxGiorni = 90 } = {}) {
+export function groupInterventiPerGiorno(list, { maxGiorni = 365 } = {}) {
   const oggi = new Date().toISOString().slice(0, 10);
-  const pianificati = list
-    .filter((i) => i.stato === "pianificato" && i.data_prevista)
-    .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
+  const pianificati = sortInterventiCronologico(
+    list.filter((i) => i.stato === "pianificato" && i.data_prevista)
+  );
 
   const byDay = new Map();
   for (const item of pianificati) {
@@ -109,9 +124,50 @@ export function groupInterventiPerGiorno(list, { maxGiorni = 90 } = {}) {
 
   return [...byDay.entries()]
     .slice(0, maxGiorni)
-    .map(([data, items]) => ({ data, items }));
+    .map(([data, items]) => ({
+      data,
+      items: sortInterventiCronologico(items),
+    }));
+}
+
+/** Elenco lineare dei prossimi lavori (fallback se serve). */
+export function prossimiInterventi(list, limit = 120) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  return sortInterventiCronologico(
+    list.filter((i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista >= oggi)
+  ).slice(0, limit);
 }
 
 export function haCalendarioStagionale(list) {
   return list.some((i) => i.fonte === "calendario_stagionale");
+}
+
+export function formatMeseIt(yyyyMm) {
+  const [y, m] = yyyyMm.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("it-IT", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Raggruppa per mese (YYYY-MM) con giorni al interno. */
+export function groupInterventiPerMese(list) {
+  const giorni = groupInterventiPerGiorno(list);
+  const byMonth = new Map();
+
+  for (const day of giorni) {
+    const monthKey = day.data.slice(0, 7);
+    if (!byMonth.has(monthKey)) {
+      byMonth.set(monthKey, { monthKey, giorni: [] });
+    }
+    byMonth.get(monthKey).giorni.push(day);
+  }
+
+  return [...byMonth.values()]
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+    .map((m) => ({
+      ...m,
+      label: formatMeseIt(m.monthKey),
+      total: m.giorni.reduce((s, g) => s + g.items.length, 0),
+    }));
 }

@@ -202,7 +202,7 @@ Rispondi SOLO JSON:
 }
 
 Regole:
-- Minimo 70 interventi, massimo 120, distribuiti su tutto l'anno (non ammassare tutto in una settimana).
+- Minimo 50 interventi, massimo 90, distribuiti su tutto l'anno (non ammassare tutto in una settimana).
 - Date reali tra ${oggi} e ${fine}; rispetta stagionalità climatica italiana e località.
 - In inverno (dic-feb) meno tagli, più pianificazione; picco concimi primavera/autunno.
 - Evita duplicati lo stesso giorno con stesso titolo.
