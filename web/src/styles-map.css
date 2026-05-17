@@ -257,8 +257,28 @@
 
 .map-modal-map {
   height: min(42vh, 380px);
+  min-height: 280px;
   width: 100%;
   background: #dfe7e4;
+  touch-action: none;
+}
+
+.map-modal-mode-warn {
+  margin: 0 16px 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  background: #fff8e1;
+  border-left: 3px solid #f9a825;
+  color: #5d4037;
+}
+
+.map-modal-mode-ok {
+  margin: 0 16px 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  background: #e8f5e9;
+  border-left: 3px solid #2e7d32;
+  color: #1b5e20;
 }
 
 .map-modal-footer {

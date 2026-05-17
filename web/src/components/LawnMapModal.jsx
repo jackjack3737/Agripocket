@@ -88,6 +88,12 @@ export default function LawnMapModal({
   const clickListenerRef = useRef(null);
   const lastGeocodeRef = useRef(null);
   const zoneOverlayRefs = useRef({ markers: [], polygons: [], polylines: [] });
+  const drawStateRef = useRef({
+    inZones: false,
+    panMode: true,
+    zoneTool: "pan",
+    pendenzaFrom: null,
+  });
 
   const [mapStep, setMapStep] = useState("boundary");
   const [panMode, setPanMode] = useState(true);
@@ -153,7 +159,7 @@ export default function LawnMapModal({
             mapRef.current.setZoom(19);
           }
         }
-        setPanMode(true);
+        setPanMode(false);
         resolve(true);
       });
     });
@@ -180,25 +186,27 @@ export default function LawnMapModal({
   }
 
   function handleMapClick(lat, lng) {
-    if (inZones) {
-      if (zoneTool === "pan") return;
-      if (zoneTool === "irrigatore") {
+    const { inZones: iz, panMode: pan, zoneTool: tool, pendenzaFrom: pFrom } = drawStateRef.current;
+
+    if (iz) {
+      if (tool === "pan") return;
+      if (tool === "irrigatore") {
         setIrrigatorPick({ lat, lng });
         return;
       }
-      if (zoneTool === "ombra" || zoneTool === "muschio") {
-        setDraftTipo(zoneTool);
+      if (tool === "ombra" || tool === "muschio") {
+        setDraftTipo(tool);
         setDraftPath((prev) => [...prev, { lat, lng }]);
         return;
       }
-      if (zoneTool === "pendenza") {
-        if (!pendenzaFrom) {
+      if (tool === "pendenza") {
+        if (!pFrom) {
           setPendenzaFrom({ lat, lng });
         } else {
           addZone({
             id: `z_${Date.now()}`,
             tipo: "pendenza",
-            from: pendenzaFrom,
+            from: pFrom,
             to: { lat, lng },
           });
         }
@@ -207,10 +215,14 @@ export default function LawnMapModal({
       return;
     }
 
-    if (!panMode) {
+    if (!pan) {
       setVertices((prev) => [...prev, { lat, lng }]);
     }
   }
+
+  useEffect(() => {
+    drawStateRef.current = { inZones, panMode, zoneTool, pendenzaFrom };
+  }, [inZones, panMode, zoneTool, pendenzaFrom]);
 
   function confirmIrrigator(modalita) {
     if (!irrigatorPick) return;
@@ -239,7 +251,7 @@ export default function LawnMapModal({
     setVertices(normalized.poligono.length >= 3 ? normalized.poligono : []);
     setZones(normalized.zone);
     setMapStep("boundary");
-    setPanMode(true);
+    setPanMode(false);
     setZoneTool("pan");
     resetDraft();
     setLoadError(null);
@@ -280,6 +292,7 @@ export default function LawnMapModal({
           fillOpacity: 0.12,
           map,
           geodesic: true,
+          clickable: false,
         });
         polyRef.current = poly;
 
@@ -378,23 +391,24 @@ export default function LawnMapModal({
   }, [zones, draftPath, draftTipo, pendenzaFrom, open, mapTick, mapReady, inZones]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mapRef.current || !mapTick) return undefined;
     const map = mapRef.current;
-    if (!map) return;
+
+    const drawMode = inZones ? zoneTool !== "pan" : !panMode;
+    map.setOptions({
+      draggable: !drawMode,
+      scrollwheel: true,
+      gestureHandling: drawMode ? "none" : "greedy",
+      disableDoubleClickZoom: drawMode,
+    });
 
     if (clickListenerRef.current) {
       window.google.maps.event.removeListener(clickListenerRef.current);
-      clickListenerRef.current = null;
     }
-
-    const drawMode = inZones ? zoneTool !== "pan" : !panMode;
-    map.setOptions({ draggable: !drawMode, scrollwheel: true });
-
-    if (drawMode || (!inZones && !panMode)) {
-      clickListenerRef.current = map.addListener("click", (e) => {
-        handleMapClick(e.latLng.lat(), e.latLng.lng());
-      });
-    }
+    clickListenerRef.current = map.addListener("click", (e) => {
+      if (!e?.latLng) return;
+      handleMapClick(e.latLng.lat(), e.latLng.lng());
+    });
 
     return () => {
       if (clickListenerRef.current) {
@@ -402,7 +416,7 @@ export default function LawnMapModal({
         clickListenerRef.current = null;
       }
     };
-  }, [panMode, zoneTool, inZones, open, mapTick, pendenzaFrom]);
+  }, [panMode, zoneTool, inZones, open, mapTick]);
 
   async function handleApply() {
     if (vertices.length < 3 || areaSqm <= 0) return;
@@ -461,8 +475,18 @@ export default function LawnMapModal({
 
         {!missingKey && !loadError && !inZones && (
           <p className="map-modal-hint">
-            Cerca l&apos;indirizzo, poi <strong>Freccia</strong> per disegnare il contorno del prato.
+            Cerca l&apos;indirizzo, poi attiva <strong>Disegna prato</strong> e tocca la mappa per ogni vertice
+            (almeno 3 punti).
           </p>
+        )}
+        {!missingKey && !loadError && !inZones && panMode && (
+          <p className="map-modal-mode-warn">Modalità mano: sposta la mappa. Per disegnare, scegli «Disegna prato».</p>
+        )}
+        {!missingKey && !loadError && !inZones && !panMode && (
+          <p className="map-modal-mode-ok">Modalità disegno attiva: ogni tap aggiunge un vertice del prato.</p>
+        )}
+        {!missingKey && !loadError && inZones && zoneTool === "pan" && (
+          <p className="map-modal-mode-warn">Scegli uno strumento (es. Irrigatore) e tocca la mappa.</p>
         )}
 
         {!missingKey && !loadError && inZones && (

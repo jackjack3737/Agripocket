@@ -47,6 +47,7 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
         strokeWeight: 2,
         fillColor: style.fill,
         fillOpacity: z.tipo === "ombra" ? 0.35 : 0.45,
+        clickable: false,
       });
       refs.polygons.push(poly);
     } else if (z.tipo === "pendenza") {
@@ -55,6 +56,7 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
         map,
         strokeColor: style.color,
         strokeWeight: 4,
+        clickable: false,
         icons: [
           {
             icon: {
@@ -83,6 +85,7 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
       strokeOpacity: 0.8,
       fillColor: style.fill,
       fillOpacity: 0.2,
+      clickable: false,
     });
     refs.polygons.push(poly);
     draft.path.forEach((p, i) => {
@@ -111,6 +114,7 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
       strokeColor: style.color,
       strokeOpacity: 0.7,
       strokeWeight: 3,
+      clickable: false,
       icons: [
         {
           icon: {
