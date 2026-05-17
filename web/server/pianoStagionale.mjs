@@ -9,6 +9,7 @@ import {
   ensureInterventoParassiti,
   hintParassitiRegionali,
 } from "./parassitiPrato.mjs";
+import { formatProfileForPrompt } from "./profileContext.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -26,22 +27,6 @@ const CATEGORIE_OK = new Set([
   "rinnovo",
   "altro",
 ]);
-
-function profileText(p) {
-  if (!p) return "Profilo prato: non compilato.";
-  return [
-    p.uso && `Uso: ${p.uso}`,
-    p.marca_seme && `Miscuglio: ${p.marca_seme}`,
-    p.esposizione && `Esposizione: ${p.esposizione}`,
-    p.tipo_terreno && `Terreno: ${p.tipo_terreno}`,
-    p.irrigazione && `Irrigazione: ${p.irrigazione}`,
-    p.superficie_mq && `Superficie: ${p.superficie_mq} m²`,
-    p.localita && `Località: ${p.localita}`,
-    p.note && `Note/specie: ${p.note}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
 
 async function geminiEmbed(text, apiKey) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:embedContent?key=${encodeURIComponent(apiKey)}`;
@@ -182,7 +167,7 @@ Oggi: ${oggi} (${mese})
 Periodo piano: da ${oggi} a ${fine}
 
 Profilo sito:
-${profileText(profilo)}
+${formatProfileForPrompt(profilo)}
 
 ${weatherBlock}
 

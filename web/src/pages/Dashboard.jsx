@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import IrrigationZoneCard from "../components/IrrigationZoneCard";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
@@ -415,6 +416,8 @@ export default function Dashboard({ profile, session }) {
       ) : null}
 
       <div className="dash-grid">
+        <IrrigationZoneCard profile={profile} />
+
         <section className="dash-card dash-card--weather">
           <h2 className="dash-card__title">Meteo</h2>
           {profile?.localita ? (
@@ -431,7 +434,7 @@ export default function Dashboard({ profile, session }) {
         <section className="dash-card dash-card--radar">
           <h2 className="dash-card__title">Stato prato</h2>
           <p className="dash-card__sub">
-            Esagono aggiornato da foto e lavori in calendario (spunta = migliora).
+            Punteggio soprattutto dalla foto; il calendario incide solo sui lavori urgenti in ritardo.
           </p>
           {loading ? (
             <p className="dash-card__loading">Calcolo stato…</p>
@@ -467,6 +470,10 @@ export default function Dashboard({ profile, session }) {
             {profile?.superficie_mq ? <li>📐 {profile.superficie_mq} m²</li> : null}
             {profile?.note ? <li>🌿 {profile.note}</li> : null}
             {profile?.marca_seme ? <li>🌱 {profile.marca_seme}</li> : null}
+            {(profile?.problemi_noti?.length ?? 0) > 0 ? (
+              <li>⚠️ Problemi noti: {(profile.problemi_noti || []).length}</li>
+            ) : null}
+            {profile?.analisi_terreno_fatta ? <li>🧪 Analisi terreno in profilo</li> : null}
           </ul>
           {ultimaAnalisi ? (
             <p className="dash-card__meta">

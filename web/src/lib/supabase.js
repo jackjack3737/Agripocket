@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { parseMqInput } from "./parseMq";
+import { computeOmbraZonePct } from "./pratoZone";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -67,6 +68,14 @@ export async function updatePratoLocalita(userId, localita) {
 export async function savePratoProfilo(userId, profile) {
   await ensureAgropocketUser();
 
+  const phRaw = profile.ph_valore;
+  const phNum =
+    typeof phRaw === "number"
+      ? phRaw
+      : phRaw != null && String(phRaw).trim()
+        ? Number(String(phRaw).trim().replace(",", "."))
+        : null;
+
   const row = {
     user_id: userId,
     uso: profile.uso,
@@ -76,6 +85,31 @@ export async function savePratoProfilo(userId, profile) {
     esposizione: profile.esposizione,
     tipo_terreno: profile.tipo_terreno,
     irrigazione: profile.irrigazione,
+    eta_prato: profile.eta_prato || null,
+    obiettivo: profile.obiettivo || null,
+    frequenza_taglio: profile.frequenza_taglio || null,
+    altezza_taglio_cm: profile.altezza_taglio_cm || null,
+    animali: profile.animali || null,
+    ultimo_trattamento_tipo: profile.ultimo_trattamento_tipo || null,
+    ultimo_trattamento_quando: profile.ultimo_trattamento_quando || null,
+    problemi_noti: Array.isArray(profile.problemi_noti) ? profile.problemi_noti : [],
+    pendenza: profile.pendenza || null,
+    ristagno_acqua: profile.ristagno_acqua || null,
+    ph_terreno: profile.ph_terreno || null,
+    ph_valore:
+      phNum != null && Number.isFinite(phNum) && phNum >= 4 && phNum <= 9
+        ? Math.round(phNum * 10) / 10
+        : null,
+    analisi_terreno_fatta: !!profile.analisi_terreno_fatta,
+    note_terreno: profile.note_terreno?.trim() || null,
+    prato_zone: profile.prato_zone && typeof profile.prato_zone === "object" ? profile.prato_zone : null,
+    ombra_zone_pct: (() => {
+      if (profile.prato_zone) {
+        const fromMap = computeOmbraZonePct(profile.prato_zone);
+        if (fromMap) return fromMap;
+      }
+      return profile.ombra_zone_pct || null;
+    })(),
     superficie_mq: (() => {
       const mq = parseMqInput(profile.superficie_mq);
       return mq != null ? Math.round(mq) : null;

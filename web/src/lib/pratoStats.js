@@ -46,6 +46,42 @@ function gravitaAltaCount(vision) {
   return (vision?.problemi_rilevati || []).filter((p) => p?.gravita === "alta").length;
 }
 
+/** Problemi strutturati che devono penalizzare (evita falsi positivi su testo libero). */
+function problemiSignificativi(vision) {
+  return (vision?.problemi_rilevati || []).filter((p) => p?.gravita === "alta" || p?.gravita === "media");
+}
+
+function testoProblemiSignificativi(vision) {
+  return problemiSignificativi(vision)
+    .map((p) => `${p?.problema || ""} ${p?.dettaglio || ""}`.toLowerCase())
+    .join(" ");
+}
+
+function isVisionEccellente(vision) {
+  if (!vision) return false;
+  const stato = vision.stato_generale;
+  if (stato === "critico" || stato === "discreto") return false;
+  if (gravitaAltaCount(vision) > 0) return false;
+  if (problemiSignificativi(vision).length > (stato === "ottimo" ? 0 : 1)) return false;
+  if (vision.stress_idrici?.segni) return false;
+  if (vision.feltro_thatch?.presente) return false;
+  if (vision.foglie_debris?.eccesso_foglie) return false;
+  if ((vision.malattie_sospette || []).length > 0) return false;
+  if (vision.taglio?.giudizio === "troppo_basso") return false;
+  return stato === "ottimo" || stato === "buono";
+}
+
+/** Per l'esagono: solo lavori urgenti reali, non tutto il calendario stagionale/catalogo. */
+function interventiPerStatoRadar(interventi) {
+  return interventi.filter((i) => {
+    if (i.fonte === "controllo_mensile") return false;
+    if (i.priorita === "bassa") return false;
+    const titolo = String(i.titolo || "");
+    if (titolo.startsWith("Catalogo —")) return false;
+    return true;
+  });
+}
+
 function visionFreshness(createdAt) {
   if (!createdAt) return 0;
   const days = giorniTra(new Date(createdAt).toISOString().slice(0, 10), oggiIso());
@@ -59,8 +95,20 @@ function visionFreshness(createdAt) {
 function scoreFromVision(vision) {
   if (!vision || typeof vision !== "object") return null;
 
+  if (isVisionEccellente(vision)) {
+    const top = vision.stato_generale === "ottimo" ? 94 : 88;
+    return {
+      idratazione: top - 2,
+      nutrizione: top - 1,
+      copertura: top,
+      salute_fogliare: top - 1,
+      difesa: top - 3,
+      manutenzione: top - 2,
+    };
+  }
+
   const base = STATO_MAP[vision.stato_generale] ?? 58;
-  const problems = testoProblemi(vision);
+  const problems = testoProblemiSignificativi(vision);
   const alta = gravitaAltaCount(vision);
   const mal = (vision.malattie_sospette || []).length;
   const erbe = (vision.erbette_infestanti || []).length;
@@ -70,12 +118,12 @@ function scoreFromVision(vision) {
   if (/sicc|secc|arid|stress idr|disidr/.test(problems)) idratazione -= 12;
 
   let nutrizione = base;
-  if (/giall|cloros|nutriz|concim|azoto|carenza/.test(problems)) nutrizione -= 18;
+  if (/giall|cloros|carenza|clorosi/.test(problems)) nutrizione -= 18;
   if (/debole|sposs/.test(problems)) nutrizione -= 10;
 
   let copertura = base;
   if (/calv|dirad|patch|vuot|ralo|sparse|bassa dens/.test(problems)) copertura -= 22;
-  if (erbe > 2) copertura -= 8;
+  if (erbe > 3) copertura -= 8;
 
   let salute_fogliare = base;
   if (vision.taglio?.giudizio === "troppo_basso") salute_fogliare -= 15;
@@ -84,7 +132,8 @@ function scoreFromVision(vision) {
   if (vision.foglie_debris?.eccesso_foglie) salute_fogliare -= 8;
   if (/necros|macchl|fungh|patolog/.test(problems)) salute_fogliare -= 14;
 
-  let difesa = 82 - alta * 12 - mal * 14 - erbe * 6;
+  let difesa = vision.stato_generale === "ottimo" ? 90 : 82;
+  difesa -= alta * 12 + mal * 14 + Math.max(0, erbe - 2) * 6;
   if (/parassit|insett|afid|larv|marcium/.test(problems)) difesa -= 15;
 
   let manutenzione = base;
@@ -108,8 +157,9 @@ function scoreFromInterventi(interventi, categorie, oggi) {
   const relevant = interventi.filter((i) => categorie.includes(i.categoria));
   if (!relevant.length) return null;
 
-  let score = 72;
+  let score = 82;
   let counted = 0;
+  let penalita = 0;
 
   for (const i of relevant) {
     if (!i.data_prevista) continue;
@@ -118,23 +168,24 @@ function scoreFromInterventi(interventi, categorie, oggi) {
 
     if (i.stato === "completato") {
       counted += 1;
-      if (late >= 0 && late <= 21) score += 6;
-      else if (late < 0) score += 4;
+      if (late >= 0 && late <= 21) score += 4;
+      else if (late < 0) score += 2;
       continue;
     }
 
     if (i.stato !== "pianificato") continue;
 
     if (late < 0) continue;
+    if (i.priorita !== "alta" && late <= 7) continue;
 
     counted += 1;
     const pen = PRIORITA_PENALTY[i.priorita] ?? 12;
-    const mult = 1 + Math.min(late, 21) / 14;
-    score -= pen * mult;
+    const mult = 1 + Math.min(late, 14) / 21;
+    penalita += pen * mult * (i.priorita === "alta" ? 1 : 0.45);
   }
 
   if (!counted) return null;
-  return clamp(score);
+  return clamp(score - penalita);
 }
 
 function scoreManutenzioneInterventi(interventi, oggi) {
@@ -188,21 +239,32 @@ function scoreFromWeather(weather) {
   return { idratazione: clamp(idratazione) };
 }
 
-function mergeAxis(visionVal, interventiVal, weatherVal, { vWeight, defaultVal = 52 }) {
+function mergeAxis(visionVal, interventiVal, weatherVal, { vWeight, defaultVal = 52, visionEccellente = false }) {
   const parts = [];
   const weights = [];
 
+  const visionW = Math.min(0.88, visionEccellente ? Math.max(vWeight, 0.82) : vWeight);
+  const interventiW =
+    interventiVal != null
+      ? visionVal != null
+        ? visionEccellente
+          ? 0.1
+          : Math.min(0.28, 1 - visionW * 0.4)
+        : 0.85
+      : 0;
+  const weatherW = weatherVal != null ? (visionEccellente ? 0.08 : 0.18) : 0;
+
   if (visionVal != null) {
     parts.push(visionVal);
-    weights.push(vWeight);
+    weights.push(visionW);
   }
-  if (interventiVal != null) {
+  if (interventiVal != null && interventiW > 0) {
     parts.push(interventiVal);
-    weights.push(visionVal != null ? 1 - vWeight * 0.35 : 0.85);
+    weights.push(interventiW);
   }
-  if (weatherVal != null) {
+  if (weatherVal != null && weatherW > 0) {
     parts.push(weatherVal);
-    weights.push(0.22);
+    weights.push(weatherW);
   }
 
   if (!parts.length) return defaultVal;
@@ -219,8 +281,10 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
   const oggi = oggiIso();
   const vision = analisi?.vision_json;
   const vWeight = visionFreshness(analisi?.created_at);
+  const visionEccellente = isVisionEccellente(vision);
   const fromVision = scoreFromVision(vision);
-  const fromInterventi = scoreFromInterventiAll(interventi, oggi);
+  const radarInterventi = interventiPerStatoRadar(interventi);
+  const fromInterventi = scoreFromInterventiAll(radarInterventi, oggi);
   const fromWeather = scoreFromWeather(weather);
 
   const stats = {};
@@ -231,7 +295,7 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
       fromVision?.[key] ?? null,
       fromInterventi[key] ?? null,
       key === "idratazione" ? fromWeather?.idratazione ?? null : null,
-      { vWeight, defaultVal: 52 }
+      { vWeight, defaultVal: 52, visionEccellente }
     );
     sources[key] = {
       vision: fromVision?.[key] ?? null,
@@ -303,7 +367,12 @@ export function buildAxisInsight(key, ctx) {
     perche.push(`Ultima foto: indicatore ~${sources[key].vision}/100.`);
   }
   if (sources[key]?.interventi != null) {
-    perche.push(`Calendario lavori: ~${sources[key].interventi}/100 (spunte e ritardi).`);
+    perche.push(
+      `Adempienza calendario: ~${sources[key].interventi}/100 (solo lavori urgenti; non penalizza tutto il piano stagionale).`,
+    );
+  }
+  if (hasVision && isVisionEccellente(vision) && sources[key]?.vision != null) {
+    perche.push("Foto: prato in ottime condizioni — il punteggio principale viene dall'analisi visiva.");
   }
   if (key === "idratazione" && sources[key]?.meteo != null) {
     perche.push(`Meteo attuale: ~${sources[key].meteo}/100 (umidità e temperature).`);
@@ -329,7 +398,7 @@ export function buildAxisInsight(key, ctx) {
   }
 
   if (key === "nutrizione") {
-    if (/giall|cloros|nutriz|carenza/.test(problems)) perche.push("Possibile carenza nutrizionale visibile.");
+    if (/giall|cloros|carenza|clorosi/.test(problems)) perche.push("Possibile carenza nutrizionale visibile.");
     if (lv === "basso") {
       migliora.push("Programma concimazione (NPK / microelementi) nei periodi indicati.");
       if (lavoriApertiPerCategorie(interventi, ["concime", "biostimolante"], oggi).length) {

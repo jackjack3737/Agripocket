@@ -1,24 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { extractInterventiFromReport, persistAnalisiAndInterventi } from "./interventiFromReport.mjs";
+import { formatProfileForPrompt } from "./profileContext.mjs";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
-
-function profileText(p) {
-  if (!p) return "Profilo prato: non compilato.";
-  const parts = [
-    p.uso && `Uso: ${p.uso}`,
-    p.marca_seme && `Marca/miscuglio dichiarata: ${p.marca_seme}`,
-    p.esposizione && `Esposizione: ${p.esposizione}`,
-    p.tipo_terreno && `Terreno: ${p.tipo_terreno}`,
-    p.irrigazione && `Irrigazione: ${p.irrigazione}`,
-    p.superficie_mq && `Superficie: ${p.superficie_mq} m²`,
-    p.note && `Note: ${p.note}`,
-    p.localita && `Località: ${p.localita}`,
-  ].filter(Boolean);
-  return parts.length ? parts.join("\n") : "Profilo prato: minimo.";
-}
 
 async function queryKnowledgeBase(admin, embedding) {
   const attempts = [
@@ -123,7 +109,7 @@ export async function analizzaPrato({ imageBase64, mimeType, authHeader, env }) 
   const visionPrompt = `Sei il miglior agronomo di tappeto erboso al mondo. Analizza questa foto di prato.
 
 Profilo del sito (senza tipo erba — lo deduci dalla foto):
-${profileText(profilo)}
+${formatProfileForPrompt(profilo)}
 
 ${weatherBlock || "Meteo: località non indicata nel profilo."}
 
@@ -183,7 +169,7 @@ Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce 
     ...speciesFromVision,
     ...(vision.malattie_sospette || []),
     ...(vision.problemi_rilevati || []).map((x) => x.problema),
-    profileText(profilo),
+    formatProfileForPrompt(profilo),
   ]
     .filter(Boolean)
     .join("\n");
@@ -200,7 +186,7 @@ Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce 
 
   const reportPrompt = `Sei il miglior agronomo di tappeto erboso al mondo.
 
-Profilo: ${profileText(profilo)}
+Profilo: ${formatProfileForPrompt(profilo)}
 
 ${weatherBlock || ""}
 

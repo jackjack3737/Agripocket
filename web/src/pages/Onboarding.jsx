@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ChoiceCard from "../components/ChoiceCard";
+import ProblemiNotiPicker from "../components/ProblemiNotiPicker";
 import StepGuide from "../components/StepGuide";
 import StepProgress from "../components/StepProgress";
-import { EXTRA_STEP, ONBOARDING_STEPS } from "../data/onboardingSteps";
+import {
+  ADVANCED_FIELDS,
+  EXTRA_STEP,
+  ONBOARDING_STEPS,
+} from "../data/onboardingSteps";
 import { formatMqInput, parseMqInput } from "../lib/parseMq";
 import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
 import { savePratoProfilo } from "../lib/supabase";
@@ -16,10 +21,26 @@ const EMPTY = {
   esposizione: null,
   tipo_terreno: null,
   irrigazione: null,
+  eta_prato: null,
+  obiettivo: null,
+  frequenza_taglio: null,
+  altezza_taglio_cm: null,
+  animali: null,
+  ultimo_trattamento_tipo: null,
+  ultimo_trattamento_quando: null,
+  problemi_noti: [],
+  pendenza: null,
+  ristagno_acqua: null,
+  ombra_zone_pct: null,
+  ph_terreno: null,
+  ph_valore: "",
+  analisi_terreno_fatta: false,
+  note_terreno: "",
   marca_seme: "",
   superficie_mq: "",
   localita: "",
   disclaimer_accettato: false,
+  prato_zone: null,
 };
 
 function profileToAnswers(p) {
@@ -29,11 +50,47 @@ function profileToAnswers(p) {
     esposizione: p.esposizione ?? null,
     tipo_terreno: p.tipo_terreno ?? null,
     irrigazione: p.irrigazione ?? null,
+    eta_prato: p.eta_prato ?? null,
+    obiettivo: p.obiettivo ?? null,
+    frequenza_taglio: p.frequenza_taglio ?? null,
+    altezza_taglio_cm: p.altezza_taglio_cm ?? null,
+    animali: p.animali ?? null,
+    ultimo_trattamento_tipo: p.ultimo_trattamento_tipo ?? null,
+    ultimo_trattamento_quando: p.ultimo_trattamento_quando ?? null,
+    problemi_noti: Array.isArray(p.problemi_noti) ? p.problemi_noti : [],
+    pendenza: p.pendenza ?? null,
+    ristagno_acqua: p.ristagno_acqua ?? null,
+    ombra_zone_pct: p.ombra_zone_pct ?? null,
+    ph_terreno: p.ph_terreno ?? null,
+    ph_valore: p.ph_valore != null ? String(p.ph_valore).replace(".", ",") : "",
+    analisi_terreno_fatta: !!p.analisi_terreno_fatta,
+    note_terreno: p.note_terreno || "",
     marca_seme: p.marca_seme || "",
     superficie_mq: p.superficie_mq != null ? formatMqInput(p.superficie_mq) : "",
     localita: p.localita || "",
     disclaimer_accettato: !!p.disclaimer_accettato_at,
+    prato_zone: p.prato_zone ?? null,
   };
+}
+
+function parsePhInput(raw) {
+  if (!raw?.trim()) return null;
+  const n = Number(String(raw).trim().replace(",", "."));
+  if (!Number.isFinite(n) || n < 4 || n > 9) return null;
+  return Math.round(n * 10) / 10;
+}
+
+function stepSkipped(stepData, answers) {
+  return stepData?.skipIf?.(answers);
+}
+
+function findNextStep(from, answers, dir = 1) {
+  let i = from;
+  while (i >= 0 && i < ONBOARDING_STEPS.length) {
+    if (!stepSkipped(ONBOARDING_STEPS[i], answers)) return i;
+    i += dir;
+  }
+  return dir > 0 ? ONBOARDING_STEPS.length : -1;
 }
 
 export default function Onboarding({ userId, initialProfile, onComplete }) {
@@ -43,20 +100,34 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [mapOpen, setMapOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(() =>
+    Boolean(
+      initialProfile?.pendenza ||
+        initialProfile?.ristagno_acqua ||
+        initialProfile?.ombra_zone_pct ||
+        initialProfile?.ph_terreno ||
+        initialProfile?.ph_valore != null ||
+        initialProfile?.analisi_terreno_fatta ||
+        initialProfile?.note_terreno,
+    ),
+  );
 
-  const isExtra = step === ONBOARDING_STEPS.length;
+  const isExtra = step >= ONBOARDING_STEPS.length;
   const stepData = isExtra ? null : ONBOARDING_STEPS[step];
-  const value = stepData ? answers[stepData.field] : null;
+  const isMulti = stepData?.type === "multi";
+  const value = stepData && !isMulti ? answers[stepData.field] : null;
 
   function setField(f, v) {
     setAnswers((a) => ({ ...a, [f]: v }));
   }
 
-  function handleMapApply({ localita, superficie_mq }) {
+  function handleMapApply({ localita, superficie_mq, prato_zone, ombra_zone_pct }) {
     setAnswers((a) => ({
       ...a,
       ...(localita ? { localita } : {}),
       ...(superficie_mq != null ? { superficie_mq: formatMqInput(superficie_mq) } : {}),
+      ...(prato_zone ? { prato_zone } : {}),
+      ...(ombra_zone_pct ? { ombra_zone_pct } : {}),
     }));
   }
 
@@ -74,10 +145,15 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
       setError("Devi accettare il disclaimer legale per usare AgriPocket.");
       return;
     }
+    const ph = parsePhInput(answers.ph_valore);
+    if (answers.ph_valore?.trim() && ph == null) {
+      setError("pH non valido: usa un numero tra 4 e 9 (es. 6,5).");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
-      const saved = await savePratoProfilo(userId, answers);
+      const saved = await savePratoProfilo(userId, { ...answers, ph_valore: ph });
       onComplete(saved);
       nav("/dashboard", { replace: true });
     } catch (e) {
@@ -92,18 +168,21 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
       finish();
       return;
     }
-    if (!value) return;
-    setStep(step + 1);
+    if (!isMulti && !value) return;
+    const n = findNextStep(step + 1, answers, 1);
+    setStep(n);
   }
 
   function back() {
-    if (step > 0) setStep(step - 1);
+    if (step <= 0) return;
+    const p = findNextStep(step - 1, answers, -1);
+    if (p >= 0) setStep(p);
   }
 
   const totalSteps = ONBOARDING_STEPS.length + 1;
   const displayStep = isExtra ? totalSteps : step + 1;
   const selectedOption =
-    stepData && value ? stepData.options.find((o) => o.value === value) : null;
+    stepData && !isMulti && value ? stepData.options.find((o) => o.value === value) : null;
   const bgImage = selectedOption?.image ?? null;
 
   const extraReady =
@@ -111,6 +190,8 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
     answers.disclaimer_accettato &&
     answers.localita?.trim() &&
     parseMqInput(answers.superficie_mq) != null;
+
+  const canAdvance = isExtra ? extraReady : isMulti || !!value;
 
   return (
     <div className="onboarding-shell">
@@ -126,7 +207,7 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
 
       <div className={`page onboarding${bgImage ? " onboarding--has-bg" : ""}`}>
         <div className="onboarding-content">
-          <StepProgress current={step} total={totalSteps} />
+          <StepProgress current={Math.min(step, ONBOARDING_STEPS.length)} total={totalSteps} />
 
           <div key={step} className="onboarding-step-body">
             {stepData ? (
@@ -141,20 +222,29 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
                   stepNumber={displayStep}
                   totalSteps={totalSteps}
                 />
-                <p className="choice-section-label">
-                  {stepData.choiceSectionLabel ?? "Tocca una riga per selezionarla"}
-                </p>
-                <div className="choice-grid">
-                  {stepData.options.map((opt) => (
-                    <ChoiceCard
-                      key={opt.value}
-                      option={opt}
-                      selected={value === opt.value}
-                      onSelect={(v) => setField(stepData.field, v)}
-                      hideThumb={value === opt.value && !!bgImage}
-                    />
-                  ))}
-                </div>
+                {isMulti ? (
+                  <ProblemiNotiPicker
+                    selected={answers.problemi_noti}
+                    onChange={(v) => setField("problemi_noti", v)}
+                  />
+                ) : (
+                  <>
+                    <p className="choice-section-label">
+                      {stepData.choiceSectionLabel ?? "Tocca una riga per selezionarla"}
+                    </p>
+                    <div className="choice-grid">
+                      {stepData.options.map((opt) => (
+                        <ChoiceCard
+                          key={opt.value}
+                          option={opt}
+                          selected={value === opt.value}
+                          onSelect={(v) => setField(stepData.field, v)}
+                          hideThumb={value === opt.value && !!bgImage}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -202,6 +292,65 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
                     onChange={(e) => setField("marca_seme", e.target.value)}
                   />
                 </label>
+
+                <details
+                  className="profile-advanced"
+                  open={advancedOpen}
+                  onToggle={(e) => setAdvancedOpen(e.target.open)}
+                >
+                  <summary className="profile-advanced__summary">{EXTRA_STEP.advancedTitle}</summary>
+                  <p className="profile-advanced__intro">{EXTRA_STEP.advancedIntro}</p>
+                  {Object.entries(ADVANCED_FIELDS).map(([field, cfg]) => (
+                    <fieldset key={field} className="profile-advanced__field">
+                      <legend>{cfg.label}</legend>
+                      {cfg.hint ? <p className="field-block-hint">{cfg.hint}</p> : null}
+                      <div className="profile-advanced__chips">
+                        {cfg.options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={`profile-advanced__chip${
+                              answers[field] === opt.value ? " profile-advanced__chip--on" : ""
+                            }`}
+                            onClick={() => setField(field, answers[field] === opt.value ? null : opt.value)}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                  <label className="field-block">
+                    pH misurato (numero)
+                    <p className="field-block-hint">{EXTRA_STEP.phValoreHint}</p>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="es. 6,5"
+                      value={answers.ph_valore}
+                      onChange={(e) => setField("ph_valore", e.target.value)}
+                    />
+                  </label>
+                  <label className="disclaimer-block__check">
+                    <input
+                      type="checkbox"
+                      checked={answers.analisi_terreno_fatta}
+                      onChange={(e) => setField("analisi_terreno_fatta", e.target.checked)}
+                    />
+                    <span>Ho fatto un&apos;analisi di laboratorio del terreno</span>
+                  </label>
+                  <label className="field-block">
+                    Note analisi terreno
+                    <p className="field-block-hint">{EXTRA_STEP.noteTerrenoHint}</p>
+                    <textarea
+                      rows={3}
+                      value={answers.note_terreno}
+                      onChange={(e) => setField("note_terreno", e.target.value)}
+                      placeholder="Opzionale"
+                    />
+                  </label>
+                </details>
+
                 <section className="disclaimer-block">
                   <h2 className="field-group__title">Disclaimer legale</h2>
                   <p className="disclaimer-block__text">{DISCLAIMER_LEGALE}</p>
@@ -233,8 +382,8 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
             )}
             <button
               type="button"
-              className={`btn btn-primary${!isExtra && value ? " btn-primary--ready" : ""}`}
-              disabled={(!isExtra && !value) || (isExtra && !extraReady) || saving}
+              className={`btn btn-primary${!isExtra && canAdvance ? " btn-primary--ready" : ""}`}
+              disabled={!canAdvance || saving}
               onClick={next}
             >
               {saving ? "…" : isExtra ? "Vai all'agronomo" : "Avanti"}
@@ -247,9 +396,13 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
         open={mapOpen}
         apiKey={GOOGLE_MAPS_API_KEY}
         initialLocalita={answers.localita}
+        initialPratoZone={answers.prato_zone}
         onClose={() => setMapOpen(false)}
         onApply={handleMapApply}
       />
     </div>
   );
 }
+
+
+

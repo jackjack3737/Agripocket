@@ -572,6 +572,117 @@ input::placeholder {
   border-top: 1px solid var(--border);
 }
 
+.problemi-picker {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.problemi-picker__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+}
+
+.problemi-picker__item--on {
+  border-color: var(--accent);
+  background: rgba(26, 61, 46, 0.06);
+}
+
+.problemi-picker__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.problemi-picker__desc {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.profile-advanced {
+  margin: 1.5rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.profile-advanced__summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  list-style: none;
+}
+
+.profile-advanced__summary::-webkit-details-marker {
+  display: none;
+}
+
+.profile-advanced__intro {
+  margin: 0 1rem 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.profile-advanced__field {
+  margin: 0 1rem 1rem;
+  border: none;
+  padding: 0;
+}
+
+.profile-advanced__field legend {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.profile-advanced__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.profile-advanced__chip {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.profile-advanced__chip--on {
+  border-color: var(--accent);
+  background: rgba(26, 61, 46, 0.08);
+  color: var(--accent);
+}
+
+.profile-advanced textarea {
+  width: 100%;
+  margin: 0 1rem 1rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.profile-advanced .field-block,
+.profile-advanced .disclaimer-block__check {
+  margin: 0 1rem 1rem;
+}
+
 .chat-header {
   display: flex;
   justify-content: space-between;

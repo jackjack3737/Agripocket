@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { localityFromGeocodeResult } from "../lib/geocodePlace";
+import { renderZoneOverlays } from "../lib/mapZoneOverlays";
 import { formatMqInput } from "../lib/parseMq";
 import { calculatePolygonAreaSqm } from "../lib/polygonArea";
+import {
+  buildPratoZonePayload,
+  computeOmbraZonePct,
+  IRRIGATOR_MODES,
+  normalizePratoZone,
+  ZONE_TYPES,
+} from "../lib/pratoZone";
 
 const SCRIPT_ID = "google-maps-agripocket-js";
 
@@ -65,16 +73,31 @@ function reverseLocality(lat, lng) {
   });
 }
 
-export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClose, onApply }) {
+export default function LawnMapModal({
+  open,
+  apiKey,
+  initialLocalita = "",
+  initialPratoZone = null,
+  onClose,
+  onApply,
+}) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const polyRef = useRef(null);
   const markersRef = useRef([]);
   const clickListenerRef = useRef(null);
   const lastGeocodeRef = useRef(null);
+  const zoneOverlayRefs = useRef({ markers: [], polygons: [], polylines: [] });
 
+  const [mapStep, setMapStep] = useState("boundary");
   const [panMode, setPanMode] = useState(true);
+  const [zoneTool, setZoneTool] = useState("pan");
   const [vertices, setVertices] = useState([]);
+  const [zones, setZones] = useState([]);
+  const [draftPath, setDraftPath] = useState([]);
+  const [draftTipo, setDraftTipo] = useState("ombra");
+  const [pendenzaFrom, setPendenzaFrom] = useState(null);
+  const [irrigatorPick, setIrrigatorPick] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [mapTick, setMapTick] = useState(0);
   const [address, setAddress] = useState("");
@@ -84,6 +107,7 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
 
   const areaSqm = useMemo(() => calculatePolygonAreaSqm(vertices), [vertices]);
   const mapReady = mapTick > 0 && !!mapRef.current;
+  const inZones = mapStep === "zones";
 
   function runGeocode(query, { fitMap = true } = {}) {
     const q = query.trim();
@@ -112,7 +136,7 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
           setAddressHint(
             status === "ZERO_RESULTS"
               ? "Nessun risultato. Prova con via, numero e città."
-              : "Ricerca non riuscita. Verifica Geocoding API sulla chiave Google."
+              : "Ricerca non riuscita. Verifica Geocoding API sulla chiave Google.",
           );
           resolve(false);
           return;
@@ -140,10 +164,84 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
     runGeocode(address);
   }
 
+  function resetDraft() {
+    setDraftPath([]);
+    setPendenzaFrom(null);
+    setIrrigatorPick(null);
+  }
+
+  function addZone(zone) {
+    setZones((prev) => [...prev, zone]);
+    resetDraft();
+  }
+
+  function removeZone(id) {
+    setZones((prev) => prev.filter((z) => z.id !== id));
+  }
+
+  function handleMapClick(lat, lng) {
+    if (inZones) {
+      if (zoneTool === "pan") return;
+      if (zoneTool === "irrigatore") {
+        setIrrigatorPick({ lat, lng });
+        return;
+      }
+      if (zoneTool === "ombra" || zoneTool === "muschio") {
+        setDraftTipo(zoneTool);
+        setDraftPath((prev) => [...prev, { lat, lng }]);
+        return;
+      }
+      if (zoneTool === "pendenza") {
+        if (!pendenzaFrom) {
+          setPendenzaFrom({ lat, lng });
+        } else {
+          addZone({
+            id: `z_${Date.now()}`,
+            tipo: "pendenza",
+            from: pendenzaFrom,
+            to: { lat, lng },
+          });
+        }
+        return;
+      }
+      return;
+    }
+
+    if (!panMode) {
+      setVertices((prev) => [...prev, { lat, lng }]);
+    }
+  }
+
+  function confirmIrrigator(modalita) {
+    if (!irrigatorPick) return;
+    addZone({
+      id: `z_${Date.now()}`,
+      tipo: "irrigatore",
+      lat: irrigatorPick.lat,
+      lng: irrigatorPick.lng,
+      modalita,
+    });
+    setIrrigatorPick(null);
+  }
+
+  function closeDraftPolygon() {
+    if (draftPath.length < 3) return;
+    addZone({
+      id: `z_${Date.now()}`,
+      tipo: draftTipo,
+      path: [...draftPath],
+    });
+  }
+
   useEffect(() => {
     if (!open) return;
-    setVertices([]);
+    const normalized = normalizePratoZone(initialPratoZone);
+    setVertices(normalized.poligono.length >= 3 ? normalized.poligono : []);
+    setZones(normalized.zone);
+    setMapStep("boundary");
     setPanMode(true);
+    setZoneTool("pan");
+    resetDraft();
     setLoadError(null);
     setAddress(initialLocalita?.trim() || "");
     setAddressHint(null);
@@ -151,7 +249,7 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
     setApplyBusy(false);
     setMapTick(0);
     lastGeocodeRef.current = null;
-  }, [open, initialLocalita]);
+  }, [open, initialLocalita, initialPratoZone]);
 
   useEffect(() => {
     if (!open || !apiKey?.trim() || !mapElRef.current) return undefined;
@@ -195,7 +293,7 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
               });
             },
             () => {},
-            { enableHighAccuracy: true, timeout: 9000, maximumAge: 60_000 }
+            { enableHighAccuracy: true, timeout: 9000, maximumAge: 60_000 },
           );
         }
 
@@ -213,6 +311,10 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
       }
       markersRef.current.forEach((m) => m.setMap(null));
       markersRef.current = [];
+      zoneOverlayRefs.current.markers.forEach((m) => m.setMap(null));
+      zoneOverlayRefs.current.polygons.forEach((p) => p.setMap(null));
+      zoneOverlayRefs.current.polylines.forEach((l) => l.setMap(null));
+      zoneOverlayRefs.current = { markers: [], polygons: [], polylines: [] };
       polyRef.current?.setMap(null);
       polyRef.current = null;
       mapRef.current = null;
@@ -226,11 +328,16 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
 
   useEffect(() => {
     if (!open) return;
-    const map = mapRef.current;
     const poly = polyRef.current;
-    if (!map || !poly) return;
-
+    if (!poly) return;
     poly.setPath(vertices);
+  }, [vertices, open, mapTick]);
+
+  useEffect(() => {
+    if (!open || inZones) return;
+    const map = mapRef.current;
+    if (!map) return;
+
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
 
@@ -246,7 +353,29 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
       });
       markersRef.current.push(m);
     });
-  }, [vertices, open, mapTick]);
+  }, [vertices, open, mapTick, inZones]);
+
+  useEffect(() => {
+    if (!open || !mapReady) return;
+    const map = mapRef.current;
+    if (!map) return;
+
+    const draft =
+      draftPath.length > 0
+        ? { path: draftPath, tipo: draftTipo }
+        : pendenzaFrom
+          ? { from: pendenzaFrom, to: null }
+          : null;
+
+    if (inZones) {
+      renderZoneOverlays(map, zoneOverlayRefs.current, zones, draft);
+    } else {
+      zoneOverlayRefs.current.markers.forEach((m) => m.setMap(null));
+      zoneOverlayRefs.current.polygons.forEach((p) => p.setMap(null));
+      zoneOverlayRefs.current.polylines.forEach((l) => l.setMap(null));
+      zoneOverlayRefs.current = { markers: [], polygons: [], polylines: [] };
+    }
+  }, [zones, draftPath, draftTipo, pendenzaFrom, open, mapTick, mapReady, inZones]);
 
   useEffect(() => {
     if (!open) return;
@@ -258,11 +387,12 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
       clickListenerRef.current = null;
     }
 
-    map.setOptions({ draggable: panMode, scrollwheel: true });
+    const drawMode = inZones ? zoneTool !== "pan" : !panMode;
+    map.setOptions({ draggable: !drawMode, scrollwheel: true });
 
-    if (!panMode) {
+    if (drawMode || (!inZones && !panMode)) {
       clickListenerRef.current = map.addListener("click", (e) => {
-        setVertices((prev) => [...prev, { lat: e.latLng.lat(), lng: e.latLng.lng() }]);
+        handleMapClick(e.latLng.lat(), e.latLng.lng());
       });
     }
 
@@ -272,24 +402,27 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
         clickListenerRef.current = null;
       }
     };
-  }, [panMode, open, mapTick]);
+  }, [panMode, zoneTool, inZones, open, mapTick, pendenzaFrom]);
 
   async function handleApply() {
     if (vertices.length < 3 || areaSqm <= 0) return;
     setApplyBusy(true);
 
-    let localita = lastGeocodeRef.current
-      ? localityFromGeocodeResult(lastGeocodeRef.current)
-      : "";
+    let localita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
 
     if (!localita) {
       const center = polygonCentroid(vertices);
       if (center) localita = await reverseLocality(center.lat, center.lng);
     }
 
+    const prato_zone = buildPratoZonePayload(vertices, zones);
+    const ombra_zone_pct = computeOmbraZonePct(prato_zone);
+
     onApply({
       localita: localita || undefined,
       superficie_mq: Math.round(areaSqm),
+      prato_zone,
+      ombra_zone_pct: ombra_zone_pct || undefined,
     });
     setApplyBusy(false);
     onClose();
@@ -298,10 +431,9 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
   if (!open) return null;
 
   const missingKey = !apiKey?.trim();
-  const canApply = vertices.length >= 3 && areaSqm > 0;
-  const previewLocalita = lastGeocodeRef.current
-    ? localityFromGeocodeResult(lastGeocodeRef.current)
-    : "";
+  const canBoundary = vertices.length >= 3 && areaSqm > 0;
+  const previewLocalita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
+  const irrCount = zones.filter((z) => z.tipo === "irrigatore").length;
 
   return (
     <div
@@ -309,10 +441,10 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
       role="presentation"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="map-modal" role="dialog" aria-labelledby="map-modal-title">
+      <div className="map-modal map-modal--wide" role="dialog" aria-labelledby="map-modal-title">
         <div className="map-modal-header">
           <h2 id="map-modal-title" className="map-modal-title">
-            Luogo e superficie
+            {inZones ? "Segna zone sul prato" : "Luogo e superficie"}
           </h2>
           <button type="button" className="map-modal-close" onClick={onClose} aria-label="Chiudi">
             ×
@@ -321,21 +453,26 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
 
         {missingKey && (
           <div className="map-modal-banner">
-            Aggiungi <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>web/.env.local</code> (stessa chiave del
-            preventivo).
+            Aggiungi <code>VITE_GOOGLE_MAPS_API_KEY</code> in <code>web/.env.local</code>.
           </div>
         )}
 
         {loadError && !missingKey && <div className="map-modal-banner map-modal-banner--error">{loadError}</div>}
 
-        {!missingKey && !loadError && (
+        {!missingKey && !loadError && !inZones && (
           <p className="map-modal-hint">
-            Cerca l&apos;indirizzo (compila il <strong>luogo</strong>), poi <strong>Freccia</strong> per disegnare il
-            prato e calcolare i <strong>m²</strong>.
+            Cerca l&apos;indirizzo, poi <strong>Freccia</strong> per disegnare il contorno del prato.
           </p>
         )}
 
-        {!missingKey && !loadError && (
+        {!missingKey && !loadError && inZones && (
+          <p className="map-modal-hint">
+            Segna irrigatori (<strong>S</strong> statico, <strong>D</strong> dinamico), ombra, muschio e pendenza.
+            Poi salva.
+          </p>
+        )}
+
+        {!missingKey && !loadError && !inZones && (
           <form className="map-modal-search" onSubmit={handleGeocodeAddress}>
             <input
               type="text"
@@ -355,31 +492,94 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
           </form>
         )}
         {addressHint && !missingKey && <div className="map-modal-address-hint">{addressHint}</div>}
-        {previewLocalita && !missingKey && (
+        {previewLocalita && !missingKey && !inZones && (
           <p className="map-modal-place-preview">
             Luogo: <strong>{previewLocalita}</strong>
           </p>
         )}
 
-        <div className="map-modal-toolbar">
-          <div className="map-modal-toggle">
-            <button type="button" className={`map-toggle-btn${panMode ? " active" : ""}`} onClick={() => setPanMode(true)}>
-              Mano
-            </button>
-            <button
-              type="button"
-              className={`map-toggle-btn${!panMode ? " active" : ""}`}
-              onClick={() => setPanMode(false)}
-            >
-              Freccia
+        {!inZones ? (
+          <div className="map-modal-toolbar">
+            <div className="map-modal-toggle">
+              <button type="button" className={`map-toggle-btn${panMode ? " active" : ""}`} onClick={() => setPanMode(true)}>
+                Mano
+              </button>
+              <button
+                type="button"
+                className={`map-toggle-btn${!panMode ? " active" : ""}`}
+                onClick={() => setPanMode(false)}
+              >
+                Disegna prato
+              </button>
+            </div>
+            <button type="button" className="btn-outline-sm" onClick={() => setVertices([])} disabled={vertices.length === 0}>
+              Azzera contorno
             </button>
           </div>
-          <button type="button" className="btn-outline-sm" onClick={() => setVertices([])} disabled={vertices.length === 0}>
-            Azzera
-          </button>
-        </div>
+        ) : (
+          <div className="map-zone-toolbar">
+            {["pan", "irrigatore", "ombra", "muschio", "pendenza"].map((tool) => (
+              <button
+                key={tool}
+                type="button"
+                className={`map-zone-tool${zoneTool === tool ? " map-zone-tool--on" : ""}`}
+                onClick={() => {
+                  setZoneTool(tool);
+                  resetDraft();
+                }}
+              >
+                {tool === "pan" ? "Mano" : ZONE_TYPES[tool]?.label || tool}
+              </button>
+            ))}
+            {(draftPath.length > 0 || pendenzaFrom) && (
+              <button type="button" className="btn-outline-sm" onClick={resetDraft}>
+                Annulla disegno
+              </button>
+            )}
+            {draftPath.length >= 3 && (
+              <button type="button" className="btn-outline-sm map-zone-tool-confirm" onClick={closeDraftPolygon}>
+                Chiudi area {ZONE_TYPES[draftTipo]?.label}
+              </button>
+            )}
+          </div>
+        )}
+
+        {zones.length > 0 && inZones && (
+          <ul className="map-zone-list">
+            {zones.map((z) => (
+              <li key={z.id}>
+                <span className="map-zone-list__dot" style={{ background: ZONE_TYPES[z.tipo]?.color }} />
+                {z.tipo === "irrigatore"
+                  ? `Irrigatore ${IRRIGATOR_MODES[z.modalita]?.label || z.modalita}`
+                  : ZONE_TYPES[z.tipo]?.label}
+                <button type="button" className="map-zone-list__del" onClick={() => removeZone(z.id)} aria-label="Rimuovi">
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div ref={mapElRef} className="map-modal-map" />
+
+        {irrigatorPick && (
+          <div className="map-irrigator-pick" role="dialog" aria-label="Tipo irrigatore">
+            <p>Che tipo di irrigatore è qui?</p>
+            <div className="map-irrigator-pick__actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => confirmIrrigator("statico")}>
+                {IRRIGATOR_MODES.statico.label}
+                <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.statico.desc}</span>
+              </button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => confirmIrrigator("dinamico")}>
+                {IRRIGATOR_MODES.dinamico.label}
+                <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.dinamico.desc}</span>
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIrrigatorPick(null)}>
+                Annulla
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="map-modal-footer">
           <div className="map-modal-area">
@@ -388,20 +588,45 @@ export default function LawnMapModal({ open, apiKey, initialLocalita = "", onClo
             ) : (
               <span>
                 Area: <strong>{formatMqInput(areaSqm)} m²</strong>
+                {inZones && irrCount > 0 ? (
+                  <>
+                    {" "}
+                    · <strong>{irrCount}</strong> irrigatori
+                  </>
+                ) : null}
               </span>
             )}
           </div>
           <div className="map-modal-actions">
-            <button type="button" className="btn-outline-sm" onClick={onClose}>
-              Annulla
-            </button>
+            {inZones ? (
+              <button type="button" className="btn-outline-sm" onClick={() => setMapStep("boundary")}>
+                Indietro contorno
+              </button>
+            ) : (
+              <button type="button" className="btn-outline-sm" onClick={onClose}>
+                Annulla
+              </button>
+            )}
+            {!inZones && canBoundary && (
+              <button
+                type="button"
+                className="btn-outline-sm"
+                onClick={() => {
+                  setMapStep("zones");
+                  setPanMode(false);
+                  setZoneTool("irrigatore");
+                }}
+              >
+                Segna zone →
+              </button>
+            )}
             <button
               type="button"
               className="map-modal-apply"
-              disabled={!canApply || applyBusy}
+              disabled={!canBoundary || applyBusy}
               onClick={handleApply}
             >
-              {applyBusy ? "…" : "Usa luogo e m²"}
+              {applyBusy ? "…" : inZones ? "Salva mappa e m²" : "Salva (solo contorno)"}
             </button>
           </div>
         </div>

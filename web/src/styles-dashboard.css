@@ -811,3 +811,67 @@
   margin-top: 0.5rem;
   width: fit-content;
 }
+
+.dash-card--irrigation {
+  grid-column: 1 / -1;
+}
+
+.irrigation-zone__summary {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.irrigation-zone__list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.irrigation-zone__list li {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(21, 101, 192, 0.04);
+}
+
+.irrigation-zone__badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.irrigation-zone__badge--statico {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.irrigation-zone__badge--dinamico {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.irrigation-zone__meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
+.irrigation-zone__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.irrigation-zone__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
