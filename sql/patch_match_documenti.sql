@@ -13,7 +13,12 @@ create index tgif_knowledge_base_embedding_hnsw_idx
   using hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops)
   with (m = 16, ef_construction = 64);
 
-create or replace function public.match_documenti(
+-- Ricrea da zero se cambia il tipo di ritorno (CREATE OR REPLACE non basta)
+drop function if exists public.match_documenti(vector, double precision, integer);
+drop function if exists public.match_documenti(vector, real, integer);
+drop function if exists public.match_documenti(vector, float, integer);
+
+create function public.match_documenti(
   query_embedding vector(3072),
   match_threshold float default 0.2,
   match_count int default 8
@@ -23,7 +28,7 @@ returns table (
   patologia text,
   specie text,
   soluzione text,
-  somiglianza float
+  somiglianza double precision
 )
 language plpgsql
 stable
@@ -63,8 +68,8 @@ begin
 end;
 $$;
 
-grant execute on function public.match_documenti(vector, float, int) to authenticated;
-grant execute on function public.match_documenti(vector, float, int) to service_role;
+grant execute on function public.match_documenti(vector, double precision, integer) to authenticated;
+grant execute on function public.match_documenti(vector, double precision, integer) to service_role;
 
 notify pgrst, 'reload schema';
 
