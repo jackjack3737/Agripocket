@@ -6,7 +6,13 @@ export const AVVISO_FITOFARMACO =
 export const AVVISO_MQ_MANCANTI =
   "⚠️ Imposta i m² del prato nel profilo (mappa) per calcolare dosi di concimi e biostimolanti in sicurezza.";
 
-export const DISCLAIMER_LEGALE = `AgriPocket è uno strumento informativo in fase beta: non sostituisce la diagnosi di un agronomo, le etichette dei prodotti né la normativa sui fitofarmaci (PAN / patentino). Le dosi automatiche riguardano solo concimi e prodotti non fitosanitari, e solo se hai indicato i m² del prato. Per fungicidi, diserbanti e insetticidi mostriamo solo riferimenti di catalogo, senza quantità da applicare. L'uso dei consigli è sotto la tua responsabilità.`;
+export const DISCLAIMER_LEGALE = `AgriPocket è uno strumento informativo in fase beta: non sostituisce la diagnosi di un agronomo abilitato, le etichette dei prodotti né la normativa sui fitofarmaci (D.Lgs. 150/2012 — PAN / patentino).
+
+Le dosi automatiche riguardano solo concimi e biostimolanti non fitosanitari, e solo se hai indicato i m² del prato sulla mappa (nessun valore presunto).
+
+Per fungicidi, diserbanti e insetticidi mostriamo solo riferimenti di catalogo a uso domestico (PFNPO), senza quantità da applicare. Non acquistare né applicare prodotti professionali senza patentino.
+
+Le foto del giardino possono essere conservate per l'analisi. L'uso dei consigli è sotto la tua esclusiva responsabilità.`;
 
 const FITO_CATEGORIE = new Set(["diserbo", "trattamento"]);
 

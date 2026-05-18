@@ -18,6 +18,15 @@ const CATEGORIE_FITOFARMACO = new Set([
   "INSETTICIDA PFnPE",
 ]);
 
+/** Fitofarmaci ammessi in app B2C (PFNPO / uso domestico — no PAN professionale). */
+const CATEGORIE_FITO_CONSUMER = new Set([
+  "FUNGICIDA BIO",
+  "DISERBANTE PFnPE",
+  "DISERBANTE PRE-EMERGENZA",
+  "INSETTICIDA BIO",
+  "INSETTICIDA PFnPE",
+]);
+
 const INTERVENTI_FITOFARMACO = new Set(["diserbo", "trattamento"]);
 
 export function isProdottoFitofarmaco(prodotto) {
@@ -41,3 +50,21 @@ export function puoCalcolareDose(prodotto, profilo) {
   }
   return superficieMqVerificata(profilo) != null;
 }
+
+/** Esclude fitofarmaci solo uso professionale / patentino. */
+export function isProdottoAmmessoConsumer(prodotto) {
+  if (!isProdottoFitofarmaco(prodotto)) return true;
+  const cat = String(prodotto?.categoria || "").toUpperCase();
+  if (CATEGORIE_FITO_CONSUMER.has(cat)) return true;
+  const blob = `${prodotto?.nome || ""} ${prodotto?.descrizione || ""} ${prodotto?.composizione || ""}`.toLowerCase();
+  if (/pfnp|libera vendita|uso domestico|giardino/.test(blob)) return true;
+  if (/professionale|solo patentino|agronom|greenkeeper|stadio|campo da golf/.test(blob)) return false;
+  return false;
+}
+
+export function filtraProdottiConsumer(pool) {
+  return (pool || []).filter(isProdottoAmmessoConsumer);
+}
+
+export const AVVISO_PRODOTTO_PROFESSIONALE =
+  "Prodotto fitosanitario da uso professionale (PAN): non suggerito in app. Consulta un agronomo o rivenditore abilitato.";

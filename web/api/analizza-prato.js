@@ -2,6 +2,7 @@ import { waitUntil } from "@vercel/functions";
 import { analizzaPrato } from "../server/analizzaPratoCore.mjs";
 import { loadServerEnv } from "../server/serverEnv.mjs";
 import { createJob, updateJob, adminClient } from "../server/jobs.mjs";
+import { checkRateLimit } from "../server/rateLimit.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 export const config = {
@@ -60,6 +61,14 @@ export default async function handler(req, res) {
     const { data: userData, error: userErr } = await supabaseUser.auth.getUser();
     if (userErr || !userData?.user) {
       res.status(401).json({ error: "Sessione non valida" });
+      return;
+    }
+
+    const rl = checkRateLimit(userData.user.id, "analizza_foto");
+    if (!rl.ok) {
+      res.status(429).json({
+        error: `Troppe analisi foto. Riprova tra ${Math.ceil((rl.retryAfterSec || 300) / 60)} minuti.`,
+      });
       return;
     }
 

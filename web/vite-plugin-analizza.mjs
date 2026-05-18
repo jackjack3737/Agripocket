@@ -5,6 +5,7 @@ import { generaPianoStagionale } from "./server/pianoStagionale.mjs";
 import { resetProfiloUtente } from "./server/resetProfilo.mjs";
 import { fetchWeatherBundle } from "./server/weatherCore.mjs";
 import { createJob, updateJob, adminClient, getJobForUser } from "./server/jobs.mjs";
+import { checkRateLimit } from "./server/rateLimit.mjs";
 
 async function authUser(req, env) {
   const auth = req.headers.authorization || "";
@@ -170,6 +171,17 @@ export function analizzaPratoPlugin() {
               return;
             }
 
+            const rl = checkRateLimit(user.id, "analizza_foto");
+            if (!rl.ok) {
+              res.statusCode = 429;
+              res.end(
+                JSON.stringify({
+                  error: `Troppe analisi foto. Riprova tra ${Math.ceil((rl.retryAfterSec || 300) / 60)} minuti.`,
+                }),
+              );
+              return;
+            }
+
             const admin = adminClient(env);
             const { job, tablesMissing } = await createJob(admin, user.id, "analizza_foto", {
               mimeType: body?.mimeType,
@@ -281,6 +293,17 @@ export function analizzaPratoPlugin() {
           if (!user) {
             res.statusCode = 401;
             res.end(JSON.stringify({ error: "Sessione non valida" }));
+            return;
+          }
+
+          const rl = checkRateLimit(user.id, "genera_piano");
+          if (!rl.ok) {
+            res.statusCode = 429;
+            res.end(
+              JSON.stringify({
+                error: `Troppo spesso. Rigenera il piano tra ${Math.ceil((rl.retryAfterSec || 600) / 60)} minuti.`,
+              }),
+            );
             return;
           }
 

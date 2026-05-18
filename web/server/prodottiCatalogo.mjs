@@ -14,6 +14,8 @@ import {
   AVVISO_MQ_MANCANTI,
   isInterventoFitofarmaco,
   isProdottoFitofarmaco,
+  filtraProdottiConsumer,
+  AVVISO_PRODOTTO_PROFESSIONALE,
   superficieMqVerificata,
 } from "./sicurezzaProdotti.mjs";
 
@@ -219,12 +221,15 @@ function restringiPoolTrattamento(pool, vision, intervento, profilo) {
   const parassiti = analizzaParassiti({ vision, intervento, localita: profilo?.localita });
 
   if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx) && !parassiti.larveSottoprato) {
-    const fung = pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase()));
+    const fung = filtraProdottiConsumer(
+      pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase())),
+    );
     if (fung.length) return preferisciPoolBottos(fung, "funghi");
   }
 
   if (/insett|afid|larv|trip|coleotter|popillia|maggiolino|otiorrinco|bruco|sottoprato/.test(ctx)) {
     let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
+    ins = filtraProdottiConsumer(ins);
     ins = filtraInsetticidaPerParassita(ins, parassiti);
     if (ins.length) return preferisciPoolBottos(ins, parassiti.larveSottoprato ? "larve" : "insetti");
   }
@@ -246,7 +251,7 @@ export function rankProdotti(prodotti, opts) {
   if (opts.categoriaIntervento === "diserbo") {
     grezzo = restringiPoolDiserbo(grezzo, opts.intervento);
   }
-  const pool = filtraPoolMarca(grezzo);
+  const pool = filtraProdottiConsumer(filtraPoolMarca(grezzo));
   return pool
     .map((p) => ({ p, score: scoreProdotto(p, opts) }))
     .sort((a, b) => {
@@ -337,8 +342,8 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
 
   if (fito) {
     const hint = prodotto
-      ? `Riferimento catalogo (non prescrizione): ${prodotto.nome} — ${prodotto.composizione || prodotto.categoria}.`
-      : "";
+      ? `Riferimento catalogo PFNPO/uso domestico (non prescrizione): ${prodotto.nome} — ${prodotto.composizione || prodotto.categoria}.`
+      : "Nessun prodotto fitosanitico idoneo al consumatore in catalogo per questo caso: valuta intervento non chimico o agronomo.";
     return {
       ...intervento,
       prodotto_id: prodotto?.id ?? null,
