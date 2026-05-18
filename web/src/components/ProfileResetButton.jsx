@@ -5,7 +5,7 @@ import { resetPratoProfiloCompleto } from "../lib/resetProfilo";
 /**
  * Reset profilo con doppia conferma.
  */
-export default function ProfileResetButton({ onResetComplete }) {
+export default function ProfileResetButton({ onResetComplete, embedded = false, stayOnPage = false }) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -24,7 +24,7 @@ export default function ProfileResetButton({ onResetComplete }) {
       const { profile } = await resetPratoProfiloCompleto();
       onResetComplete?.(profile ?? null);
       close();
-      navigate("/onboarding", { replace: true });
+      if (!stayOnPage) navigate("/onboarding", { replace: true });
     } catch (e) {
       setError(e.message || "Reset non riuscito");
     } finally {
@@ -34,15 +34,27 @@ export default function ProfileResetButton({ onResetComplete }) {
 
   return (
     <>
-      <section className="profile-reset-zone">
-        <h3 className="profile-reset-zone__title">Zona pericolosa</h3>
-        <p className="profile-reset-zone__desc">
-          Elimina profilo, mappa, calendario e analisi foto. Dovrai rifare l&apos;onboarding da zero.
-        </p>
-        <button type="button" className="btn profile-reset-zone__btn" onClick={() => setStep(1)}>
-          Reset profilo
-        </button>
-      </section>
+      {embedded ? (
+        <div className="profile-reset-inline">
+          <p className="profile-reset-inline__label">Zona pericolosa</p>
+          <p className="profile-reset-inline__desc">
+            Cancella profilo, mappa, calendario e foto. Rifarai l&apos;onboarding.
+          </p>
+          <button type="button" className="btn profile-reset-inline__btn" onClick={() => setStep(1)}>
+            Reset profilo
+          </button>
+        </div>
+      ) : (
+        <section className="profile-reset-zone">
+          <h3 className="profile-reset-zone__title">Zona pericolosa</h3>
+          <p className="profile-reset-zone__desc">
+            Elimina profilo, mappa, calendario e analisi foto. Dovrai rifare l&apos;onboarding da zero.
+          </p>
+          <button type="button" className="btn profile-reset-zone__btn" onClick={() => setStep(1)}>
+            Reset profilo
+          </button>
+        </section>
+      )}
 
       {step > 0 ? (
         <div className="profile-reset-backdrop" role="presentation" onClick={close}>

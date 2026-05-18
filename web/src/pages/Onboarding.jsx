@@ -14,6 +14,7 @@ import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
 import { savePratoProfilo } from "../lib/supabase";
 import LawnMapModal from "../components/LawnMapModal";
 import LawnMapProfileCard from "../components/LawnMapProfileCard";
+import ProfileResetButton from "../components/ProfileResetButton";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
@@ -403,6 +404,19 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
               {saving ? "…" : isExtra ? "Vai all'agronomo" : "Avanti"}
             </button>
           </div>
+
+          {(initialProfile?.onboarding_completato || initialProfile?.localita) && (
+            <ProfileResetButton
+              embedded
+              stayOnPage
+              onResetComplete={(p) => {
+                onComplete(p);
+                setAnswers(profileToAnswers(p));
+                setStep(0);
+                setError("");
+              }}
+            />
+          )}
         </div>
       </div>
 

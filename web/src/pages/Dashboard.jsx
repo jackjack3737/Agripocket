@@ -527,6 +527,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           <Link className="btn btn-outline btn-sm dash-card__cta" to="/chat">
             Nuova analisi foto
           </Link>
+          <ProfileResetButton embedded onResetComplete={onProfileUpdate} />
         </section>
       </div>
 
@@ -635,8 +636,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           </>
         )}
       </section>
-
-      <ProfileResetButton onResetComplete={onProfileUpdate} />
 
       <LawnMapModal
         open={mapOpen}
