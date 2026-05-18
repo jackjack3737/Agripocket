@@ -142,7 +142,10 @@ export default function LawnMapModal({
   const inZones = isZoneEdit || mapStep === "zones";
 
   /** In modifica zona: solo il layer attivo (irrigatori OR ombra OR …), mai sovrapposti. */
-  const zonesOnMap = useMemo(() => (isZoneEdit ? zones : zones), [isZoneEdit, zones]);
+  const zonesOnMap = useMemo(() => {
+    if (!isZoneEdit) return zones;
+    return zones.filter((z) => z.tipo === zoneToolProp);
+  }, [isZoneEdit, zones, zoneToolProp]);
 
   function runGeocode(query, { fitMap = true } = {}) {
     const q = query.trim();
@@ -507,7 +510,11 @@ export default function LawnMapModal({
       role="presentation"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="map-modal map-modal--wide" role="dialog" aria-labelledby="map-modal-title">
+      <div
+        className={`map-modal map-modal--wide${isZoneEdit ? " map-modal--zone-edit" : ""}`}
+        role="dialog"
+        aria-labelledby="map-modal-title"
+      >
         <div className="map-modal-header">
           <h2 id="map-modal-title" className="map-modal-title">
             {isZoneEdit
