@@ -13,7 +13,12 @@ import {
   PRIORITA_LABEL,
   PRIORITY_LEVEL,
   formatDataIt,
+  CALENDARIO_AMBITI,
+  CALENDARIO_TIPO_FILTRI,
+  contaLavoriPianificatiFiltrati,
+  filtraInterventiPerCalendario,
   groupInterventi,
+  formatMeseIt,
   groupInterventiPerMese,
   haCalendarioStagionale,
   prossimiInterventi,
@@ -202,6 +207,44 @@ function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinInterven
   );
 }
 
+function CalendarioFiltri({ tipo, ambito, meseLabel, conteggi, onTipo, onAmbito }) {
+  return (
+    <div className="dash-cal-filters">
+      <div className="dash-cal-filters__row">
+        <span className="dash-cal-filters__label">Tipo</span>
+        <div className="dash-cal-filters__chips" role="group" aria-label="Filtra per tipo">
+          {Object.entries(CALENDARIO_TIPO_FILTRI).map(([key, cfg]) => (
+            <button
+              key={key}
+              type="button"
+              className={`dash-cal-filters__chip${tipo === key ? " dash-cal-filters__chip--on" : ""}`}
+              onClick={() => onTipo(key)}
+            >
+              {cfg.label}
+              {conteggi?.[key] != null ? ` (${conteggi[key]})` : ""}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="dash-cal-filters__row">
+        <span className="dash-cal-filters__label">Periodo</span>
+        <div className="dash-cal-filters__chips" role="group" aria-label="Filtra per periodo">
+          {Object.entries(CALENDARIO_AMBITI).map(([key, cfg]) => (
+            <button
+              key={key}
+              type="button"
+              className={`dash-cal-filters__chip${ambito === key ? " dash-cal-filters__chip--on" : ""}`}
+              onClick={() => onAmbito(key)}
+            >
+              {key === "mese" ? `${cfg.label} (${meseLabel})` : cfg.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InterventoSection({ title, hint, items, onToggle, onPin, empty }) {
   if (!items.length && !empty) return null;
   return (
@@ -249,13 +292,38 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
   const [mapSaving, setMapSaving] = useState(false);
 
   const userId = session?.user?.id;
-  const groups = groupInterventi(interventi);
-  const mesi = groupInterventiPerMese(interventi);
-  const prossimi = prossimiInterventi(interventi);
   const hasPiano = haCalendarioStagionale(interventi);
   const autoPianoStarted = useRef(false);
   const meseCorrente = new Date().toISOString().slice(0, 7);
   const [mesiAperti, setMesiAperti] = useState(() => new Set([meseCorrente]));
+  const [calTipo, setCalTipo] = useState("tutti");
+  const [calAmbito, setCalAmbito] = useState("anno");
+
+  const filtroOpts = useMemo(
+    () => ({ tipo: calTipo, ambito: calAmbito, meseCorrente }),
+    [calTipo, calAmbito, meseCorrente],
+  );
+
+  const interventiCalendario = useMemo(
+    () => filtraInterventiPerCalendario(interventi, filtroOpts),
+    [interventi, filtroOpts],
+  );
+
+  const groups = useMemo(() => groupInterventi(interventiCalendario), [interventiCalendario]);
+  const mesi = useMemo(() => groupInterventiPerMese(interventiCalendario), [interventiCalendario]);
+  const prossimi = useMemo(() => prossimiInterventi(interventiCalendario), [interventiCalendario]);
+
+  const conteggiFiltri = useMemo(() => {
+    const base = { tipo: calTipo, meseCorrente };
+    return {
+      tutti: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "tutti", ambito: "anno" }),
+      trattamenti: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "trattamenti", ambito: "anno" }),
+      giardino: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "giardino", ambito: "anno" }),
+    };
+  }, [interventi, calTipo, meseCorrente]);
+
+  const soloControlliFoto =
+    !hasPiano && interventi.some((i) => i.fonte === "controllo_mensile" && i.stato === "pianificato");
 
   const mqVerificati = superficieMqVerificata(profile);
 
@@ -318,12 +386,12 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
   }, [userId]);
 
   useEffect(() => {
-    if (loading || !userId || !profile?.localita || interventi.length > 0 || generatingPiano) return;
+    if (loading || !userId || !profile?.localita || hasPiano || generatingPiano) return;
     if (autoPianoStarted.current) return;
     autoPianoStarted.current = true;
     setBanner("Creazione automatica del piano annuale… (1-2 minuti, non chiudere la pagina)");
     handleGeneraPiano();
-  }, [loading, userId, profile?.localita, interventi.length, generatingPiano]);
+  }, [loading, userId, profile?.localita, hasPiano, generatingPiano]);
 
   useEffect(() => {
     if (!profile?.localita) {
@@ -557,13 +625,29 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           </div>
         </div>
 
+        {soloControlliFoto ? (
+          <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
+            Vedi solo i <strong>controlli foto mensili</strong> perché il piano annuale lavori non è ancora stato
+            generato. Clicca «Genera piano annuale completo» per tagli, concimi, diserbi e tutti i lavori stagionali.
+          </p>
+        ) : null}
+
+        <CalendarioFiltri
+          tipo={calTipo}
+          ambito={calAmbito}
+          meseLabel={formatMeseIt(meseCorrente)}
+          conteggi={conteggiFiltri}
+          onTipo={setCalTipo}
+          onAmbito={setCalAmbito}
+        />
+
         {loading || generatingPiano ? (
           <p className="dash-card__loading">
             {generatingPiano ? "Creazione piano annuale in corso… 1-2 minuti" : "Caricamento piano…"}
           </p>
         ) : (
           <>
-            {groups.daFoto.length ? (
+            {groups.daFoto.length && calTipo === "tutti" ? (
               <InterventoSection
                 title="Urgenti dall'analisi foto"
                 hint="Dall'ultima foto."
@@ -589,6 +673,14 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
                   />
                 ))}
               </div>
+            ) : null}
+
+            {!mesi.length && !prossimi.length && !groups.daFoto.length && !groups.senzaData.length && hasPiano ? (
+              <p className="dash-calendar-section__empty">
+                Nessun lavoro con questo filtro
+                {calAmbito === "mese" ? ` per ${formatMeseIt(meseCorrente)}` : ""}. Prova «Tutto l&apos;anno» o un altro
+                tipo.
+              </p>
             ) : null}
 
             {!mesi.length && prossimi.length ? (

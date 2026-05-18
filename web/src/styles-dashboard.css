@@ -317,6 +317,67 @@
   color: #c62828;
 }
 
+.dash-calendar__warn--piano {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  color: #5d4037;
+  line-height: 1.45;
+}
+
+.dash-cal-filters {
+  margin: 0 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dash-cal-filters__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dash-cal-filters__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.dash-cal-filters__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.dash-cal-filters__chip {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.dash-cal-filters__chip:hover {
+  border-color: var(--accent, #2e7d32);
+}
+
+.dash-cal-filters__chip--on {
+  background: var(--accent, #2e7d32);
+  border-color: var(--accent, #2e7d32);
+  color: #fff;
+}
+
 .dash-month-timeline {
   margin-bottom: 1.5rem;
   display: flex;

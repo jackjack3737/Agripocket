@@ -210,6 +210,50 @@ export function haCalendarioStagionale(list) {
   return list.some((i) => i.fonte === "calendario_stagionale");
 }
 
+/** Filtri calendario: tipo lavoro + ambito temporale. */
+export const CALENDARIO_TIPO_FILTRI = {
+  tutti: { label: "Tutti", categorie: null },
+  trattamenti: {
+    label: "Trattamenti",
+    categorie: ["trattamento", "diserbo", "concime", "biostimolante", "umettante", "rinnovo"],
+  },
+  giardino: {
+    label: "Lavori in giardino",
+    categorie: ["taglio", "arieggiatura", "pulizia", "irrigazione"],
+  },
+};
+
+export const CALENDARIO_AMBITI = {
+  mese: { label: "Questo mese" },
+  anno: { label: "Tutto l'anno" },
+};
+
+export function filtraInterventiPerCalendario(
+  list,
+  { tipo = "tutti", ambito = "anno", meseCorrente } = {},
+) {
+  const cfg = CALENDARIO_TIPO_FILTRI[tipo] ?? CALENDARIO_TIPO_FILTRI.tutti;
+  let out = list;
+
+  if (cfg.categorie) {
+    out = out.filter((i) => cfg.categorie.includes(i.categoria));
+    out = out.filter((i) => i.fonte !== "controllo_mensile");
+  }
+
+  if (ambito === "mese" && meseCorrente) {
+    out = out.filter((i) => i.data_prevista && i.data_prevista.slice(0, 7) === meseCorrente);
+  }
+
+  return out;
+}
+
+export function contaLavoriPianificatiFiltrati(list, opts) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  return filtraInterventiPerCalendario(list, opts).filter(
+    (i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista >= oggi,
+  ).length;
+}
+
 export function formatMeseIt(yyyyMm) {
   const [y, m] = yyyyMm.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("it-IT", {
