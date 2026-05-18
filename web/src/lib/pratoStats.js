@@ -156,10 +156,10 @@ function scoreFromVision(vision) {
   difesa -= alta * 12 + mal * 14 + Math.max(0, erbe - 2) * 6;
   if (/parassit|insett|afid|larv|marcium/.test(problems)) difesa -= 15;
 
-  let manutenzione = base;
+  let manutenzione = base + baseBoost;
   if (vision.taglio?.giudizio === "troppo_basso") manutenzione -= 18;
   if (vision.taglio?.giudizio === "troppo_alto") manutenzione -= 10;
-  if (vision.feltro_thatch?.presente) manutenzione -= 14;
+  if (vision.feltro_thatch?.presente) manutenzione -= vision.stato_generale === "ottimo" ? 5 : 14;
   if (vision.foglie_debris?.eccesso_foglie) manutenzione -= 12;
   if (/thatch|feltro|scarific|ariegg/.test(problems)) manutenzione -= 8;
 
@@ -173,67 +173,25 @@ function scoreFromVision(vision) {
   };
 }
 
-function scoreFromInterventi(interventi, categorie, oggi) {
-  const relevant = interventi.filter((i) => categorie.includes(i.categoria));
-  if (!relevant.length) return null;
-
-  let score = 82;
-  let counted = 0;
-  let penalita = 0;
-
-  for (const i of relevant) {
-    if (!i.data_prevista) continue;
-    const scadenza = i.data_prevista;
-    const late = giorniTra(scadenza, oggi);
-
-    if (i.stato === "completato") {
-      counted += 1;
-      if (late >= 0 && late <= 21) score += 4;
-      else if (late < 0) score += 2;
-      continue;
-    }
-
-    if (i.stato !== "pianificato") continue;
-
-    if (late < 0) continue;
-    if (i.priorita !== "alta" && late <= 7) continue;
-
-    counted += 1;
-    const pen = PRIORITA_PENALTY[i.priorita] ?? 12;
-    const mult = 1 + Math.min(late, 14) / 21;
-    penalita += pen * mult * (i.priorita === "alta" ? 1 : 0.45);
-  }
-
-  if (!counted) return null;
-  return clamp(score - penalita);
-}
-
-function scoreManutenzioneInterventi(interventi, oggi) {
-  const cats = CATEGORIE.manutenzione;
-  const taglio = interventi.filter((i) => i.categoria === "taglio");
-  const altri = interventi.filter((i) =>
-    cats.includes(i.categoria) && i.categoria !== "taglio"
+/** Solo lavori in ritardo (data passata, non completati). I futuri non contano. */
+function interventiScadutiPerRadar(interventi, oggi) {
+  return interventiPerStatoRadar(interventi).filter(
+    (i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista < oggi,
   );
-
-  const sTaglio = scoreFromInterventi(taglio, ["taglio"], oggi);
-  const sAltri = scoreFromInterventi(altri, ["arieggiatura", "pulizia"], oggi);
-
-  if (sTaglio == null && sAltri == null) return null;
-  if (sTaglio == null) return sAltri;
-  if (sAltri == null) return sTaglio;
-  return clamp(sTaglio * 0.55 + sAltri * 0.45);
 }
 
-function scoreFromInterventiAll(interventi, oggi) {
-  const out = {};
-  for (const key of Object.keys(CATEGORIE)) {
-    if (key === "manutenzione") {
-      out[key] = scoreManutenzioneInterventi(interventi, oggi);
-    } else {
-      out[key] = scoreFromInterventi(interventi, CATEGORIE[key], oggi);
-    }
+function penalitaAsseDaScaduti(scaduti, categorie, oggi) {
+  const list = scaduti.filter((i) => categorie.includes(i.categoria));
+  if (!list.length) return 0;
+
+  let penalita = 0;
+  for (const i of list) {
+    const giorniRitardo = giorniTra(i.data_prevista, oggi);
+    const base = PRIORITA_PENALTY[i.priorita] ?? 10;
+    const mult = 0.45 + Math.min(giorniRitardo, 21) / 21;
+    penalita += base * mult * (i.priorita === "alta" ? 1 : 0.55);
   }
-  return out;
+  return Math.min(Math.round(penalita), 32);
 }
 
 function scoreFromWeather(weather) {
@@ -259,47 +217,6 @@ function scoreFromWeather(weather) {
   return { idratazione: clamp(idratazione) };
 }
 
-function mergeAxis(visionVal, interventiVal, weatherVal, { vWeight, defaultVal = 52, visionEccellente = false }) {
-  const parts = [];
-  const weights = [];
-
-  const visionAlta = visionVal != null && visionVal >= 78;
-  const visionW = Math.min(
-    0.9,
-    visionEccellente ? Math.max(vWeight, 0.85) : visionAlta ? Math.max(vWeight, 0.72) : vWeight,
-  );
-  const interventiW =
-    interventiVal != null
-      ? visionVal != null
-        ? visionEccellente
-          ? 0.08
-          : visionAlta
-            ? 0.12
-            : Math.min(0.28, 1 - visionW * 0.4)
-        : 0.85
-      : 0;
-  const weatherW = weatherVal != null ? (visionEccellente ? 0.08 : 0.18) : 0;
-
-  if (visionVal != null) {
-    parts.push(visionVal);
-    weights.push(visionW);
-  }
-  if (interventiVal != null && interventiW > 0) {
-    parts.push(interventiVal);
-    weights.push(interventiW);
-  }
-  if (weatherVal != null && weatherW > 0) {
-    parts.push(weatherVal);
-    weights.push(weatherW);
-  }
-
-  if (!parts.length) return defaultVal;
-
-  const totalW = weights.reduce((a, b) => a + b, 0);
-  const sum = parts.reduce((acc, val, i) => acc + val * weights[i], 0);
-  return clamp(sum / totalW);
-}
-
 /**
  * @param {{ interventi?: object[], analisi?: { vision_json?: object, created_at?: string } | null, weather?: object | null }} input
  */
@@ -307,25 +224,28 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
   const oggi = oggiIso();
   const vision = analisi?.vision_json;
   const vWeight = visionFreshness(analisi?.created_at);
-  const visionEccellente = isVisionEccellente(vision);
   const fromVision = scoreFromVision(vision);
-  const radarInterventi = interventiPerStatoRadar(interventi);
-  const fromInterventi = scoreFromInterventiAll(radarInterventi, oggi);
+  const scaduti = interventiScadutiPerRadar(interventi, oggi);
   const fromWeather = scoreFromWeather(weather);
+  const hasOverdue = scaduti.length > 0;
 
   const stats = {};
   const sources = {};
 
   for (const { key } of PRATO_STAT_AXES) {
-    stats[key] = mergeAxis(
-      fromVision?.[key] ?? null,
-      fromInterventi[key] ?? null,
-      key === "idratazione" ? fromWeather?.idratazione ?? null : null,
-      { vWeight, defaultVal: 52, visionEccellente }
-    );
+    const visionVal = fromVision?.[key] ?? null;
+    let val = visionVal ?? 52;
+    const penScaduti = penalitaAsseDaScaduti(scaduti, CATEGORIE[key], oggi);
+    val = clamp(val - penScaduti);
+
+    if (key === "idratazione" && fromWeather?.idratazione != null && !vision?.stress_idrici?.segni) {
+      val = clamp(val * 0.94 + fromWeather.idratazione * 0.06);
+    }
+
+    stats[key] = val;
     sources[key] = {
-      vision: fromVision?.[key] ?? null,
-      interventi: fromInterventi[key] ?? null,
+      vision: visionVal,
+      penalitaScaduti: penScaduti,
       meteo: key === "idratazione" ? fromWeather?.idratazione ?? null : null,
     };
   }
@@ -333,14 +253,16 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
   let values = Object.values(stats);
   let media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
 
-  const mediaFloor = minMediaDaStatoVision(vision);
-  if (mediaFloor != null && media < mediaFloor) {
-    const boost = mediaFloor - media;
-    for (const { key } of PRATO_STAT_AXES) {
-      stats[key] = clamp(stats[key] + boost);
+  if (!hasOverdue) {
+    const mediaFloor = minMediaDaStatoVision(vision);
+    if (mediaFloor != null && media < mediaFloor) {
+      const boost = mediaFloor - media;
+      for (const { key } of PRATO_STAT_AXES) {
+        stats[key] = clamp(stats[key] + boost);
+      }
+      values = Object.values(stats);
+      media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
     }
-    values = Object.values(stats);
-    media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
   }
 
   const insights = buildAllAxisInsights({
@@ -348,9 +270,11 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
     sources,
     vision,
     interventi,
+    scaduti,
     weather,
     oggi,
     hasVision: !!fromVision,
+    hasOverdue,
     visionAge: analisi?.created_at,
     freshness: vWeight,
   });
@@ -362,6 +286,8 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
     insights,
     hasVision: !!fromVision,
     hasInterventi: interventi.length > 0,
+    hasOverdue,
+    overdueCount: scaduti.length,
     visionAge: analisi?.created_at ?? null,
     freshness: vWeight,
   };
@@ -387,7 +313,8 @@ function livello(score) {
  * @returns {{ score: number, perche: string[], migliora: string[] }}
  */
 export function buildAxisInsight(key, ctx) {
-  const { stats, sources, vision, interventi, weather, oggi, hasVision, visionAge, freshness } = ctx;
+  const { stats, sources, vision, interventi, scaduti, weather, oggi, hasVision, hasOverdue, visionAge, freshness } =
+    ctx;
   const score = stats[key] ?? 50;
   const perche = [];
   const migliora = [];
@@ -400,15 +327,18 @@ export function buildAxisInsight(key, ctx) {
   }
 
   if (sources[key]?.vision != null) {
-    perche.push(`Ultima foto: indicatore ~${sources[key].vision}/100.`);
+    perche.push(`Dalla foto: ~${sources[key].vision}/100.`);
   }
-  if (sources[key]?.interventi != null) {
+  if (sources[key]?.penalitaScaduti > 0) {
+    const n = (scaduti || []).filter((i) => CATEGORIE[key].includes(i.categoria)).length;
     perche.push(
-      `Adempienza calendario: ~${sources[key].interventi}/100 (solo lavori urgenti; non penalizza tutto il piano stagionale).`,
+      `${n} lavoro/i in ritardo (data già passata) abbassa questo indicatore di ~${sources[key].penalitaScaduti} punti.`,
     );
+  } else if (hasVision && !hasOverdue) {
+    perche.push("Nessun lavoro scaduto: il punteggio riflette solo la foto (i lavori futuri non contano).");
   }
   if (hasVision && isVisionEccellente(vision) && sources[key]?.vision != null) {
-    perche.push("Foto: prato in ottime condizioni — il punteggio principale viene dall'analisi visiva.");
+    perche.push("Foto: prato in ottime condizioni.");
   }
   if (key === "idratazione" && sources[key]?.meteo != null) {
     perche.push(`Meteo attuale: ~${sources[key].meteo}/100 (umidità e temperature).`);

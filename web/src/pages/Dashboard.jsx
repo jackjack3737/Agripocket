@@ -530,7 +530,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         <section className="dash-card dash-card--radar">
           <h2 className="dash-card__title">Stato prato</h2>
           <p className="dash-card__sub">
-            Punteggio soprattutto dalla foto; il calendario incide solo sui lavori urgenti in ritardo.
+            Punteggio dalla <strong>foto</strong>. Solo i lavori <strong>scaduti</strong> (data già passata) lo
+            abbassano — i lavori di mesi futuri non contano e non alzano il voto.
           </p>
           {loading ? (
             <p className="dash-card__loading">Calcolo stato…</p>
@@ -550,7 +551,9 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
                 day: "numeric",
                 month: "short",
               })}
-              {!pratoRadar.hasInterventi ? " · aggiungi lavori o spunta il calendario" : null}
+              {pratoRadar.hasOverdue
+                ? ` · ${pratoRadar.overdueCount} lavori in ritardo abbassano il punteggio`
+                : null}
             </p>
           ) : (
             <p className="dash-card__meta dash-card__meta--radar">
