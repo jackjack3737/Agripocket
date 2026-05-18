@@ -62,13 +62,27 @@ function isVisionEccellente(vision) {
   const stato = vision.stato_generale;
   if (stato === "critico" || stato === "discreto") return false;
   if (gravitaAltaCount(vision) > 0) return false;
-  if (problemiSignificativi(vision).length > (stato === "ottimo" ? 0 : 1)) return false;
+  const medie = problemiSignificativi(vision).filter((p) => p.gravita === "media").length;
+  if (stato === "ottimo" && medie > 1) return false;
+  if (stato === "buono" && medie > 2) return false;
   if (vision.stress_idrici?.segni) return false;
-  if (vision.feltro_thatch?.presente) return false;
   if (vision.foglie_debris?.eccesso_foglie) return false;
-  if ((vision.malattie_sospette || []).length > 0) return false;
   if (vision.taglio?.giudizio === "troppo_basso") return false;
+  if ((vision.malattie_sospette || []).length > 0 && stato !== "ottimo") return false;
   return stato === "ottimo" || stato === "buono";
+}
+
+/** Pavimento minimo sulla media quando la visione descrive un prato sano (evita 62 su prati belli). */
+function minMediaDaStatoVision(vision) {
+  if (!vision) return null;
+  if (gravitaAltaCount(vision) > 0) return null;
+  const medie = problemiSignificativi(vision).filter((p) => p.gravita === "media").length;
+  const stato = vision.stato_generale;
+  if (stato === "ottimo") return 84;
+  if (stato === "buono" && medie <= 1) return 74;
+  if (stato === "buono" && medie <= 2) return 70;
+  if (stato === "discreto" && medie === 0) return 58;
+  return null;
 }
 
 /** Per l'esagono: solo lavori urgenti reali, non tutto il calendario stagionale/catalogo. */
@@ -97,38 +111,44 @@ function scoreFromVision(vision) {
 
   if (isVisionEccellente(vision)) {
     const top = vision.stato_generale === "ottimo" ? 94 : 88;
+    const feltro = vision.feltro_thatch?.presente ? 4 : 0;
     return {
       idratazione: top - 2,
       nutrizione: top - 1,
       copertura: top,
-      salute_fogliare: top - 1,
+      salute_fogliare: top - 1 - feltro,
       difesa: top - 3,
-      manutenzione: top - 2,
+      manutenzione: top - 2 - feltro,
     };
   }
 
   const base = STATO_MAP[vision.stato_generale] ?? 58;
+  const soloBasse =
+    problemiSignificativi(vision).length === 0 &&
+    (vision.problemi_rilevati || []).every((p) => p?.gravita === "bassa" || !p?.gravita);
+  const baseBoost =
+    vision.stato_generale === "ottimo" ? 8 : vision.stato_generale === "buono" && soloBasse ? 6 : 0;
   const problems = testoProblemiSignificativi(vision);
   const alta = gravitaAltaCount(vision);
   const mal = (vision.malattie_sospette || []).length;
   const erbe = (vision.erbette_infestanti || []).length;
 
-  let idratazione = base;
+  let idratazione = base + baseBoost;
   if (vision.stress_idrici?.segni) idratazione -= 28;
   if (/sicc|secc|arid|stress idr|disidr/.test(problems)) idratazione -= 12;
 
-  let nutrizione = base;
+  let nutrizione = base + baseBoost;
   if (/giall|cloros|carenza|clorosi/.test(problems)) nutrizione -= 18;
   if (/debole|sposs/.test(problems)) nutrizione -= 10;
 
-  let copertura = base;
+  let copertura = base + baseBoost;
   if (/calv|dirad|patch|vuot|ralo|sparse|bassa dens/.test(problems)) copertura -= 22;
   if (erbe > 3) copertura -= 8;
 
-  let salute_fogliare = base;
+  let salute_fogliare = base + baseBoost;
   if (vision.taglio?.giudizio === "troppo_basso") salute_fogliare -= 15;
   if (vision.taglio?.giudizio === "troppo_alto") salute_fogliare -= 8;
-  if (vision.feltro_thatch?.presente) salute_fogliare -= 10;
+  if (vision.feltro_thatch?.presente) salute_fogliare -= vision.stato_generale === "ottimo" ? 4 : 10;
   if (vision.foglie_debris?.eccesso_foglie) salute_fogliare -= 8;
   if (/necros|macchl|fungh|patolog/.test(problems)) salute_fogliare -= 14;
 
@@ -243,13 +263,19 @@ function mergeAxis(visionVal, interventiVal, weatherVal, { vWeight, defaultVal =
   const parts = [];
   const weights = [];
 
-  const visionW = Math.min(0.88, visionEccellente ? Math.max(vWeight, 0.82) : vWeight);
+  const visionAlta = visionVal != null && visionVal >= 78;
+  const visionW = Math.min(
+    0.9,
+    visionEccellente ? Math.max(vWeight, 0.85) : visionAlta ? Math.max(vWeight, 0.72) : vWeight,
+  );
   const interventiW =
     interventiVal != null
       ? visionVal != null
         ? visionEccellente
-          ? 0.1
-          : Math.min(0.28, 1 - visionW * 0.4)
+          ? 0.08
+          : visionAlta
+            ? 0.12
+            : Math.min(0.28, 1 - visionW * 0.4)
         : 0.85
       : 0;
   const weatherW = weatherVal != null ? (visionEccellente ? 0.08 : 0.18) : 0;
@@ -304,8 +330,18 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
     };
   }
 
-  const values = Object.values(stats);
-  const media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
+  let values = Object.values(stats);
+  let media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
+
+  const mediaFloor = minMediaDaStatoVision(vision);
+  if (mediaFloor != null && media < mediaFloor) {
+    const boost = mediaFloor - media;
+    for (const { key } of PRATO_STAT_AXES) {
+      stats[key] = clamp(stats[key] + boost);
+    }
+    values = Object.values(stats);
+    media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
+  }
 
   const insights = buildAllAxisInsights({
     stats,
@@ -460,9 +496,9 @@ function buildAllAxisInsights(ctx) {
 }
 
 export function labelStatoPrato(media) {
-  if (media >= 82) return "Ottimo";
-  if (media >= 68) return "Buono";
-  if (media >= 52) return "Discreto";
+  if (media >= 80) return "Ottimo";
+  if (media >= 66) return "Buono";
+  if (media >= 50) return "Discreto";
   if (media >= 36) return "Da recuperare";
   return "Critico";
 }

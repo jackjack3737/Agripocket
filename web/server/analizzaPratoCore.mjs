@@ -136,7 +136,16 @@ Rispondi SOLO JSON valido (italiano), forma:
   ],
   "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili"
 }
-Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce con confidenza bassa e motivo.`;
+Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce con confidenza bassa e motivo.
+
+VALUTAZIONE stato_generale (importante per il punteggio utente):
+- "ottimo": prato uniformemente verde, denso, tagliato bene, senza danni evidenti (è il caso di un prato bello/curato).
+- "buono": ottima copertura con piccole imperfezioni locali o lievi note.
+- "discreto": problemi visibili ma gestibili.
+- "critico": solo con danni gravi estesi.
+- Se il prato appare sano e curato, NON usare "discreto" per prudenza: usa "ottimo" o "buono".
+- problemi_rilevati: solo difetti REALI e visibili; se il prato è bello lascia [] o al massimo 1 voce "bassa".
+- malattie_sospette, erbette_infestanti, parassiti_sottoprato: array vuoti se non vedi evidenza chiara (non ipotizzare).`;
 
   const visionRaw = await geminiGenerate(
     geminiKey,
