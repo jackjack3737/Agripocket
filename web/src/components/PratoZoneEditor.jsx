@@ -54,7 +54,8 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
     <section className="dash-card dash-card--zone-editor dash-card--wide">
       <h2 className="dash-card__title">Mappa del prato</h2>
       <p className="dash-card__sub">
-        Contorno e m² nel profilo; qui segni irrigatori, ombra, muschio e pendenza uno alla volta.
+        Ogni pulsante apre una mappa dedicata: vedi solo irrigatori, solo ombra, ecc. Ideale anche per
+        giardini piccoli.
       </p>
 
       {!hasPoligono ? (
@@ -94,6 +95,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       <IrrigationZoneCard profile={profile} hideEditLink />
 
       <LawnMapModal
+        key={activeTool || "zone-map"}
         open={mapOpen}
         apiKey={GOOGLE_MAPS_API_KEY}
         purpose="zone"

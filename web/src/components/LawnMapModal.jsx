@@ -56,21 +56,26 @@ function polygonCentroid(vertices) {
   return { lat: lat / vertices.length, lng: lng / vertices.length };
 }
 
-/** Zoom sulla superficie del prato (non sull'intero indirizzo). */
+/** Zoom sulla superficie del prato (giardini piccoli: più vicino, ma puoi allontanare). */
 function fitMapToPolygon(map, vertices) {
   if (!map || !vertices?.length || !window.google?.maps?.LatLngBounds) return;
+  const center = polygonCentroid(vertices);
   if (vertices.length === 1) {
     map.setCenter(vertices[0]);
     map.setZoom(20);
     return;
   }
+  const area = calculatePolygonAreaSqm(vertices);
+  if (center && area > 0 && area < 180) {
+    map.setCenter(center);
+    map.setZoom(area < 45 ? 20 : area < 90 ? 19 : 18);
+    return;
+  }
   const bounds = new window.google.maps.LatLngBounds();
   for (const v of vertices) bounds.extend(v);
-  map.fitBounds(bounds, 56);
+  map.fitBounds(bounds, 72);
   window.google.maps.event.addListenerOnce(map, "idle", () => {
-    const z = map.getZoom();
-    if (z > 21) map.setZoom(21);
-    else if (z < 18) map.setZoom(18);
+    if (map.getZoom() > 21) map.setZoom(21);
   });
 }
 
@@ -136,13 +141,8 @@ export default function LawnMapModal({
   const mapReady = mapTick > 0 && !!mapRef.current;
   const inZones = isZoneEdit || mapStep === "zones";
 
-  const otherZones = useMemo(() => {
-    if (!isZoneEdit) return [];
-    const n = normalizePratoZone(initialPratoZone);
-    return n.zone.filter((z) => z.tipo !== zoneToolProp);
-  }, [isZoneEdit, initialPratoZone, zoneToolProp]);
-
-  const zonesOnMap = useMemo(() => [...otherZones, ...zones], [otherZones, zones]);
+  /** In modifica zona: solo il layer attivo (irrigatori OR ombra OR …), mai sovrapposti. */
+  const zonesOnMap = useMemo(() => (isZoneEdit ? zones : zones), [isZoneEdit, zones]);
 
   function runGeocode(query, { fitMap = true } = {}) {
     const q = query.trim();
@@ -536,7 +536,8 @@ export default function LawnMapModal({
               : zoneToolProp === "pendenza"
                 ? "Due tap: inizio e fine della freccia (verso dove scende l'acqua)."
                 : "Tocca i vertici dell'area, poi «Chiudi area»."}{" "}
-            <strong>Rotella o pinch per ingrandire</strong>; trascina per spostare la mappa.
+            <strong>Solo {ZONE_TYPES[zoneToolProp]?.label?.toLowerCase()}</strong> su questa mappa (gli altri
+            li segni con i pulsanti separati in Dashboard). Rotella/pinch per zoom, trascina per spostare.
           </p>
         )}
 
@@ -621,7 +622,17 @@ export default function LawnMapModal({
                   className="btn-outline-sm"
                   onClick={() => fitMapToPolygon(mapRef.current, vertices)}
                 >
-                  Ingrandisci sul prato
+                  Centra sul prato
+                </button>
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={() => {
+                    setZones([]);
+                    resetDraft();
+                  }}
+                >
+                  Azzera {ZONE_TYPES[zoneToolProp]?.label?.toLowerCase()}
                 </button>
               </>
             )}
