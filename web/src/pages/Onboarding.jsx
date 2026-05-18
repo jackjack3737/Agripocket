@@ -395,6 +395,7 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
       <LawnMapModal
         open={mapOpen}
         apiKey={GOOGLE_MAPS_API_KEY}
+        purpose="boundary"
         initialLocalita={answers.localita}
         initialPratoZone={answers.prato_zone}
         onClose={() => setMapOpen(false)}

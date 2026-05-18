@@ -337,7 +337,7 @@ export const EXTRA_STEP = {
   localitaHint: "Città o CAP — es. Bologna, 40100",
   mqHint: "Obbligatorio — es. 120 oppure 125,5 m² (virgola per i decimali)",
   mqMapHint:
-    "Apri mappa: indirizzo, contorno prato, poi «Segna zone» per irrigatori (statico/dinamico), ombra, muschio e pendenza.",
+    "Apri mappa: indirizzo e contorno del prato. Irrigatori, ombra e pendenza si segnano dopo in Dashboard.",
   advancedTitle: "Approfondisci il terreno (opzionale)",
   advancedIntro:
     "Questi dati migliorano concimi, drenaggio e gestione ombra. Puoi saltarli e completarli dopo da «Aggiorna profilo».",

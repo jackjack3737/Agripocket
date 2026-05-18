@@ -53,6 +53,22 @@ export async function loadPratoProfilo(userId) {
   return data;
 }
 
+export async function updatePratoZoneMappa(userId, prato_zone) {
+  await ensureAgropocketUser();
+  const ombra_zone_pct = prato_zone ? computeOmbraZonePct(prato_zone) : null;
+  const { data, error } = await supabase
+    .from("prato_profilo")
+    .update({
+      prato_zone,
+      ...(ombra_zone_pct ? { ombra_zone_pct } : {}),
+    })
+    .eq("user_id", userId)
+    .select()
+    .single();
+  if (error) throw new Error(formatDbError(error));
+  return data;
+}
+
 export async function updatePratoLocalita(userId, localita) {
   await ensureAgropocketUser();
   const { data, error } = await supabase

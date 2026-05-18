@@ -67,6 +67,26 @@ export function buildPratoZonePayload(poligono, zone) {
   };
 }
 
+/**
+ * Aggiorna mappa: sostituisce le zone dei tipi indicati e opzionalmente il poligono.
+ * @param {unknown} existing
+ * @param {{ poligono?: {lat,lng}[], zones?: object[], replaceTypes?: string[] }} patch
+ */
+export function mergePratoZoneUpdate(existing, { poligono, zones, replaceTypes = [] }) {
+  const base = normalizePratoZone(existing);
+  const types = new Set(replaceTypes);
+  let merged = types.size ? base.zone.filter((z) => !types.has(z.tipo)) : [...base.zone];
+  if (zones?.length) merged = [...merged, ...zones.map((z) => ({ ...z }))];
+  return {
+    version: 1,
+    poligono: (poligono?.length ? poligono : base.poligono).map((p) => ({
+      lat: p.lat,
+      lng: p.lng,
+    })),
+    zone: merged,
+  };
+}
+
 /** Stima % ombra sul prato (somma aree zone ombra / area prato, cap 100). */
 export function computeOmbraZonePct(pratoZone) {
   const { poligono, zone } = normalizePratoZone(pratoZone);

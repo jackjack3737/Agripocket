@@ -4,9 +4,9 @@ import { renderZoneOverlays } from "../lib/mapZoneOverlays";
 import { formatMqInput } from "../lib/parseMq";
 import { calculatePolygonAreaSqm } from "../lib/polygonArea";
 import {
-  buildPratoZonePayload,
   computeOmbraZonePct,
   IRRIGATOR_MODES,
+  mergePratoZoneUpdate,
   normalizePratoZone,
   ZONE_TYPES,
 } from "../lib/pratoZone";
@@ -76,11 +76,14 @@ function reverseLocality(lat, lng) {
 export default function LawnMapModal({
   open,
   apiKey,
+  purpose = "boundary",
+  zoneTool: zoneToolProp = "irrigatore",
   initialLocalita = "",
   initialPratoZone = null,
   onClose,
   onApply,
 }) {
+  const isZoneEdit = purpose === "zone";
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const polyRef = useRef(null);
@@ -113,7 +116,15 @@ export default function LawnMapModal({
 
   const areaSqm = useMemo(() => calculatePolygonAreaSqm(vertices), [vertices]);
   const mapReady = mapTick > 0 && !!mapRef.current;
-  const inZones = mapStep === "zones";
+  const inZones = isZoneEdit || mapStep === "zones";
+
+  const otherZones = useMemo(() => {
+    if (!isZoneEdit) return [];
+    const n = normalizePratoZone(initialPratoZone);
+    return n.zone.filter((z) => z.tipo !== zoneToolProp);
+  }, [isZoneEdit, initialPratoZone, zoneToolProp]);
+
+  const zonesOnMap = useMemo(() => [...otherZones, ...zones], [otherZones, zones]);
 
   function runGeocode(query, { fitMap = true } = {}) {
     const q = query.trim();
@@ -221,8 +232,13 @@ export default function LawnMapModal({
   }
 
   useEffect(() => {
-    drawStateRef.current = { inZones, panMode, zoneTool, pendenzaFrom };
-  }, [inZones, panMode, zoneTool, pendenzaFrom]);
+    drawStateRef.current = {
+      inZones,
+      panMode,
+      zoneTool: isZoneEdit ? zoneToolProp : zoneTool,
+      pendenzaFrom,
+    };
+  }, [inZones, panMode, zoneTool, pendenzaFrom, isZoneEdit, zoneToolProp]);
 
   function confirmIrrigator(modalita) {
     if (!irrigatorPick) return;
@@ -248,11 +264,19 @@ export default function LawnMapModal({
   useEffect(() => {
     if (!open) return;
     const normalized = normalizePratoZone(initialPratoZone);
-    setVertices(normalized.poligono.length >= 3 ? normalized.poligono : []);
-    setZones(normalized.zone);
-    setMapStep("boundary");
-    setPanMode(false);
-    setZoneTool("pan");
+    if (isZoneEdit) {
+      setVertices(normalized.poligono);
+      setZones(normalized.zone.filter((z) => z.tipo === zoneToolProp));
+      setMapStep("zones");
+      setZoneTool(zoneToolProp);
+      setPanMode(false);
+    } else {
+      setVertices(normalized.poligono.length >= 3 ? normalized.poligono : []);
+      setZones([]);
+      setMapStep("boundary");
+      setPanMode(false);
+      setZoneTool("pan");
+    }
     resetDraft();
     setLoadError(null);
     setAddress(initialLocalita?.trim() || "");
@@ -261,7 +285,7 @@ export default function LawnMapModal({
     setApplyBusy(false);
     setMapTick(0);
     lastGeocodeRef.current = null;
-  }, [open, initialLocalita, initialPratoZone]);
+  }, [open, initialLocalita, initialPratoZone, isZoneEdit, zoneToolProp]);
 
   useEffect(() => {
     if (!open || !apiKey?.trim() || !mapElRef.current) return undefined;
@@ -381,14 +405,14 @@ export default function LawnMapModal({
           : null;
 
     if (inZones) {
-      renderZoneOverlays(map, zoneOverlayRefs.current, zones, draft);
+      renderZoneOverlays(map, zoneOverlayRefs.current, zonesOnMap, draft);
     } else {
       zoneOverlayRefs.current.markers.forEach((m) => m.setMap(null));
       zoneOverlayRefs.current.polygons.forEach((p) => p.setMap(null));
       zoneOverlayRefs.current.polylines.forEach((l) => l.setMap(null));
       zoneOverlayRefs.current = { markers: [], polygons: [], polylines: [] };
     }
-  }, [zones, draftPath, draftTipo, pendenzaFrom, open, mapTick, mapReady, inZones]);
+  }, [zonesOnMap, draftPath, draftTipo, pendenzaFrom, open, mapTick, mapReady, inZones]);
 
   useEffect(() => {
     if (!open || !mapRef.current || !mapTick) return undefined;
@@ -422,19 +446,31 @@ export default function LawnMapModal({
     if (vertices.length < 3 || areaSqm <= 0) return;
     setApplyBusy(true);
 
-    let localita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
+    let localita;
+    let superficie_mq;
+    let prato_zone;
 
-    if (!localita) {
-      const center = polygonCentroid(vertices);
-      if (center) localita = await reverseLocality(center.lat, center.lng);
+    if (isZoneEdit) {
+      prato_zone = mergePratoZoneUpdate(initialPratoZone, {
+        poligono: vertices,
+        zones,
+        replaceTypes: [zoneToolProp],
+      });
+    } else {
+      prato_zone = mergePratoZoneUpdate(initialPratoZone, { poligono: vertices });
+      localita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
+      if (!localita) {
+        const center = polygonCentroid(vertices);
+        if (center) localita = await reverseLocality(center.lat, center.lng);
+      }
+      superficie_mq = Math.round(areaSqm);
     }
 
-    const prato_zone = buildPratoZonePayload(vertices, zones);
     const ombra_zone_pct = computeOmbraZonePct(prato_zone);
 
     onApply({
       localita: localita || undefined,
-      superficie_mq: Math.round(areaSqm),
+      superficie_mq,
       prato_zone,
       ombra_zone_pct: ombra_zone_pct || undefined,
     });
@@ -458,7 +494,11 @@ export default function LawnMapModal({
       <div className="map-modal map-modal--wide" role="dialog" aria-labelledby="map-modal-title">
         <div className="map-modal-header">
           <h2 id="map-modal-title" className="map-modal-title">
-            {inZones ? "Segna zone sul prato" : "Luogo e superficie"}
+            {isZoneEdit
+              ? `Segna: ${ZONE_TYPES[zoneToolProp]?.label || zoneToolProp}`
+              : inZones
+                ? "Segna zone sul prato"
+                : "Luogo e superficie"}
           </h2>
           <button type="button" className="map-modal-close" onClick={onClose} aria-label="Chiudi">
             ×
@@ -473,30 +513,30 @@ export default function LawnMapModal({
 
         {loadError && !missingKey && <div className="map-modal-banner map-modal-banner--error">{loadError}</div>}
 
-        {!missingKey && !loadError && !inZones && (
+        {!missingKey && !loadError && isZoneEdit && (
           <p className="map-modal-hint">
-            Cerca l&apos;indirizzo, poi attiva <strong>Disegna prato</strong> e tocca la mappa per ogni vertice
-            (almeno 3 punti).
+            {zoneToolProp === "irrigatore"
+              ? "Tocca la mappa per ogni irrigatore, poi scegli statico o dinamico."
+              : zoneToolProp === "pendenza"
+                ? "Due tap: inizio e fine della freccia (verso dove scende l'acqua)."
+                : "Tocca i vertici dell'area, poi «Chiudi area»."}
           </p>
         )}
-        {!missingKey && !loadError && !inZones && panMode && (
+
+        {!missingKey && !loadError && !isZoneEdit && !inZones && (
+          <p className="map-modal-hint">
+            Cerca l&apos;indirizzo, poi <strong>Disegna prato</strong> e tocca la mappa (almeno 3 punti). Zone e
+            irrigatori si segnano in Dashboard.
+          </p>
+        )}
+        {!missingKey && !loadError && !isZoneEdit && !inZones && panMode && (
           <p className="map-modal-mode-warn">Modalità mano: sposta la mappa. Per disegnare, scegli «Disegna prato».</p>
         )}
-        {!missingKey && !loadError && !inZones && !panMode && (
+        {!missingKey && !loadError && !isZoneEdit && !inZones && !panMode && (
           <p className="map-modal-mode-ok">Modalità disegno attiva: ogni tap aggiunge un vertice del prato.</p>
         )}
-        {!missingKey && !loadError && inZones && zoneTool === "pan" && (
-          <p className="map-modal-mode-warn">Scegli uno strumento (es. Irrigatore) e tocca la mappa.</p>
-        )}
 
-        {!missingKey && !loadError && inZones && (
-          <p className="map-modal-hint">
-            Segna irrigatori (<strong>S</strong> statico, <strong>D</strong> dinamico), ombra, muschio e pendenza.
-            Poi salva.
-          </p>
-        )}
-
-        {!missingKey && !loadError && !inZones && (
+        {!missingKey && !loadError && !isZoneEdit && !inZones && (
           <form className="map-modal-search" onSubmit={handleGeocodeAddress}>
             <input
               type="text"
@@ -516,13 +556,13 @@ export default function LawnMapModal({
           </form>
         )}
         {addressHint && !missingKey && <div className="map-modal-address-hint">{addressHint}</div>}
-        {previewLocalita && !missingKey && !inZones && (
+        {previewLocalita && !missingKey && !isZoneEdit && !inZones && (
           <p className="map-modal-place-preview">
             Luogo: <strong>{previewLocalita}</strong>
           </p>
         )}
 
-        {!inZones ? (
+        {!isZoneEdit && !inZones ? (
           <div className="map-modal-toolbar">
             <div className="map-modal-toggle">
               <button type="button" className={`map-toggle-btn${panMode ? " active" : ""}`} onClick={() => setPanMode(true)}>
@@ -540,21 +580,25 @@ export default function LawnMapModal({
               Azzera contorno
             </button>
           </div>
-        ) : (
+        ) : inZones ? (
           <div className="map-zone-toolbar">
-            {["pan", "irrigatore", "ombra", "muschio", "pendenza"].map((tool) => (
-              <button
-                key={tool}
-                type="button"
-                className={`map-zone-tool${zoneTool === tool ? " map-zone-tool--on" : ""}`}
-                onClick={() => {
-                  setZoneTool(tool);
-                  resetDraft();
-                }}
-              >
-                {tool === "pan" ? "Mano" : ZONE_TYPES[tool]?.label || tool}
-              </button>
-            ))}
+            {!isZoneEdit ? (
+              ["pan", "irrigatore", "ombra", "muschio", "pendenza"].map((tool) => (
+                <button
+                  key={tool}
+                  type="button"
+                  className={`map-zone-tool${zoneTool === tool ? " map-zone-tool--on" : ""}`}
+                  onClick={() => {
+                    setZoneTool(tool);
+                    resetDraft();
+                  }}
+                >
+                  {tool === "pan" ? "Mano" : ZONE_TYPES[tool]?.label || tool}
+                </button>
+              ))
+            ) : (
+              <span className="map-zone-tool map-zone-tool--on">{ZONE_TYPES[zoneToolProp]?.label}</span>
+            )}
             {(draftPath.length > 0 || pendenzaFrom) && (
               <button type="button" className="btn-outline-sm" onClick={resetDraft}>
                 Annulla disegno
@@ -566,9 +610,9 @@ export default function LawnMapModal({
               </button>
             )}
           </div>
-        )}
+        ) : null}
 
-        {zones.length > 0 && inZones && (
+        {zones.length > 0 && inZones && isZoneEdit && (
           <ul className="map-zone-list">
             {zones.map((z) => (
               <li key={z.id}>
@@ -622,35 +666,21 @@ export default function LawnMapModal({
             )}
           </div>
           <div className="map-modal-actions">
-            {inZones ? (
-              <button type="button" className="btn-outline-sm" onClick={() => setMapStep("boundary")}>
-                Indietro contorno
-              </button>
-            ) : (
-              <button type="button" className="btn-outline-sm" onClick={onClose}>
-                Annulla
-              </button>
-            )}
-            {!inZones && canBoundary && (
-              <button
-                type="button"
-                className="btn-outline-sm"
-                onClick={() => {
-                  setMapStep("zones");
-                  setPanMode(false);
-                  setZoneTool("irrigatore");
-                }}
-              >
-                Segna zone →
-              </button>
-            )}
+            <button type="button" className="btn-outline-sm" onClick={onClose}>
+              Annulla
+            </button>
+            {!isZoneEdit && !inZones && canBoundary && null}
             <button
               type="button"
               className="map-modal-apply"
               disabled={!canBoundary || applyBusy}
               onClick={handleApply}
             >
-              {applyBusy ? "…" : inZones ? "Salva mappa e m²" : "Salva (solo contorno)"}
+              {applyBusy
+                ? "…"
+                : isZoneEdit
+                  ? `Salva ${ZONE_TYPES[zoneToolProp]?.label?.toLowerCase() || "zone"}`
+                  : "Salva luogo e m²"}
             </button>
           </div>
         </div>

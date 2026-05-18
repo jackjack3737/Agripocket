@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import IrrigationZoneCard from "../components/IrrigationZoneCard";
+import PratoZoneEditor from "../components/PratoZoneEditor";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
@@ -216,7 +216,7 @@ function InterventoSection({ title, hint, items, onToggle, onPin, empty }) {
   );
 }
 
-export default function Dashboard({ profile, session }) {
+export default function Dashboard({ profile, session, onProfileUpdate }) {
   const location = useLocation();
   const summary = profileSummary(profile);
   const [weather, setWeather] = useState(null);
@@ -416,7 +416,7 @@ export default function Dashboard({ profile, session }) {
       ) : null}
 
       <div className="dash-grid">
-        <IrrigationZoneCard profile={profile} />
+        <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />
 
         <section className="dash-card dash-card--weather">
           <h2 className="dash-card__title">Meteo</h2>

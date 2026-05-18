@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { suggestIrrigation, countZonesByType } from "../lib/pratoZone";
 
-export default function IrrigationZoneCard({ profile }) {
+export default function IrrigationZoneCard({ profile, hideEditLink = false }) {
   const pratoZone = profile?.prato_zone;
   if (!pratoZone) return null;
 
@@ -42,9 +42,11 @@ export default function IrrigationZoneCard({ profile }) {
           {s}
         </p>
       ))}
-      <Link className="btn btn-outline btn-sm dash-card__cta" to="/onboarding">
-        Modifica mappa zone
-      </Link>
+      {!hideEditLink ? (
+        <Link className="btn btn-outline btn-sm dash-card__cta" to="/onboarding">
+          Modifica mappa zone
+        </Link>
+      ) : null}
     </section>
   );
 }

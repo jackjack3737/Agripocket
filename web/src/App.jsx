@@ -91,7 +91,7 @@ export default function App() {
           ) : needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <Dashboard profile={profile} session={session} />
+            <Dashboard profile={profile} session={session} onProfileUpdate={setProfile} />
           )
         }
       />
