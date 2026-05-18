@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import LawnMapModal from "./LawnMapModal";
 import IrrigationZoneCard from "./IrrigationZoneCard";
+import OmbraSeedCard from "./OmbraSeedCard";
 import { countZonesByType, normalizePratoZone, ZONE_TYPES } from "../lib/pratoZone";
 import { updatePratoZoneMappa } from "../lib/supabase";
 
@@ -92,6 +93,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       {error ? <p className="form-msg form-msg--error">{error}</p> : null}
       {saving ? <p className="dash-card__loading">Salvataggio mappa…</p> : null}
 
+      <OmbraSeedCard profile={profile} />
       <IrrigationZoneCard profile={profile} hideEditLink />
 
       <LawnMapModal

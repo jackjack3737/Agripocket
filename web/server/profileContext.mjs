@@ -1,6 +1,7 @@
 /** Etichette e testo profilo per prompt IA (livello A + C). */
 
-import { formatIrrigationForPrompt, formatZonesForPrompt } from "./pratoZone.mjs";
+import { formatLivelloConcimiForPrompt } from "./livelloConcimi.mjs";
+import { formatIrrigationForPrompt, formatOmbraSeedForPrompt, formatZonesForPrompt } from "./pratoZone.mjs";
 
 const ETA = {
   nuovo: "Nuovo (< 1 anno da semina/posa)",
@@ -131,8 +132,12 @@ export function formatProfileForPrompt(p) {
 
   const mappa = formatZonesForPrompt(p.prato_zone);
   if (mappa) base.push(`Mappa zone prato:\n${mappa}`);
+  const ombraSeme = formatOmbraSeedForPrompt(p.prato_zone, p);
+  if (ombraSeme) base.push(`Rinnovo zone ombra (quantità seme da mappa):\n${ombraSeme}`);
   const irrig = formatIrrigationForPrompt(p.prato_zone, p);
   if (irrig) base.push(`Programma irrigazione suggerito (da mappa):\n${irrig}`);
+
+  base.push(formatLivelloConcimiForPrompt(p));
 
   return base.length ? base.join("\n") : "Profilo prato: minimo.";
 }

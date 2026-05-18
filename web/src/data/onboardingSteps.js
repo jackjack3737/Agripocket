@@ -199,6 +199,12 @@ export const ONBOARDING_STEPS = [
     whatToDo: "Pensa alla stagione tipo (aprile–giugno).",
     options: [
       { value: "settimanale", label: "Ogni settimana", desc: "Circa 1 volta a settimana", help: "" },
+      {
+        value: "robot",
+        label: "Robot tagliaerba",
+        desc: "Taglio automatico frequente",
+        help: "Il robot taglia spesso in piccole passate: il calendario adatta frequenza e concimi leggeri.",
+      },
       { value: "quindicinale", label: "Ogni 10–14 giorni", desc: "Due volte al mese", help: "" },
       { value: "raro", label: "Raramente", desc: "Meno spesso", help: "Erba che cresce molto tra un taglio e l'altro." },
       { value: "non_so", label: "Non lo so", desc: "Variabile", help: "" },
@@ -383,6 +389,7 @@ export const LABELS = {
   },
   frequenza_taglio: {
     settimanale: "Taglio settimanale",
+    robot: "Robot tagliaerba",
     quindicinale: "Taglio 10–14 gg",
     raro: "Taglio raro",
     non_so: "—",

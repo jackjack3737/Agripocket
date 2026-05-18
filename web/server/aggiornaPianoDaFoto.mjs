@@ -5,6 +5,10 @@ import {
   loadProdotti,
   mqPrato,
 } from "./prodottiCatalogo.mjs";
+import {
+  filtraInterventiFitofarmacoCurativo,
+  isInterventoFitofarmacoCurativo,
+} from "./regoleFitofarmaci.mjs";
 
 function oggiIso() {
   return new Date().toISOString().slice(0, 10);
@@ -98,13 +102,15 @@ Rispondi SOLO JSON:
 }
 
 Regole:
-- 0-5 aggiunte al calendario stagionale se la foto mostra problemi non coperti (es. fungicida, diserbo mirato).
+- 0-5 aggiunte SOLO se la foto mostra problemi non già coperti (malattie, parassiti, erbacce, danni evidenti).
+- NON aggiungere fungicidi/insetticidi/diserbi post-emergenza preventivi se la foto è sana o solo migliorabile con concimi/taglio.
+- Pre-emergenza / antigerminanti: solo se coerente con infestanti visibili o stadio stagionale.
 - Date da oggi in avanti, distribuite logicamente (non tutte lo stesso giorno).
-- annulla_ids solo se un lavoro pianificato è chiaramente inutile o dannoso dopo la foto (raro, max 2).
-- modifica per anticipare/posticipare trattamenti in base a gravità visiva.
-- Prodotto: preferisci marca BOTTOS per concimi, biostimolanti, sementi, bagnanti.
-- Per fungicidi, diserbanti e insetticidi puoi usare qualsiasi marca del catalogo (id in elenco).
-- Larve sotto prato / popillia: categoria trattamento, riferimento insetticida Fly (Bottos) se in catalogo.`;
+- annulla_ids: max 2, solo per lavori fitofarmaco curativi non più giustificati dopo foto sana.
+- modifica per anticipare/posticipare trattamenti SOLO se c'è evidenza visiva di gravità.
+- Prodotto: preferisci BOTTOS per concimi, biostimolanti, sementi, bagnanti.
+- Fitofarmaci curativi solo con difetto visibile in foto; se in catalogo usa BOTTOS: Fly (larve/popillia), Trichoderma (funghi).
+- Larve sotto prato / popillia con segni: categoria trattamento con Fly BOTTOS.`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -201,6 +207,13 @@ export async function integraFotoNelPiano({
       data_prevista: raw.data_prevista,
       ordine: ordineBase++,
     };
+
+    if (
+      isInterventoFitofarmacoCurativo(item) &&
+      !filtraInterventiFitofarmacoCurativo([item], { vision, profilo }).length
+    ) {
+      continue;
+    }
 
     if (raw.prodotto_suggerito_id) {
       let p = prodotti.find((x) => x.id === Number(raw.prodotto_suggerito_id));

@@ -9,7 +9,7 @@ alter table public.prato_profilo
     obiettivo is null or obiettivo in ('estetico', 'resistente', 'bassa_manutenzione', 'non_so')
   ),
   add column if not exists frequenza_taglio text check (
-    frequenza_taglio is null or frequenza_taglio in ('settimanale', 'quindicinale', 'raro', 'non_so')
+    frequenza_taglio is null or frequenza_taglio in ('settimanale', 'quindicinale', 'robot', 'raro', 'non_so')
   ),
   add column if not exists altezza_taglio_cm text check (
     altezza_taglio_cm is null or altezza_taglio_cm in ('2_3', '4_5', '6_plus', 'non_so')

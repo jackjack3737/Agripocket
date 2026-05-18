@@ -197,7 +197,8 @@ ${kbContext || "(nessun chunk)"}
 
 Report Markdown in italiano con ## :
 Cosa vedo nella foto, Specie e miscuglio (da visione), Meteo e temperature recenti, Diagnosi e problemi, Parassiti e larve (sotto il tappeto: popillia/maggiolino, otiorrinco, altri), Taglio e altezza, Feltro/thatch, Foglie e detriti, Irrigazione e stress, Malattie, Piano d'azione, Cosa evitare, Nota agronomica.
-Per popillia/larve sotto prato: citare trattamento con insetticida Fly (Bottos) o equivalente da catalogo, senza dose automatica.
+Fitofarmaci (fungicidi/insetticidi): SOLO se la foto mostra malattie, parassiti o danni evidenti — non preventivi generici.
+Se serve un trattamento, preferisci prodotti BOTTOS in catalogo: Fly (larve/popillia), Trichoderma (problemi fungini), senza dose automatica.
 Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se utile. Collega diagnosi + meteo.`;
 
   const report = await geminiGenerate(geminiKey, [{ text: reportPrompt }], {

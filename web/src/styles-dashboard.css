@@ -884,6 +884,36 @@
   font-weight: 600;
 }
 
+.dash-card--ombra-seed {
+  margin-top: 12px;
+  border-left: 3px solid #455a64;
+}
+
+.ombra-seed__miscela,
+.ombra-seed__dose {
+  margin: 8px 0 4px;
+  font-size: 0.92rem;
+}
+
+.ombra-seed__note,
+.ombra-seed__finestre,
+.ombra-seed__catalog,
+.ombra-seed__hint {
+  margin: 6px 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #5a6b63);
+}
+
+.ombra-seed__zones {
+  margin: 8px 0 0 1.1rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.ombra-seed__zones li {
+  margin-bottom: 4px;
+}
+
 .dash-card--irrigation {
   grid-column: 1 / -1;
   margin-top: 0.5rem;

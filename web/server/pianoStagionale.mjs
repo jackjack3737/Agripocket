@@ -4,12 +4,13 @@ import { ensurePreEmergenzaAnnuali, valutaPreEmergenzaAnnuali } from "./preEmerg
 import { arricchisciInterventoConProdotto, loadProdotti } from "./prodottiCatalogo.mjs";
 import { integraCatalogoNelPiano } from "./pianoDaCatalogo.mjs";
 import { mergeControlliMensili } from "./controlliMensili.mjs";
-import {
-  analizzaParassiti,
-  ensureInterventoParassiti,
-  hintParassitiRegionali,
-} from "./parassitiPrato.mjs";
+import { hintParassitiRegionali } from "./parassitiPrato.mjs";
+import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
 import { formatProfileForPrompt } from "./profileContext.mjs";
+import {
+  REGOLE_FITOFARMACI_PROMPT,
+  filtraInterventiFitofarmacoCurativo,
+} from "./regoleFitofarmaci.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -117,7 +118,7 @@ function addDays(iso, n) {
   return d.toISOString().slice(0, 10);
 }
 
-export async function buildPianoInterventi(profilo, env, admin) {
+export async function buildPianoInterventi(profilo, env, admin, { vision = null } = {}) {
   const geminiKey = env.GEMINI_API_KEY?.trim();
   if (!geminiKey) throw new Error("Manca GEMINI_API_KEY");
 
@@ -187,10 +188,11 @@ Obiettivo: elencare TUTTI i lavori tipici del prato, con data_prevista specifica
 - Taglio (frequenza stagionale, altezza cm)
 - Biostimolanti e stress (caldo, siccità)
 - Agenti umettanti / miglioratori irrigazione
-- Trattamenti fungicidi/insetticidi (tutte le marche catalogo); per larve popillia sotto prato: insetticida Fly Bottos
 - Solo marca BOTTOS per concimi, biostimolanti, umettanti, ammendanti
-- Rinnovo / overseeding dove appropriato
+- Rinnovo / overseeding: se la mappa indica zone ombra, usa miscela e quantità seme (g/m²) già nel profilo — un intervento dedicato alle zone ombra
 - Pulizia foglie, controllo feltro, bordi
+
+${REGOLE_FITOFARMACI_PROMPT}
 
 Rispondi SOLO JSON:
 {
@@ -212,7 +214,8 @@ Regole:
 - Evita duplicati lo stesso giorno con stesso titolo.
 - priorita alta per finestre critiche: overseeding, pre-emergenza setaria/digitaria (se finestra termica aperta), stress caldo.
 - Non spostare la pre-emergenza setaria/digitaria a febbraio se il meteo indica finestra aperta ora (mag-giu in pianura padana).
-- Adatta a uso prato (gioco, estetico, basso input) e irrigazione del profilo.`;
+- Adatta a obiettivo, uso, frequenza taglio (se robot: micro-tagli frequenti, altezza costante) e livello concimi indicato nel profilo (professionali vs blandi).
+- Non inserire tutti i concimi del catalogo: rispetta il livello concimi del profilo (estetico→NPK/ferro; bassa manutenzione→slow/universali).`;
 
   const raw = await geminiGenerate(geminiKey, prompt, { maxTokens: 16384 });
   let parsed;
@@ -256,16 +259,8 @@ Regole:
     }
   }
 
-  const parassiti = analizzaParassiti({ localita: profilo?.localita });
-  const meseNum = new Date().getMonth() + 1;
-  const nordPadana = parassiti.regione?.id === "nord_padana";
-  const stagioneLarve = meseNum >= 4 && meseNum <= 9;
-  if (parassiti.popillia || parassiti.larveSottoprato || (nordPadana && stagioneLarve)) {
-    const p = nordPadana && stagioneLarve && !parassiti.popillia
-      ? { ...parassiti, larveSottoprato: true, popillia: meseNum >= 5 && meseNum <= 7 }
-      : parassiti;
-    parsedList = ensureInterventoParassiti(parsedList, p, oggi, addDays);
-  }
+  parsedList = filtraInterventiFitofarmacoCurativo(parsedList, { vision, profilo });
+  parsedList = ensureOmbraOverseedInterventi(parsedList, profilo?.prato_zone, profilo, oggi, addDays);
 
   return parsedList;
 }
@@ -354,10 +349,25 @@ export async function generaPianoStagionale({ authHeader, env }) {
   }
 
   const oggi = new Date().toISOString().slice(0, 10);
-  const interventiGrezzi = await buildPianoInterventi(profilo, env, admin);
-  const prodotti = await loadProdotti(admin);
+
+  const { data: ultimaAnalisi } = await admin
+    .from("prato_analisi")
+    .select("vision_json")
+    .eq("user_id", userData.user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const vision = ultimaAnalisi?.vision_json ?? null;
+
+  const profiloPerPrompt = {
+    ...profilo,
+    _prodottiCatalogo: await loadProdotti(admin),
+  };
+
+  const interventiGrezzi = await buildPianoInterventi(profiloPerPrompt, env, admin, { vision });
+  const prodotti = profiloPerPrompt._prodottiCatalogo;
   const arricchiti = interventiGrezzi.map((i) =>
-    arricchisciInterventoConProdotto(i, profilo, prodotti, null),
+    arricchisciInterventoConProdotto(i, profilo, prodotti, vision),
   );
   const { interventi: conCatalogo, catalogoAggiunti } = integraCatalogoNelPiano(
     arricchiti,
@@ -365,7 +375,8 @@ export async function generaPianoStagionale({ authHeader, env }) {
     profilo,
     oggi,
   );
-  const conControlli = mergeControlliMensili(conCatalogo, oggi);
+  const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(conCatalogo, { vision, profilo });
+  const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
   const saved = await persistPianoStagionale(admin, userData.user.id, conControlli, profilo);
 
   return {

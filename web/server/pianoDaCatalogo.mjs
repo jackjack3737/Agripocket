@@ -8,6 +8,8 @@ import {
   filtraPoolMarca,
   periodoCompatibile,
 } from "./prodottiCatalogo.mjs";
+import { concimeAmmessoPerProfilo } from "./livelloConcimi.mjs";
+import { catalogoAmmessoSenzaFoto } from "./regoleFitofarmaci.mjs";
 import { isProdottoFitofarmaco } from "./sicurezzaProdotti.mjs";
 
 const MESI_IT = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
@@ -77,8 +79,10 @@ function prioritaCatalogo(prodotto, tipo, dataIso) {
   return "bassa";
 }
 
-function prodottoAmmessoAlCalendario(prodotto) {
+function prodottoAmmessoAlCalendario(prodotto, profilo) {
   if (!mappaTipoProdotto(prodotto)) return false;
+  if (!catalogoAmmessoSenzaFoto(prodotto)) return false;
+  if (!concimeAmmessoPerProfilo(prodotto, profilo)) return false;
   return filtraPoolMarca([prodotto]).length > 0;
 }
 
@@ -130,7 +134,7 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
  * @param {object[]} interventiPiano - già arricchiti da Gemini
  */
 export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi) {
-  const eligibili = prodotti.filter(prodottoAmmessoAlCalendario);
+  const eligibili = prodotti.filter((p) => prodottoAmmessoAlCalendario(p, profilo));
   const extra = [];
 
   for (const p of eligibili) {

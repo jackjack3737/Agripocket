@@ -1,6 +1,11 @@
 /** Catalogo Prodotti (Supabase) + dosi su m² (solo concimi/biostimolanti Bottos, non fitofarmaci). */
 
 import {
+  bonusPunteggioBottosFito,
+  preferisciPoolBottos,
+} from "./bottosFitofarmaci.mjs";
+import { bonusConcimePerProfilo, livelloConcimiTarget, tierConcime } from "./livelloConcimi.mjs";
+import {
   analizzaParassiti,
   filtraInsetticidaPerParassita,
 } from "./parassitiPrato.mjs";
@@ -146,7 +151,7 @@ export function scoreProdotto(p, { categoriaIntervento, vision, intervento, prof
   let score = 0;
   const isBottos = String(p.marca || "").toUpperCase() === "BOTTOS";
   const fito = consenteTutteMarche(p);
-  if (isBottos) score += 8;
+  if (isBottos) score += fito ? 10 : 8;
   else if (!fito) score -= 50;
 
   const meseCode = meseDaData(intervento?.data_prevista);
@@ -156,6 +161,13 @@ export function scoreProdotto(p, { categoriaIntervento, vision, intervento, prof
   const ctx = contestoVision(vision, intervento);
   const intTxt = `${intervento?.titolo || ""} ${intervento?.descrizione || ""}`.toLowerCase();
   const parassiti = analizzaParassiti({ vision, intervento, localita: profilo?.localita });
+
+  if (fito) {
+    score += bonusPunteggioBottosFito(p, {
+      categoriaIntervento,
+      ctx: `${ctx} ${intTxt}`,
+    });
+  }
 
   if (categoriaIntervento === "diserbo" && isPreEmergenzaAnnualiIntervento(intervento)) {
     if (String(p.categoria || "").toUpperCase() === "DISERBANTE PRE-EMERGENZA") score += 18;
@@ -177,6 +189,10 @@ export function scoreProdotto(p, { categoriaIntervento, vision, intervento, prof
   if (categoriaIntervento === "concime" && /giall|cloros|nutriz|concim|azoto/.test(ctx + blob)) score += 5;
   if (categoriaIntervento === "biostimolante" && /stress|debole|ripresa/.test(ctx + blob)) score += 4;
 
+  if (categoriaIntervento === "concime" || /concim|npk|ferro|ammend/.test(blob)) {
+    score += bonusConcimePerProfilo(p, profilo);
+  }
+
   return score;
 }
 
@@ -189,13 +205,13 @@ export function filtraProdottiPerIntervento(prodotti, categoriaIntervento) {
 function restringiPoolDiserbo(pool, intervento) {
   if (!isPreEmergenzaAnnualiIntervento(intervento)) return pool;
   const pre = pool.filter((p) => String(p.categoria || "").toUpperCase() === "DISERBANTE PRE-EMERGENZA");
-  if (pre.length) return pre;
-  const match = pool.filter((p) =>
+  const base = pre.length ? pre : pool.filter((p) =>
     /setaria|digitaria|panico|pre.?emerg|antigermin|annualit/i.test(
       `${p.nome} ${p.descrizione} ${p.composizione}`,
     ),
   );
-  return match.length ? match : pool;
+  const narrowed = base.length ? base : pool;
+  return preferisciPoolBottos(narrowed, "pre_emergenza");
 }
 
 function restringiPoolTrattamento(pool, vision, intervento, profilo) {
@@ -204,19 +220,19 @@ function restringiPoolTrattamento(pool, vision, intervento, profilo) {
 
   if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx) && !parassiti.larveSottoprato) {
     const fung = pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase()));
-    if (fung.length) return fung;
+    if (fung.length) return preferisciPoolBottos(fung, "funghi");
   }
 
   if (/insett|afid|larv|trip|coleotter|popillia|maggiolino|otiorrinco|bruco|sottoprato/.test(ctx)) {
     let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
     ins = filtraInsetticidaPerParassita(ins, parassiti);
-    if (ins.length) return ins;
+    if (ins.length) return preferisciPoolBottos(ins, parassiti.larveSottoprato ? "larve" : "insetti");
   }
 
   if (parassiti.larveSottoprato) {
     let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
     ins = filtraInsetticidaPerParassita(ins, parassiti);
-    if (ins.length) return ins;
+    if (ins.length) return preferisciPoolBottos(ins, "larve");
   }
 
   return pool.filter((p) => consenteTutteMarche(p));
@@ -233,7 +249,13 @@ export function rankProdotti(prodotti, opts) {
   const pool = filtraPoolMarca(grezzo);
   return pool
     .map((p) => ({ p, score: scoreProdotto(p, opts) }))
-    .sort((a, b) => b.score - a.score || String(a.p.nome).localeCompare(String(b.p.nome)));
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const bA = String(a.p.marca || "").toUpperCase() === "BOTTOS" ? 1 : 0;
+      const bB = String(b.p.marca || "").toUpperCase() === "BOTTOS" ? 1 : 0;
+      if (bB !== bA) return bB - bA;
+      return String(a.p.nome).localeCompare(String(b.p.nome));
+    });
 }
 
 /** Tutti i prodotti con punteggio vicino al migliore (non solo il primo). */
@@ -260,7 +282,15 @@ function motiviPunteggio(p, opts, score) {
   }
   const par = analizzaParassiti({ vision: opts.vision, intervento: opts.intervento, localita: opts.profilo?.localita });
   if (par.popillia && /\bfly\b/i.test(String(p.nome))) {
-    motivi.push("idoneo per larve popillia (Fly)");
+    motivi.push("idoneo per larve popillia (Fly Bottos)");
+  }
+  if (/trichoderma/i.test(String(p.nome + p.composizione)) && isBottos) {
+    motivi.push("Trichoderma Bottos per difesa fungina");
+  }
+  if (opts.categoriaIntervento === "concime" && opts.profilo) {
+    const target = livelloConcimiTarget(opts.profilo);
+    const tier = tierConcime(p);
+    if (tier === target) motivi.push(`concime ${tier} (coerente con obiettivo)`);
   }
   if (!motivi.length) motivi.push(`punteggio totale ${score}`);
   return motivi;

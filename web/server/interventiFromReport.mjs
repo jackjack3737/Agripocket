@@ -2,6 +2,7 @@ import {
   arricchisciInterventoConProdotto,
   loadProdotti,
 } from "./prodottiCatalogo.mjs";
+import { filtraInterventiFitofarmacoCurativo } from "./regoleFitofarmaci.mjs";
 import { integraFotoNelPiano } from "./aggiornaPianoDaFoto.mjs";
 import { aggiornaAnalisiFoto, uploadAnalisiFoto } from "./uploadAnalisiFoto.mjs";
 
@@ -129,10 +130,13 @@ Rispondi SOLO JSON valido:
 
 Regole:
 - 4-8 interventi urgenti (prossime 2-6 settimane), ordinati per urgenza.
-- Includi trattamenti/diserbi/concimi se evidenti dalla foto.
-- Titoli concreti (es. "Trattamento fungicida preventivo", "Diserbo selettivo trifoglio").
-- Se parassiti_sottoprato indica popillia o larve sotto il prato: intervento trattamento con riferimento a insetticida Fly (Bottos) per larve di coleotteri.
-- Concimi/biostimolanti: solo prodotti BOTTOS; fungicidi/diserbanti/insetticidi: qualsiasi marca catalogo.`;
+- Fungicidi, insetticidi e diserbi post-emergenza SOLO se la foto mostra chiaramente malattie, parassiti, erbacce infestanti o danni (gravita media/alta).
+- NON proporre trattamenti preventivi senza segni visibili.
+- Pre-emergenza / antigerminanti: solo se erbe annuali o infestazione in germinazione è plausibile dalla situazione.
+- Titoli concreti legati a ciò che si vede (es. "Diserbo selettivo trifoglio visibile", non "trattamento preventivo").
+- Se parassiti_sottoprato indica popillia o larve con segni/danni: trattamento con insetticida Fly (BOTTOS).
+- Se malattie fungine visibili: preferisci fungicida/bio con Trichoderma (BOTTOS) se in catalogo.
+- Concimi/biostimolanti: solo BOTTOS; altri fitofarmaci curativi solo con evidenza foto, sempre preferendo BOTTOS (Fly, Trichoderma).`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -147,7 +151,18 @@ Regole:
     return [];
   }
 
-  const list = Array.isArray(parsed?.interventi) ? parsed.interventi : [];
+  let list = Array.isArray(parsed?.interventi) ? parsed.interventi : [];
+  list = filtraInterventiFitofarmacoCurativo(
+    list.map((item, idx) => ({
+      titolo: String(item.titolo || "").trim(),
+      descrizione: String(item.descrizione || "").trim(),
+      priorita: normalizePriorita(item.priorita),
+      categoria: normalizeCategoria(item.categoria),
+      data_prevista: parseDataPrevista(item),
+      ordine: idx,
+    })),
+    { vision },
+  );
   const base = list
     .filter((i) => i?.titolo?.trim())
     .map((item, idx) => ({

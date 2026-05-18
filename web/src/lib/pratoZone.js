@@ -104,6 +104,161 @@ export function computeOmbraZonePct(pratoZone) {
   return "75_100";
 }
 
+/** Aree ombra disegnate (m² per poligono + totale). */
+export function computeOmbraZoneAreas(pratoZone) {
+  const { poligono, zone } = normalizePratoZone(pratoZone);
+  const lawnMq = calculatePolygonAreaSqm(poligono);
+  if (lawnMq <= 0) return null;
+
+  const zones = [];
+  let totalMq = 0;
+  let idx = 0;
+  for (const z of zone) {
+    if (z.tipo !== "ombra") continue;
+    const mq = calculatePolygonAreaSqm(z.path);
+    if (mq < 0.5) continue;
+    idx += 1;
+    totalMq += mq;
+    zones.push({
+      id: z.id,
+      label: `Zona ombra ${idx}`,
+      mq: Math.round(mq * 10) / 10,
+      pctOfLawn: Math.round((mq / lawnMq) * 100),
+    });
+  }
+  if (totalMq <= 0) return null;
+
+  return {
+    lawnMq: Math.round(lawnMq * 10) / 10,
+    totalMq: Math.round(totalMq * 10) / 10,
+    pctTotal: Math.min(100, Math.round((totalMq / lawnMq) * 100)),
+    zones,
+  };
+}
+
+/** Miscela e dose seme per overseeding in ombra (g/m²). */
+export function raccomandazioneMiscelaOmbra(pctOmbra, ombraZonePct) {
+  const bucket = ombraZonePct || (pctOmbra >= 60 ? "75_100" : pctOmbra >= 35 ? "50_75" : pctOmbra >= 15 ? "25_50" : "0_25");
+
+  if (bucket === "75_100" || pctOmbra >= 55) {
+    return {
+      miscela: "Poa supina + Festuca rubra trapezifera",
+      specie: ["Poa supina", "Festuca rubra trapezifera"],
+      gPerMq: 45,
+      nota: "Ombra intensa: evitare Lolium perenne dominante; preferire specie da tappeto ombreggiato.",
+    };
+  }
+  if (bucket === "50_75" || pctOmbra >= 30) {
+    return {
+      miscela: "Poa trivialis + Festuca rubra",
+      specie: ["Poa trivialis", "Festuca rubra"],
+      gPerMq: 40,
+      nota: "Mezzombra: miscela resistente con Poa trivialis per recupero zone poco soleggiate.",
+    };
+  }
+  return {
+    miscela: "Festuca rubra + Poa trivialis (ombre leggere)",
+    specie: ["Festuca rubra", "Poa trivialis"],
+    gPerMq: 35,
+    nota: "Ombra parziale: rinforzo con specie tolleranti; integrare dove il tappeto dirada.",
+  };
+}
+
+/**
+ * Quantità seme per zone ombra (da mappa).
+ * @param {unknown} pratoZone
+ * @param {{ ombra_zone_pct?: string, prodottiCatalogo?: {id,nome,descrizione,categoria}[] }} [opts]
+ */
+export function suggestOmbraSeed(pratoZone, opts = {}) {
+  const areas = computeOmbraZoneAreas(pratoZone);
+  if (!areas) return null;
+
+  const rec = raccomandazioneMiscelaOmbra(areas.pctTotal, opts.ombra_zone_pct);
+  const grammi = Math.round(areas.totalMq * rec.gPerMq);
+  const kg = Math.round((grammi / 1000) * 10) / 10;
+
+  const catalogo = (opts.prodottiCatalogo || []).filter(
+    (p) =>
+      String(p.categoria || "").toUpperCase() === "SEMENTI" &&
+      /ombra|shade|trivialis|supina|mezzombra|royal|ombreggiat/i.test(
+        `${p.nome || ""} ${p.descrizione || ""}`,
+      ),
+  );
+
+  const prodottiSuggeriti = catalogo.slice(0, 4).map((p) => ({ id: p.id, nome: p.nome }));
+
+  return {
+    ...areas,
+    ...rec,
+    grammi,
+    kg,
+    doseLabel: `${grammi} g (${kg} kg) per ${areas.totalMq} m² in ombra`,
+    prodottiSuggeriti,
+    finestre: ["marzo–aprile", "settembre (se temperature miti)"],
+  };
+}
+
+export function formatOmbraSeedForPrompt(pratoZone, profilo) {
+  const seed = suggestOmbraSeed(pratoZone, { ombra_zone_pct: profilo?.ombra_zone_pct });
+  if (!seed) return null;
+
+  const lines = [
+    `Zone ombra in mappa: ${seed.totalMq} m² (${seed.pctTotal}% del prato, ${seed.zones.length} area/e).`,
+    `Overseeding consigliato: ${seed.miscela} — ${seed.doseLabel} a ${seed.gPerMq} g/m².`,
+    seed.nota,
+    `Finestre: ${seed.finestre.join(", ")}.`,
+  ];
+  if (seed.prodottiSuggeriti.length) {
+    lines.push(`Sementi catalogo idonee ombra: ${seed.prodottiSuggeriti.map((p) => p.nome).join("; ")}.`);
+  }
+  for (const z of seed.zones) {
+    const zg = Math.round(z.mq * seed.gPerMq);
+    lines.push(`  · ${z.label}: ${z.mq} m² → ~${zg} g seme.`);
+  }
+  return lines.join("\n");
+}
+
+/** Aggiunge overseeding zone ombra al piano (primavera). */
+export function ensureOmbraOverseedInterventi(interventi, pratoZone, profilo, oggi, addDays) {
+  const seed = suggestOmbraSeed(pratoZone, { ombra_zone_pct: profilo?.ombra_zone_pct });
+  if (!seed || seed.totalMq < 1) return interventi;
+
+  const blob = (i) => `${i.titolo} ${i.descrizione}`.toLowerCase();
+  const has = interventi.some(
+    (i) =>
+      i.categoria === "rinnovo" &&
+      /ombra|overseed|rinnovo.*ombra|seme.*ombra|trivialis|supina/.test(blob(i)),
+  );
+  if (has) return interventi;
+
+  const m = new Date(`${oggi}T12:00:00`).getMonth() + 1;
+  let data = oggi;
+  if (m > 4 && m < 9) data = addDays(oggi, 14);
+  else if (m >= 9) data = addDays(oggi, 21);
+
+  const prodHint =
+    seed.prodottiSuggeriti.length > 0
+      ? ` Prodotti catalogo: ${seed.prodottiSuggeriti.map((p) => p.nome).join(", ")}.`
+      : "";
+
+  return [
+    ...interventi,
+    {
+      titolo: `Overseeding zone ombra (${seed.totalMq} m²)`,
+      descrizione: [
+        `Rinnovo mirato sulle ${seed.zones.length} zone in ombra (${seed.totalMq} m², ${seed.pctTotal}% prato).`,
+        `Miscela: ${seed.miscela}. Quantità: ${seed.doseLabel} (${seed.gPerMq} g/m²).`,
+        `Preparare il letto (scarifica leggera), semina a secco, irrigazione leggera e frequente 2–3 settimane.`,
+        seed.nota + prodHint,
+      ].join(" "),
+      priorita: seed.pctTotal >= 40 ? "alta" : "media",
+      categoria: "rinnovo",
+      data_prevista: data,
+      ordine: 4200,
+    },
+  ].sort((a, b) => a.data_prevista.localeCompare(b.data_prevista) || (a.ordine ?? 0) - (b.ordine ?? 0));
+}
+
 export function countZonesByType(pratoZone) {
   const { zone } = normalizePratoZone(pratoZone);
   const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, dinamico: 0 };
@@ -211,7 +366,14 @@ export function formatZonesForPrompt(pratoZone) {
       `Irrigatori in mappa: ${counts.statico} statici, ${counts.dinamico} dinamici (rotativi/oscillanti).`,
     );
   }
-  if (counts.ombra) lines.push(`Zone ombra disegnate: ${counts.ombra}.`);
+  if (counts.ombra) {
+    const areas = computeOmbraZoneAreas(pratoZone);
+    lines.push(
+      areas
+        ? `Zone ombra: ${counts.ombra} poligoni, ${areas.totalMq} m² (${areas.pctTotal}% prato).`
+        : `Zone ombra disegnate: ${counts.ombra}.`,
+    );
+  }
   if (counts.muschio) lines.push(`Zone muschio/problema: ${counts.muschio}.`);
   if (counts.pendenza) lines.push(`Frecce pendenza/drenaggio: ${counts.pendenza}.`);
   return lines.join("\n");

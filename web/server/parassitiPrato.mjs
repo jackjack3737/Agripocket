@@ -1,6 +1,8 @@
+import { isFlyBottos, preferisciPoolBottos } from "./bottosFitofarmaci.mjs";
+
 /**
  * Parassiti del prato (larve sotto tappeto, regioni) e abbinamento prodotti catalogo.
- * Regola marca: solo BOTTOS per concimi/biostimolanti/umettanti; fitofarmaci tutte le marche.
+ * Fitofarmaci curativi: preferenza BOTTOS (Fly, Trichoderma) quando in catalogo.
  */
 
 /** @typedef {{ id: string, label: string, prodottiPattern: RegExp, interventoPattern: RegExp }} ParassitaDef */
@@ -130,9 +132,13 @@ export function analizzaParassiti({ vision, intervento, report, localita } = {})
 
 export function hintParassitiRegionali(localita) {
   const regione = regioneDaLocalita(localita);
-  if (regione) return `## Parassiti tipici zona\n${regione.note}`;
-  return `## Parassiti da considerare nel piano
-In base alla località italiana, prevedi almeno un controllo preventivo o monitoraggio per larve sotto il tappeto (popillia, mag-giu al Nord), otiorrinco (autunno) e afidi stagionali. Per popillia: riferimento catalogo Fly (Bottos). Solo marca BOTTOS per concimi/biostimolanti; fungicidi/diserbanti/insetticidi tutte le marche.`;
+  if (regione) {
+    return `## Monitoraggio parassiti (zona)
+${regione.note}
+NON inserire trattamenti insetticidi/fungicidi preventivi: solo monitoraggio visivo o dopo difetti in foto.`;
+  }
+  return `## Monitoraggio parassiti
+Valuta larve sotto prato, otiorrinco e afidi con ispezioni periodiche — nessun trattamento fitofarmaco curativo nel calendario senza danni visibili in foto.`;
 }
 
 /** Pool insetticida ristretto al parassita (tutte le marche ammesse). */
@@ -150,17 +156,20 @@ export function filtraInsetticidaPerParassita(pool, analisiParassiti) {
   }
 
   const arr = [...matched];
-  if (arr.length) return arr;
+  if (arr.length) return preferisciPoolBottos(arr, analisiParassiti.larveSottoprato ? "larve" : "insetti");
 
   if (analisiParassiti.popillia || analisiParassiti.larveSottoprato) {
     const fly = pool.filter((p) => /\bfly\b/i.test(`${p.nome} ${p.descrizione}`));
+    const flyBottos = fly.filter(isFlyBottos);
+    if (flyBottos.length) return flyBottos;
     if (fly.length) return fly;
   }
 
-  return pool;
+  return preferisciPoolBottos(pool, "insetti");
 }
 
 export function ensureInterventoParassiti(interventi, analisiParassiti, oggi, addDays) {
+  if (!analisiParassiti?.rilevati?.length) return interventi;
   if (!analisiParassiti?.popillia && !analisiParassiti?.larveSottoprato) return interventi;
 
   const blob = (i) => `${i.titolo} ${i.descrizione}`.toLowerCase();
@@ -179,7 +188,7 @@ export function ensureInterventoParassiti(interventi, analisiParassiti, oggi, ad
     ...interventi,
     {
       titolo,
-      descrizione: `${analisiParassiti.testoPrompt} Riferimento: insetticida Fly (Bottos) o equivalente da catalogo per larve di coleotteri. Verificare etichetta e normativa.`,
+      descrizione: `${analisiParassiti.testoPrompt} Prodotto preferito: insetticida Fly (BOTTOS) da catalogo per larve di coleotteri. Verificare etichetta e normativa.`,
       priorita: analisiParassiti.popillia ? "alta" : "media",
       categoria: "trattamento",
       data_prevista: addDays(oggi, 10),
