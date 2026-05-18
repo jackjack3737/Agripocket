@@ -237,38 +237,6 @@ export const ONBOARDING_STEPS = [
     ],
   },
   {
-    id: "ultimo_trattamento",
-    field: "ultimo_trattamento_tipo",
-    title: "Ultimo trattamento fatto",
-    intro: "Evita di sovrapporre concimi o fitofarmaci troppo vicini.",
-    whatToDo: "Che tipo di prodotto hai usato l'ultima volta?",
-    options: [
-      { value: "concime", label: "Concime", desc: "Granulare o liquido", help: "" },
-      { value: "biostimolante", label: "Biostimolante", desc: "O correttivo", help: "" },
-      { value: "diserbo", label: "Diserbo", desc: "Erbicida", help: "" },
-      { value: "fungicida", label: "Fungicida", desc: "", help: "" },
-      { value: "insetticida", label: "Insetticida", desc: "", help: "" },
-      { value: "nessuno", label: "Nessuno", desc: "Non ricordo trattamenti", help: "" },
-      { value: "non_so", label: "Non lo so", desc: "—", help: "" },
-    ],
-  },
-  {
-    id: "ultimo_trattamento_quando",
-    field: "ultimo_trattamento_quando",
-    title: "Quando l'hai fatto?",
-    intro: "Serve a calibrare il prossimo intervento in calendario.",
-    whatToDo: "Riferisciti all'ultimo trattamento che hai indicato.",
-    skipIf: (answers) =>
-      answers.ultimo_trattamento_tipo === "nessuno" || answers.ultimo_trattamento_tipo === "non_so",
-    options: [
-      { value: "settimana", label: "Ultima settimana", desc: "", help: "" },
-      { value: "mese", label: "Ultimo mese", desc: "", help: "" },
-      { value: "stagione", label: "Questa stagione", desc: "Ultimi 3–4 mesi", help: "" },
-      { value: "oltre_anno", label: "Oltre un anno fa", desc: "", help: "" },
-      { value: "non_so", label: "Non lo so", desc: "—", help: "" },
-    ],
-  },
-  {
     id: "problemi_noti",
     field: "problemi_noti",
     type: "multi",
@@ -339,7 +307,7 @@ export const EXTRA_STEP = {
   intro:
     "Non ti chiediamo il tipo di erba: lo riconosciamo dalla prima foto con l'intelligenza artificiale (specie botaniche, non categorie generiche).",
   whatToDo:
-    "Aggiungi luogo e metri quadri del prato (obbligatori): servono per meteo, calendario e dosi di concimi/biostimolanti. Accetta il disclaimer legale per continuare.",
+    "Disegna prima il contorno del prato su Google Maps (consigliato), poi accetta il disclaimer legale per continuare.",
   localitaHint: "Città o CAP — es. Bologna, 40100",
   mqHint: "Obbligatorio — es. 120 oppure 125,5 m² (virgola per i decimali)",
   mqMapHint:

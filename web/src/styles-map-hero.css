@@ -1,0 +1,191 @@
+/* Card hero — disegna prato su Google Maps (profilo) */
+
+.lawn-map-hero {
+  position: relative;
+  margin: 0 0 1.35rem;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(26, 61, 46, 0.22);
+  background: linear-gradient(145deg, rgba(26, 61, 46, 0.07) 0%, rgba(255, 255, 255, 0.95) 48%, rgba(26, 61, 46, 0.04) 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 12px 32px rgba(26, 61, 46, 0.08);
+}
+
+.lawn-map-hero--done {
+  border-color: rgba(26, 61, 46, 0.35);
+  background: linear-gradient(145deg, rgba(26, 61, 46, 0.1) 0%, #f8faf8 55%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.lawn-map-hero__glow {
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 55%;
+  height: 120%;
+  background: radial-gradient(ellipse at center, rgba(26, 61, 46, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.lawn-map-hero__inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 0.65rem 1rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  align-items: start;
+}
+
+.lawn-map-hero__icon {
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(26, 61, 46, 0.1);
+  color: var(--accent, #1a3d2e);
+}
+
+.lawn-map-hero__text {
+  min-width: 0;
+}
+
+.lawn-map-hero__kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent, #1a3d2e);
+  opacity: 0.85;
+}
+
+.lawn-map-hero__title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--text, #141413);
+}
+
+.lawn-map-hero__desc {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--muted, #5a6b63);
+}
+
+.lawn-map-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent, #1a3d2e);
+}
+
+.lawn-map-hero__stats li {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(26, 61, 46, 0.1);
+}
+
+.lawn-map-hero__cta {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0.15rem 0 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
+
+.lawn-map-hero:not(.lawn-map-hero--done) .lawn-map-hero__cta:not(.btn-outline) {
+  background: var(--accent, #1a3d2e);
+  border-color: var(--accent, #1a3d2e);
+  color: #fff;
+}
+
+.lawn-map-hero:not(.lawn-map-hero--done) .lawn-map-hero__cta:not(.btn-outline):hover {
+  opacity: 0.92;
+}
+
+.lawn-map-hero__warn {
+  margin: 0;
+  padding: 0.5rem 1.2rem 0.85rem;
+  font-size: 0.78rem;
+  color: #8b4513;
+  background: rgba(139, 69, 19, 0.06);
+}
+
+.lawn-map-hero--compact .lawn-map-hero__inner {
+  padding: 0.95rem 1rem;
+}
+
+.lawn-map-hero--compact .lawn-map-hero__title {
+  font-size: 1.02rem;
+}
+
+.field-group--place {
+  margin: 0 0 1.25rem;
+  padding: 0;
+  border: none;
+}
+
+.field-manual-fallback {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.field-manual-fallback__summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--muted);
+  list-style: none;
+}
+
+.field-manual-fallback__summary::-webkit-details-marker {
+  display: none;
+}
+
+.field-manual-fallback__body {
+  margin-top: 0.85rem;
+}
+
+.onboarding--has-bg .lawn-map-hero {
+  background: linear-gradient(
+    145deg,
+    rgba(26, 61, 46, 0.18) 0%,
+    rgba(20, 20, 19, 0.55) 50%,
+    rgba(26, 61, 46, 0.12) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.onboarding--has-bg .lawn-map-hero__title,
+.onboarding--has-bg .lawn-map-hero__kicker {
+  color: #e8f0ec;
+}
+
+.onboarding--has-bg .lawn-map-hero__desc {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.onboarding--has-bg .lawn-map-hero__stats li {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e8f0ec;
+}
+
+.onboarding--has-bg .lawn-map-hero__icon {
+  background: rgba(255, 255, 255, 0.12);
+  color: #c5e0d0;
+}

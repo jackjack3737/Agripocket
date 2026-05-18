@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import ChoiceCard from "../components/ChoiceCard";
 import ProblemiNotiPicker from "../components/ProblemiNotiPicker";
 import StepGuide from "../components/StepGuide";
@@ -13,6 +13,7 @@ import { formatMqInput, parseMqInput } from "../lib/parseMq";
 import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
 import { savePratoProfilo } from "../lib/supabase";
 import LawnMapModal from "../components/LawnMapModal";
+import LawnMapProfileCard from "../components/LawnMapProfileCard";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
@@ -26,8 +27,6 @@ const EMPTY = {
   frequenza_taglio: null,
   altezza_taglio_cm: null,
   animali: null,
-  ultimo_trattamento_tipo: null,
-  ultimo_trattamento_quando: null,
   problemi_noti: [],
   pendenza: null,
   ristagno_acqua: null,
@@ -55,8 +54,6 @@ function profileToAnswers(p) {
     frequenza_taglio: p.frequenza_taglio ?? null,
     altezza_taglio_cm: p.altezza_taglio_cm ?? null,
     animali: p.animali ?? null,
-    ultimo_trattamento_tipo: p.ultimo_trattamento_tipo ?? null,
-    ultimo_trattamento_quando: p.ultimo_trattamento_quando ?? null,
     problemi_noti: Array.isArray(p.problemi_noti) ? p.problemi_noti : [],
     pendenza: p.pendenza ?? null,
     ristagno_acqua: p.ristagno_acqua ?? null,
@@ -95,11 +92,12 @@ function findNextStep(from, answers, dir = 1) {
 
 export default function Onboarding({ userId, initialProfile, onComplete }) {
   const nav = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState(() => profileToAnswers(initialProfile));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [mapOpen, setMapOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(() => Boolean(location.state?.openMap));
   const [advancedOpen, setAdvancedOpen] = useState(() =>
     Boolean(
       initialProfile?.pendenza ||
@@ -111,6 +109,13 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
         initialProfile?.note_terreno,
     ),
   );
+
+  useEffect(() => {
+    if (location.state?.openMap) {
+      setMapOpen(true);
+      nav(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.openMap, location.pathname, nav]);
 
   const isExtra = step >= ONBOARDING_STEPS.length;
   const stepData = isExtra ? null : ONBOARDING_STEPS[step];
@@ -256,33 +261,42 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
                   totalSteps={totalSteps}
                 />
                 <section className="field-group field-group--place">
-                  <h2 className="field-group__title">Luogo e metri quadri</h2>
-                  <p className="field-group__lead">{EXTRA_STEP.mqMapHint}</p>
-                  <button type="button" className="btn btn-outline field-map-open" onClick={() => setMapOpen(true)}>
-                    Apri mappa (luogo + m²)
-                  </button>
-                  <label className="field-block">
-                    Dove si trova il prato
-                    <p className="field-block-hint">{EXTRA_STEP.localitaHint}</p>
-                    <input
-                      placeholder="es. Bologna, 20100"
-                      value={answers.localita}
-                      onChange={(e) => setField("localita", e.target.value)}
-                      autoComplete="address-level2"
-                    />
-                  </label>
-                  <label className="field-block">
-                    Superficie (m²) <span className="field-required">*</span>
-                    <p className="field-block-hint">{EXTRA_STEP.mqHint}</p>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="es. 120 oppure 125,5"
-                      value={answers.superficie_mq}
-                      onChange={(e) => setField("superficie_mq", e.target.value)}
-                      required
-                    />
-                  </label>
+                  <LawnMapProfileCard
+                    onOpenMap={() => setMapOpen(true)}
+                    localita={answers.localita}
+                    superficie_mq={answers.superficie_mq}
+                    pratoZone={answers.prato_zone}
+                    apiKeyMissing={!GOOGLE_MAPS_API_KEY?.trim()}
+                  />
+                  <details className="field-manual-fallback">
+                    <summary className="field-manual-fallback__summary">
+                      Inserisci luogo e m² a mano (senza mappa)
+                    </summary>
+                    <div className="field-manual-fallback__body">
+                      <label className="field-block">
+                        Dove si trova il prato
+                        <p className="field-block-hint">{EXTRA_STEP.localitaHint}</p>
+                        <input
+                          placeholder="es. Bologna, 20100"
+                          value={answers.localita}
+                          onChange={(e) => setField("localita", e.target.value)}
+                          autoComplete="address-level2"
+                        />
+                      </label>
+                      <label className="field-block">
+                        Superficie (m²) <span className="field-required">*</span>
+                        <p className="field-block-hint">{EXTRA_STEP.mqHint}</p>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="es. 120 oppure 125,5"
+                          value={answers.superficie_mq}
+                          onChange={(e) => setField("superficie_mq", e.target.value)}
+                          required
+                        />
+                      </label>
+                    </div>
+                  </details>
                 </section>
                 <label className="field-block">
                   Marca o tipo di seme (se lo ricordi)

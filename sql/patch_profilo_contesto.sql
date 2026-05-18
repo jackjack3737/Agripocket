@@ -17,16 +17,6 @@ alter table public.prato_profilo
   add column if not exists animali text check (
     animali is null or animali in ('nessuno', 'cane', 'altro', 'non_so')
   ),
-  add column if not exists ultimo_trattamento_tipo text check (
-    ultimo_trattamento_tipo is null
-    or ultimo_trattamento_tipo in (
-      'concime', 'diserbo', 'fungicida', 'biostimolante', 'insetticida', 'nessuno', 'non_so'
-    )
-  ),
-  add column if not exists ultimo_trattamento_quando text check (
-    ultimo_trattamento_quando is null
-    or ultimo_trattamento_quando in ('settimana', 'mese', 'stagione', 'oltre_anno', 'non_so')
-  ),
   add column if not exists problemi_noti text[] not null default '{}',
   add column if not exists pendenza text check (
     pendenza is null or pendenza in ('piana', 'leggera', 'marcata', 'non_so')

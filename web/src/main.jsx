@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles.css";
 import "./styles-map.css";
+import "./styles-map-hero.css";
 import "./styles-animations.css";
 import "./styles-grass-exam.css";
 import "./styles-chat-photo.css";

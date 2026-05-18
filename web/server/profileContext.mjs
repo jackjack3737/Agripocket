@@ -33,22 +33,6 @@ const ANIMALI = {
   altro: "Altri animali (gatti, conigli, pollame…)",
   non_so: "Presenza animali non indicata",
 };
-const TRATT_TIPO = {
-  concime: "Ultimo: concime",
-  diserbo: "Ultimo: diserbo",
-  fungicida: "Ultimo: fungicida",
-  biostimolante: "Ultimo: biostimolante",
-  insetticida: "Ultimo: insetticida",
-  nessuno: "Nessun trattamento recente dichiarato",
-  non_so: "Ultimo trattamento non indicato",
-};
-const TRATT_QUANDO = {
-  settimana: "nell'ultima settimana",
-  mese: "nell'ultimo mese",
-  stagione: "in questa stagione",
-  oltre_anno: "oltre un anno fa",
-  non_so: "tempo non indicato",
-};
 const PROBLEMI = {
   feltro_thatch: "Feltro/thatch",
   muschio: "Muschio",
@@ -107,13 +91,6 @@ export function formatProfileForPrompt(p) {
     p.frequenza_taglio && FREQ_TAGLIO[p.frequenza_taglio] && `Taglio: ${FREQ_TAGLIO[p.frequenza_taglio]}`,
     p.altezza_taglio_cm && ALT_TAGLIO[p.altezza_taglio_cm],
     p.animali && ANIMALI[p.animali] && `Animali: ${ANIMALI[p.animali]}`,
-    p.ultimo_trattamento_tipo &&
-      TRATT_TIPO[p.ultimo_trattamento_tipo] &&
-      `Trattamenti: ${TRATT_TIPO[p.ultimo_trattamento_tipo]}${
-        p.ultimo_trattamento_quando && TRATT_QUANDO[p.ultimo_trattamento_quando]
-          ? ` ${TRATT_QUANDO[p.ultimo_trattamento_quando]}`
-          : ""
-      }`,
     formatProblemiNoti(p.problemi_noti) && `Problemi noti dal cliente: ${formatProblemiNoti(p.problemi_noti)}`,
     p.note && `Note/specie: ${p.note}`,
   ].filter(Boolean);

@@ -12,6 +12,9 @@
     },
     "api/job-status.js": {
       "maxDuration": 10
+    },
+    "api/reset-profilo.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

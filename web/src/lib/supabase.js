@@ -106,8 +106,6 @@ export async function savePratoProfilo(userId, profile) {
     frequenza_taglio: profile.frequenza_taglio || null,
     altezza_taglio_cm: profile.altezza_taglio_cm || null,
     animali: profile.animali || null,
-    ultimo_trattamento_tipo: profile.ultimo_trattamento_tipo || null,
-    ultimo_trattamento_quando: profile.ultimo_trattamento_quando || null,
     problemi_noti: Array.isArray(profile.problemi_noti) ? profile.problemi_noti : [],
     pendenza: profile.pendenza || null,
     ristagno_acqua: profile.ristagno_acqua || null,

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import LawnMapModal from "../components/LawnMapModal";
+import LawnMapProfileCard from "../components/LawnMapProfileCard";
+import ProfileResetButton from "../components/ProfileResetButton";
 import PratoZoneEditor from "../components/PratoZoneEditor";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
@@ -23,13 +26,15 @@ import {
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
-import { supabase } from "../lib/supabase";
+import { savePratoProfilo, supabase } from "../lib/supabase";
 import {
   AVVISO_FITOFARMACO,
   AVVISO_MQ_MANCANTI,
   isInterventoFitofarmaco,
   superficieMqVerificata,
 } from "../lib/sicurezzaClient";
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 function formattaDoseIntervento(totale, unita, perMq) {
   const u = (unita || "g").toLowerCase();
@@ -240,6 +245,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
       : "Piano aggiornato dall'ultima analisi foto.";
   });
   const [generatingPiano, setGeneratingPiano] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [mapSaving, setMapSaving] = useState(false);
 
   const userId = session?.user?.id;
   const groups = groupInterventi(interventi);
@@ -256,6 +263,27 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     () => computePratoStats({ interventi, analisi: ultimaAnalisi, weather }),
     [interventi, ultimaAnalisi, weather]
   );
+
+  async function handleProfileMapApply({ localita, superficie_mq, prato_zone }) {
+    if (!userId) return;
+    setMapSaving(true);
+    setError("");
+    try {
+      const updated = await savePratoProfilo(userId, {
+        ...profile,
+        disclaimer_accettato: true,
+        localita: localita?.trim() || profile.localita,
+        superficie_mq: superficie_mq ?? profile.superficie_mq,
+        prato_zone: prato_zone ?? profile.prato_zone,
+      });
+      onProfileUpdate?.(updated);
+      setMapOpen(false);
+    } catch (e) {
+      setError(e.message || "Errore salvataggio mappa");
+    } finally {
+      setMapSaving(false);
+    }
+  }
 
   function toggleMese(monthKey) {
     setMesiAperti((prev) => {
@@ -465,6 +493,15 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
         <section className="dash-card dash-card--profile dash-card--wide">
           <h2 className="dash-card__title">Profilo prato</h2>
+          <LawnMapProfileCard
+            compact
+            onOpenMap={() => setMapOpen(true)}
+            localita={profile?.localita}
+            superficie_mq={profile?.superficie_mq}
+            pratoZone={profile?.prato_zone}
+            apiKeyMissing={!GOOGLE_MAPS_API_KEY?.trim()}
+          />
+          {mapSaving ? <p className="dash-card__loading">Salvataggio mappa…</p> : null}
           <ul className="dash-profile-list">
             {profile?.localita ? <li>📍 {profile.localita}</li> : null}
             {profile?.superficie_mq ? <li>📐 {profile.superficie_mq} m²</li> : null}
@@ -598,6 +635,18 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           </>
         )}
       </section>
+
+      <ProfileResetButton onResetComplete={onProfileUpdate} />
+
+      <LawnMapModal
+        open={mapOpen}
+        apiKey={GOOGLE_MAPS_API_KEY}
+        purpose="boundary"
+        initialLocalita={profile?.localita || ""}
+        initialPratoZone={profile?.prato_zone}
+        onClose={() => setMapOpen(false)}
+        onApply={handleProfileMapApply}
+      />
     </div>
   );
 }
