@@ -1,7 +1,9 @@
 # Relazione tecnico-funzionale — AgriPocket
 ## Documento per valutazione critica (Gemini / revisore esterno)
 
-**Versione:** maggio 2026  
+> **Aggiornamento maggio 2026:** per revisione critica aggiornata usa **`docs/RELAZIONE_CRITICA_GEMINI.md`** + prompt in **`docs/PROMPT_GEMINI_REVISIONE.txt`**.
+
+**Versione:** maggio 2026 (archivio; vedi relazione critica per stato corrente)  
 **Repository:** https://github.com/jackjack3737/Agripocket  
 **Produzione:** https://agripocket-azure.vercel.app  
 **Stack:** React 19 + Vite 6, Supabase (Auth + Postgres + pgvector), Gemini 2.5 Flash, Vercel Serverless

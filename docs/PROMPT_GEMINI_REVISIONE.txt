@@ -1,0 +1,24 @@
+Sei un revisore senior: agronomo turfgrass (Italia) + architect software + product manager.
+
+Allego la relazione tecnico-funzionale di AgriPocket (app web per la cura del prato con foto, calendario annuale, RAG su knowledge base Bottos/NCSU, dosi prodotti su m² da mappa Google).
+
+ISTRUZIONI OBBLIGATORIE:
+- Sii MOLTO CRITICO. Non compiacere il team.
+- Ogni affermazione deve essere supportata da rischio, impatto utente o gap tecnico.
+- Evidenzia rischi fitosanitari e responsabilità legale in Italia (GDPR, foto, geolocalizzazione, dosi).
+- Segnala incoerenze tra UX promessa e comportamento reale (es. calendario solo foto mensili, punteggio radar basso su prato sano).
+
+Produci in italiano:
+
+1. Executive summary (max 20 righe) — verdetto: pronto / beta rischiosa / non pronto
+2. Tabella 20 punteggi (1–10) sulle domande della sezione 10 della relazione + 1 riga motivazione ciascuna
+3. Top 10 criticità P0/P1/P2
+4. Diagramma testuale punti di rottura: foto → vision → piano → prodotti → radar → UI
+5. Rischio legale e compliance (Italia)
+6. Backlog MoSCoW 4 settimane (max 15 item)
+7. Max 5 punti di forza REALI (non marketing)
+
+Repository: https://github.com/jackjack3737/Agripocket
+Produzione: https://agripocket-azure.vercel.app
+
+[ALLEGARE QUI IL FILE: docs/RELAZIONE_CRITICA_GEMINI.md]
