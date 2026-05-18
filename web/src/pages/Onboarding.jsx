@@ -199,6 +199,13 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
 
   const canAdvance = isExtra ? extraReady : isMulti || !!value;
 
+  const canLeaveProfile =
+    Boolean(initialProfile?.onboarding_completato && initialProfile?.disclaimer_accettato_at);
+
+  function exitToDashboard() {
+    nav("/dashboard", { replace: true });
+  }
+
   return (
     <div className="onboarding-shell">
       {bgImage ? (
@@ -213,6 +220,17 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
 
       <div className={`page onboarding${bgImage ? " onboarding--has-bg" : ""}`}>
         <div className="onboarding-content">
+          {canLeaveProfile ? (
+            <div className="onboarding-exit-bar">
+              <button type="button" className="btn btn-ghost btn-sm onboarding-exit-bar__btn" onClick={exitToDashboard}>
+                ← Torna alla dashboard
+              </button>
+              <p className="onboarding-exit-bar__hint">
+                Modifica opzionale. Esci quando vuoi: le risposte non salvate non contano.
+              </p>
+            </div>
+          ) : null}
+
           <StepProgress current={Math.min(step, ONBOARDING_STEPS.length)} total={totalSteps} />
 
           <div key={step} className="onboarding-step-body">
@@ -391,6 +409,10 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
             {step > 0 ? (
               <button type="button" className="btn btn-ghost" onClick={back}>
                 Indietro
+              </button>
+            ) : canLeaveProfile ? (
+              <button type="button" className="btn btn-ghost" onClick={exitToDashboard}>
+                Esci senza salvare
               </button>
             ) : (
               <span />

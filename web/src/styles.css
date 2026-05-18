@@ -563,6 +563,24 @@ input::placeholder {
   padding-bottom: 1rem;
 }
 
+.onboarding-exit-bar {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.onboarding-exit-bar__btn {
+  padding-left: 0;
+  font-weight: 600;
+}
+
+.onboarding-exit-bar__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .onboarding-nav {
   display: flex;
   justify-content: space-between;
