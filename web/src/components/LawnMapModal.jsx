@@ -56,6 +56,24 @@ function polygonCentroid(vertices) {
   return { lat: lat / vertices.length, lng: lng / vertices.length };
 }
 
+/** Zoom sulla superficie del prato (non sull'intero indirizzo). */
+function fitMapToPolygon(map, vertices) {
+  if (!map || !vertices?.length || !window.google?.maps?.LatLngBounds) return;
+  if (vertices.length === 1) {
+    map.setCenter(vertices[0]);
+    map.setZoom(20);
+    return;
+  }
+  const bounds = new window.google.maps.LatLngBounds();
+  for (const v of vertices) bounds.extend(v);
+  map.fitBounds(bounds, 56);
+  window.google.maps.event.addListenerOnce(map, "idle", () => {
+    const z = map.getZoom();
+    if (z > 21) map.setZoom(21);
+    else if (z < 18) map.setZoom(18);
+  });
+}
+
 function reverseLocality(lat, lng) {
   return new Promise((resolve) => {
     if (!window.google?.maps?.Geocoder) {
@@ -299,11 +317,14 @@ export default function LawnMapModal({
 
         const map = new window.google.maps.Map(mapElRef.current, {
           center: { lat: 41.9028, lng: 12.4964 },
-          zoom: 18,
+          zoom: 19,
           mapTypeId: "satellite",
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
+          zoomControl: true,
+          gestureHandling: "greedy",
+          scrollwheel: true,
         });
         mapRef.current = map;
 
@@ -319,20 +340,6 @@ export default function LawnMapModal({
           clickable: false,
         });
         polyRef.current = poly;
-
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              if (cancelled || !mapRef.current) return;
-              mapRef.current.setCenter({
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-              });
-            },
-            () => {},
-            { enableHighAccuracy: true, timeout: 9000, maximumAge: 60_000 },
-          );
-        }
 
         setMapTick((t) => t + 1);
       } catch (e) {
@@ -359,9 +366,17 @@ export default function LawnMapModal({
   }, [open, apiKey]);
 
   useEffect(() => {
-    if (!open || !mapReady || !initialLocalita?.trim()) return;
+    if (!open || !mapReady || !initialLocalita?.trim() || isZoneEdit) return;
     runGeocode(initialLocalita, { fitMap: true });
-  }, [open, mapReady, initialLocalita]);
+  }, [open, mapReady, initialLocalita, isZoneEdit]);
+
+  useEffect(() => {
+    if (!open || !mapReady || !isZoneEdit || vertices.length < 3) return;
+    const map = mapRef.current;
+    if (!map) return;
+    const t = window.setTimeout(() => fitMapToPolygon(map, vertices), 120);
+    return () => window.clearTimeout(t);
+  }, [open, mapReady, isZoneEdit, zoneToolProp, vertices]);
 
   useEffect(() => {
     if (!open) return;
@@ -420,10 +435,11 @@ export default function LawnMapModal({
 
     const drawMode = inZones ? zoneTool !== "pan" : !panMode;
     map.setOptions({
-      draggable: !drawMode,
+      draggable: isZoneEdit || panMode,
       scrollwheel: true,
-      gestureHandling: drawMode ? "none" : "greedy",
-      disableDoubleClickZoom: drawMode,
+      gestureHandling: "greedy",
+      disableDoubleClickZoom: false,
+      zoomControl: true,
     });
 
     if (clickListenerRef.current) {
@@ -519,7 +535,8 @@ export default function LawnMapModal({
               ? "Tocca la mappa per ogni irrigatore, poi scegli statico o dinamico."
               : zoneToolProp === "pendenza"
                 ? "Due tap: inizio e fine della freccia (verso dove scende l'acqua)."
-                : "Tocca i vertici dell'area, poi «Chiudi area»."}
+                : "Tocca i vertici dell'area, poi «Chiudi area»."}{" "}
+            <strong>Rotella o pinch per ingrandire</strong>; trascina per spostare la mappa.
           </p>
         )}
 
@@ -597,7 +614,16 @@ export default function LawnMapModal({
                 </button>
               ))
             ) : (
-              <span className="map-zone-tool map-zone-tool--on">{ZONE_TYPES[zoneToolProp]?.label}</span>
+              <>
+                <span className="map-zone-tool map-zone-tool--on">{ZONE_TYPES[zoneToolProp]?.label}</span>
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={() => fitMapToPolygon(mapRef.current, vertices)}
+                >
+                  Ingrandisci sul prato
+                </button>
+              </>
             )}
             {(draftPath.length > 0 || pendenzaFrom) && (
               <button type="button" className="btn-outline-sm" onClick={resetDraft}>
