@@ -2,7 +2,15 @@
 
 const AXES = ["idratazione", "nutrizione", "copertura", "salute_fogliare", "difesa", "manutenzione"];
 
-const STATO_BASE = { ottimo: 88, buono: 78, discreto: 58, critico: 32 };
+const STATO_BASE = {
+  ottimo: 88,
+  buono: 78,
+  discreto: 58,
+  discreta: 58,
+  sufficiente: 62,
+  critico: 32,
+  male: 28,
+};
 
 function clamp(n, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(n)));
@@ -33,6 +41,27 @@ export function normalizePunteggiAssiStrict(raw) {
   return out;
 }
 
+/** Analisi legacy: vision presente ma senza punteggi_assi né stato_generale noto. */
+function legacyVisionScores(vision) {
+  const blob = JSON.stringify(vision).toLowerCase();
+  if (
+    !vision.sintesi_visiva &&
+    !vision.problemi_rilevati?.length &&
+    !vision.malattie_sospette?.length &&
+    !/prato|erba|verde|foto|stato/.test(blob)
+  ) {
+    return null;
+  }
+  let base = 72;
+  if (/ottim|eccellent|molto buon/.test(blob)) base = 85;
+  else if (/buon|sano|uniform/.test(blob)) base = 78;
+  else if (/discret|mediocre|migliorab/.test(blob)) base = 58;
+  else if (/crit|grave|male|dann/.test(blob)) base = 35;
+  const out = {};
+  for (const key of AXES) out[key] = base;
+  return { scores: out, fromFallback: true };
+}
+
 /**
  * Punteggi per l'esagono: da punteggi_assi se validi, altrimenti stima da stato_generale + flag vision.
  * @returns {{ scores: object, fromFallback: boolean } | null}
@@ -51,9 +80,11 @@ export function resolvePunteggiAssi(vision) {
     }
   }
 
-  const stato = String(vision.stato_generale || "").toLowerCase();
+  const stato = String(vision.stato_generale || vision.stato || "").toLowerCase().trim();
   const base = STATO_BASE[stato];
-  if (base == null && Object.keys(partial).length === 0) return null;
+  if (base == null && Object.keys(partial).length === 0) {
+    return legacyVisionScores(vision);
+  }
 
   const fallbackBase = base ?? 70;
   const out = {};
