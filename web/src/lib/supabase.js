@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { parseMqInput } from "./parseMq";
-import { computeOmbraZonePct } from "./pratoZone";
+import { anonymizePratoZoneForStorage, computeOmbraZonePct } from "./pratoZone";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -116,7 +116,10 @@ export async function savePratoProfilo(userId, profile) {
         : null,
     analisi_terreno_fatta: !!profile.analisi_terreno_fatta,
     note_terreno: profile.note_terreno?.trim() || null,
-    prato_zone: profile.prato_zone && typeof profile.prato_zone === "object" ? profile.prato_zone : null,
+    prato_zone:
+      profile.prato_zone && typeof profile.prato_zone === "object"
+        ? anonymizePratoZoneForStorage(profile.prato_zone)
+        : null,
     ombra_zone_pct: (() => {
       if (profile.prato_zone) {
         const fromMap = computeOmbraZonePct(profile.prato_zone);

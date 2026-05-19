@@ -15,6 +15,7 @@ import {
   isInterventoFitofarmaco,
   isProdottoFitofarmaco,
   filtraProdottiConsumer,
+  inferCategoriaLegale,
   AVVISO_PRODOTTO_PROFESSIONALE,
   superficieMqVerificata,
 } from "./sicurezzaProdotti.mjs";
@@ -87,7 +88,11 @@ export async function loadProdotti(admin) {
     console.warn("[prodotti] load:", error.message);
     return [];
   }
-  return data ?? [];
+  const enriched = (data ?? []).map((p) => ({
+    ...p,
+    categoria_legale: p.categoria_legale || inferCategoriaLegale(p),
+  }));
+  return filtraProdottiConsumer(enriched);
 }
 
 export function mqPrato(profilo) {

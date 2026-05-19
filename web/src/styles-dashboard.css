@@ -98,6 +98,24 @@
   gap: 0.65rem;
 }
 
+.prato-radar--no-data .prato-radar__fill,
+.prato-radar--no-data .prato-radar__stroke,
+.prato-radar--no-data .prato-radar__dot {
+  display: none;
+}
+
+.prato-radar--no-data .prato-radar__media {
+  font-size: 1.35rem;
+  opacity: 0.55;
+}
+
+.prato-radar--no-data .prato-radar__stato {
+  font-size: 0.72rem;
+  max-width: 7rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
 .prato-radar__chart-wrap {
   position: relative;
   width: 100%;

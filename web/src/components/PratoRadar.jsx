@@ -32,13 +32,13 @@ function RadarTooltip({ insight, label, onClose }) {
       </p>
       <p className="prato-radar__tooltip-sub">Perché questo punteggio</p>
       <ul>
-        {insight.perche.map((t, i) => (
+        {(insight.perche || []).map((t, i) => (
           <li key={`p-${i}`}>{t}</li>
         ))}
       </ul>
       <p className="prato-radar__tooltip-sub">Dove migliorare</p>
       <ul>
-        {insight.migliora.map((t, i) => (
+        {(insight.migliora || []).map((t, i) => (
           <li key={`m-${i}`}>{t}</li>
         ))}
       </ul>
@@ -46,20 +46,25 @@ function RadarTooltip({ insight, label, onClose }) {
   );
 }
 
-export default function PratoRadar({ stats, media, statoLabel, insights, compact = false }) {
+export default function PratoRadar({ stats, media, statoLabel, insights, hasVision = true, compact = false }) {
   const [hoverKey, setHoverKey] = useState(null);
 
   if (!stats) return null;
 
-  const values = PRATO_STAT_AXES.map(({ key }) => stats[key] ?? 50);
+  const values = hasVision
+    ? PRATO_STAT_AXES.map(({ key }) => stats[key] ?? 0)
+    : PRATO_STAT_AXES.map(() => 0);
   const gridLevels = [25, 50, 75, 100];
   const size = compact ? 200 : 260;
   const viewBox = "0 0 240 240";
   const active = hoverKey ? PRATO_STAT_AXES.find((a) => a.key === hoverKey) : null;
   const activeInsight = hoverKey && insights ? insights[hoverKey] : null;
+  const mediaDisplay = hasVision ? media : "—";
 
   return (
-    <div className={`prato-radar${compact ? " prato-radar--compact" : ""}`}>
+    <div
+      className={`prato-radar${compact ? " prato-radar--compact" : ""}${!hasVision ? " prato-radar--no-data" : ""}`}
+    >
       <div className="prato-radar__chart-wrap">
         <svg
           className="prato-radar__svg"
@@ -67,7 +72,9 @@ export default function PratoRadar({ stats, media, statoLabel, insights, compact
           width={size}
           height={size}
           role="img"
-          aria-label={`Stato prato: ${statoLabel}, media ${media}`}
+          aria-label={
+            hasVision ? `Stato prato: ${statoLabel}, media ${media}` : "Stato prato: dato non disponibile"
+          }
         >
           {gridLevels.map((level) => (
             <polygon
@@ -82,12 +89,16 @@ export default function PratoRadar({ stats, media, statoLabel, insights, compact
               <line key={i} className="prato-radar__axis" x1={CX} y1={CY} x2={x} y2={y} />
             );
           })}
-          <polygon className="prato-radar__fill" points={polygonPoints(values)} />
-          <polygon className="prato-radar__stroke" points={polygonPoints(values)} />
-          {values.map((v, i) => {
-            const [x, y] = pointAt(i, v);
-            return <circle key={i} className="prato-radar__dot" cx={x} cy={y} r={3.5} />;
-          })}
+          {hasVision ? (
+            <>
+              <polygon className="prato-radar__fill" points={polygonPoints(values)} />
+              <polygon className="prato-radar__stroke" points={polygonPoints(values)} />
+              {values.map((v, i) => {
+                const [x, y] = pointAt(i, v);
+                return <circle key={i} className="prato-radar__dot" cx={x} cy={y} r={3.5} />;
+              })}
+            </>
+          ) : null}
           {PRATO_STAT_AXES.map(({ key, label }, i) => {
             const [x, y] = pointAt(i, 108);
             const on = hoverKey === key;
@@ -111,7 +122,7 @@ export default function PratoRadar({ stats, media, statoLabel, insights, compact
           })}
         </svg>
         <div className="prato-radar__center">
-          <span className="prato-radar__media">{media}</span>
+          <span className="prato-radar__media">{mediaDisplay}</span>
           <span className="prato-radar__stato">{statoLabel}</span>
         </div>
         {activeInsight ? (
@@ -126,6 +137,7 @@ export default function PratoRadar({ stats, media, statoLabel, insights, compact
         {PRATO_STAT_AXES.map(({ key, label }) => {
           const insight = insights?.[key];
           const on = hoverKey === key;
+          const val = hasVision ? stats[key] : "—";
           return (
             <li
               key={key}
@@ -137,10 +149,13 @@ export default function PratoRadar({ stats, media, statoLabel, insights, compact
             >
               <span className="prato-radar__legend-label">{label}</span>
               <span className="prato-radar__legend-bar" aria-hidden>
-                <span className="prato-radar__legend-fill" style={{ width: `${stats[key]}%` }} />
+                <span
+                  className="prato-radar__legend-fill"
+                  style={{ width: hasVision ? `${stats[key]}%` : "0%" }}
+                />
               </span>
-              <span className="prato-radar__legend-val">{stats[key]}</span>
-              {insight && on ? (
+              <span className="prato-radar__legend-val">{val}</span>
+              {insight && on && hasVision ? (
                 <span className="prato-radar__legend-hint">Passa il mouse per dettagli</span>
               ) : null}
             </li>

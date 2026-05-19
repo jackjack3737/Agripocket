@@ -1,4 +1,4 @@
-/** Statistiche esagono prato (0–100), stile radar PES. */
+/** Statistiche esagono prato (0–100): base da Gemini `punteggi_assi`, decadimento tempo, cap calendario. */
 
 export const PRATO_STAT_AXES = [
   { key: "idratazione", label: "Idratazione" },
@@ -9,17 +9,16 @@ export const PRATO_STAT_AXES = [
   { key: "manutenzione", label: "Manutenzione" },
 ];
 
-const STATO_MAP = { ottimo: 90, buono: 76, discreto: 54, critico: 28 };
-
-const CATEGORIE = {
-  idratazione: ["irrigazione", "umettante"],
-  nutrizione: ["concime", "biostimolante"],
-  copertura: ["rinnovo"],
-  difesa: ["trattamento", "diserbo"],
-  manutenzione: ["taglio", "arieggiatura", "pulizia"],
+const MAX_PENALTY_PER_AXIS = 15;
+const MAX_VISION_AGE_DAYS = 30;
+const EMPTY_STATS = {
+  idratazione: 0,
+  nutrizione: 0,
+  copertura: 0,
+  salute_fogliare: 0,
+  difesa: 0,
+  manutenzione: 0,
 };
-
-const PRIORITA_PENALTY = { alta: 22, media: 14, bassa: 7 };
 
 function clamp(n, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(n)));
@@ -29,405 +28,218 @@ function oggiIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function giorniTra(fromIso, toIso) {
-  if (!fromIso || !toIso) return 0;
-  const a = new Date(fromIso + "T12:00:00").getTime();
-  const b = new Date(toIso + "T12:00:00").getTime();
-  return Math.floor((b - a) / 86400000);
+function diffDays(dateString) {
+  if (!dateString) return 999;
+  const past = new Date(dateString);
+  const now = new Date();
+  return Math.floor((now - past) / (1000 * 60 * 60 * 24));
 }
 
-function testoProblemi(vision) {
-  return (vision?.problemi_rilevati || [])
-    .map((p) => `${p?.problema || ""} ${p?.dettaglio || ""}`.toLowerCase())
-    .join(" ");
+function normalizePunteggiAssi(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  let valid = 0;
+  for (const { key } of PRATO_STAT_AXES) {
+    const n = Number(raw[key]);
+    if (Number.isFinite(n)) {
+      out[key] = clamp(n);
+      valid += 1;
+    }
+  }
+  return valid === PRATO_STAT_AXES.length ? out : null;
 }
 
-function gravitaAltaCount(vision) {
-  return (vision?.problemi_rilevati || []).filter((p) => p?.gravita === "alta").length;
-}
-
-/** Problemi strutturati che devono penalizzare (evita falsi positivi su testo libero). */
-function problemiSignificativi(vision) {
-  return (vision?.problemi_rilevati || []).filter((p) => p?.gravita === "alta" || p?.gravita === "media");
-}
-
-function testoProblemiSignificativi(vision) {
-  return problemiSignificativi(vision)
-    .map((p) => `${p?.problema || ""} ${p?.dettaglio || ""}`.toLowerCase())
-    .join(" ");
-}
-
-function isVisionEccellente(vision) {
-  if (!vision) return false;
-  const stato = vision.stato_generale;
-  if (stato === "critico" || stato === "discreto") return false;
-  if (gravitaAltaCount(vision) > 0) return false;
-  const medie = problemiSignificativi(vision).filter((p) => p.gravita === "media").length;
-  if (stato === "ottimo" && medie > 1) return false;
-  if (stato === "buono" && medie > 2) return false;
-  if (vision.stress_idrici?.segni) return false;
-  if (vision.foglie_debris?.eccesso_foglie) return false;
-  if (vision.taglio?.giudizio === "troppo_basso") return false;
-  if ((vision.malattie_sospette || []).length > 0 && stato !== "ottimo") return false;
-  return stato === "ottimo" || stato === "buono";
-}
-
-/** Pavimento minimo sulla media quando la visione descrive un prato sano (evita 62 su prati belli). */
-function minMediaDaStatoVision(vision) {
-  if (!vision) return null;
-  if (gravitaAltaCount(vision) > 0) return null;
-  const medie = problemiSignificativi(vision).filter((p) => p.gravita === "media").length;
-  const stato = vision.stato_generale;
-  if (stato === "ottimo") return 84;
-  if (stato === "buono" && medie <= 1) return 74;
-  if (stato === "buono" && medie <= 2) return 70;
-  if (stato === "discreto" && medie === 0) return 58;
-  return null;
-}
-
-/** Per l'esagono: solo lavori urgenti reali, non tutto il calendario stagionale/catalogo. */
-function interventiPerStatoRadar(interventi) {
+/** Esclude controlli mensili, priorità bassa e voci catalogo automatiche. */
+function interventiPerPenalita(interventi) {
+  const oggi = oggiIso();
   return interventi.filter((i) => {
+    if (i.stato !== "pianificato" || !i.data_prevista || i.data_prevista >= oggi) return false;
     if (i.fonte === "controllo_mensile") return false;
     if (i.priorita === "bassa") return false;
-    const titolo = String(i.titolo || "");
-    if (titolo.startsWith("Catalogo —")) return false;
+    if (String(i.titolo || "").startsWith("Catalogo —")) return false;
     return true;
   });
 }
 
-function visionFreshness(createdAt) {
-  if (!createdAt) return 0;
-  const days = giorniTra(new Date(createdAt).toISOString().slice(0, 10), oggiIso());
-  if (days <= 7) return 0.62;
-  if (days <= 21) return 0.48;
-  if (days <= 45) return 0.32;
-  if (days <= 90) return 0.18;
-  return 0.1;
-}
+function getPenalitaCalendario(interventi) {
+  const scaduti = interventiPerPenalita(interventi);
+  const penalita = { ...EMPTY_STATS };
 
-function scoreFromVision(vision) {
-  if (!vision || typeof vision !== "object") return null;
+  for (const task of scaduti) {
+    const peso = task.priorita === "alta" ? 8 : 4;
+    const cat = String(task.categoria || "").toLowerCase();
 
-  if (isVisionEccellente(vision)) {
-    const top = vision.stato_generale === "ottimo" ? 94 : 88;
-    const feltro = vision.feltro_thatch?.presente ? 4 : 0;
-    return {
-      idratazione: top - 2,
-      nutrizione: top - 1,
-      copertura: top,
-      salute_fogliare: top - 1 - feltro,
-      difesa: top - 3,
-      manutenzione: top - 2 - feltro,
-    };
+    if (cat === "irrigazione" || cat === "umettante") penalita.idratazione += peso;
+    if (cat === "concime" || cat === "biostimolante") penalita.nutrizione += peso;
+    if (cat === "rinnovo") penalita.copertura += peso;
+    if (cat === "trattamento") {
+      penalita.salute_fogliare += peso;
+      penalita.difesa += peso;
+    }
+    if (cat === "diserbo") penalita.difesa += peso;
+    if (cat === "taglio" || cat === "arieggiatura" || cat === "pulizia") penalita.manutenzione += peso;
   }
 
-  const base = STATO_MAP[vision.stato_generale] ?? 58;
-  const soloBasse =
-    problemiSignificativi(vision).length === 0 &&
-    (vision.problemi_rilevati || []).every((p) => p?.gravita === "bassa" || !p?.gravita);
-  const baseBoost =
-    vision.stato_generale === "ottimo" ? 8 : vision.stato_generale === "buono" && soloBasse ? 6 : 0;
-  const problems = testoProblemiSignificativi(vision);
-  const alta = gravitaAltaCount(vision);
-  const mal = (vision.malattie_sospette || []).length;
-  const erbe = (vision.erbette_infestanti || []).length;
-
-  let idratazione = base + baseBoost;
-  if (vision.stress_idrici?.segni) idratazione -= 28;
-  if (/sicc|secc|arid|stress idr|disidr/.test(problems)) idratazione -= 12;
-
-  let nutrizione = base + baseBoost;
-  if (/giall|cloros|carenza|clorosi/.test(problems)) nutrizione -= 18;
-  if (/debole|sposs/.test(problems)) nutrizione -= 10;
-
-  let copertura = base + baseBoost;
-  if (/calv|dirad|patch|vuot|ralo|sparse|bassa dens/.test(problems)) copertura -= 22;
-  if (erbe > 3) copertura -= 8;
-
-  let salute_fogliare = base + baseBoost;
-  if (vision.taglio?.giudizio === "troppo_basso") salute_fogliare -= 15;
-  if (vision.taglio?.giudizio === "troppo_alto") salute_fogliare -= 8;
-  if (vision.feltro_thatch?.presente) salute_fogliare -= vision.stato_generale === "ottimo" ? 4 : 10;
-  if (vision.foglie_debris?.eccesso_foglie) salute_fogliare -= 8;
-  if (/necros|macchl|fungh|patolog/.test(problems)) salute_fogliare -= 14;
-
-  let difesa = vision.stato_generale === "ottimo" ? 90 : 82;
-  difesa -= alta * 12 + mal * 14 + Math.max(0, erbe - 2) * 6;
-  if (/parassit|insett|afid|larv|marcium/.test(problems)) difesa -= 15;
-
-  let manutenzione = base + baseBoost;
-  if (vision.taglio?.giudizio === "troppo_basso") manutenzione -= 18;
-  if (vision.taglio?.giudizio === "troppo_alto") manutenzione -= 10;
-  if (vision.feltro_thatch?.presente) manutenzione -= vision.stato_generale === "ottimo" ? 5 : 14;
-  if (vision.foglie_debris?.eccesso_foglie) manutenzione -= 12;
-  if (/thatch|feltro|scarific|ariegg/.test(problems)) manutenzione -= 8;
-
-  return {
-    idratazione: clamp(idratazione),
-    nutrizione: clamp(nutrizione),
-    copertura: clamp(copertura),
-    salute_fogliare: clamp(salute_fogliare),
-    difesa: clamp(difesa),
-    manutenzione: clamp(manutenzione),
-  };
-}
-
-/** Solo lavori in ritardo (data passata, non completati). I futuri non contano. */
-function interventiScadutiPerRadar(interventi, oggi) {
-  return interventiPerStatoRadar(interventi).filter(
-    (i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista < oggi,
-  );
-}
-
-function penalitaAsseDaScaduti(scaduti, categorie, oggi) {
-  const list = scaduti.filter((i) => categorie.includes(i.categoria));
-  if (!list.length) return 0;
-
-  let penalita = 0;
-  for (const i of list) {
-    const giorniRitardo = giorniTra(i.data_prevista, oggi);
-    const base = PRIORITA_PENALTY[i.priorita] ?? 10;
-    const mult = 0.45 + Math.min(giorniRitardo, 21) / 21;
-    penalita += base * mult * (i.priorita === "alta" ? 1 : 0.55);
+  for (const key of Object.keys(penalita)) {
+    penalita[key] = Math.min(penalita[key], MAX_PENALTY_PER_AXIS);
   }
-  return Math.min(Math.round(penalita), 32);
+
+  return { penalita, scaduti };
 }
 
-function scoreFromWeather(weather) {
-  if (!weather?.current?.main) return null;
-  const h = weather.current.main.humidity;
-  const t = weather.current.main.temp;
-  let idratazione = 68;
-  if (h >= 65) idratazione += 12;
-  else if (h >= 45) idratazione += 4;
-  else if (h < 35) idratazione -= 14;
+function buildInsights(stats, ctx) {
+  const { penalita, baseScores, ageDays, decayFactor, hasOverdue, scaduti, weather } = ctx;
+  const out = {};
 
-  if (t > 30) idratazione -= 10;
-  if (t > 33) idratazione -= 8;
+  for (const { key, label } of PRATO_STAT_AXES) {
+    const perche = [];
+    const migliora = [];
+    const base = baseScores[key];
+    const pen = penalita[key];
 
-  const rainy = weather.history?.rainyDays ?? 0;
-  if (rainy >= 2) idratazione += 8;
-  if (rainy === 0 && t > 26) idratazione -= 6;
+    perche.push(`Dalla foto: ${base}/100 (valutazione visiva AI).`);
+    if (ageDays > 0) {
+      perche.push(
+        `Foto di ${ageDays} giorni fa: decadimento −${Math.round((1 - decayFactor) * 100)}% sul punteggio base.`,
+      );
+    }
+    if (pen > 0) {
+      const n = scaduti.filter((i) => penalitaCategoriaSuAsse(i.categoria, key)).length;
+      perche.push(
+        `Calendario: −${pen} pt (max ${MAX_PENALTY_PER_AXIS} per asse) per ${n} lavoro/i scaduto/i.`,
+      );
+    } else if (hasOverdue) {
+      perche.push("Nessun lavoro scaduto rilevante per questo asse.");
+    } else {
+      perche.push("Nessun lavoro scaduto: il calendario non abbassa questo indicatore.");
+    }
 
-  const advice = (weather.advice?.status || "").toLowerCase();
-  if (/sicc|irriga|acqua|stress/.test(advice)) idratazione -= 12;
-  if (/ottim|buon|favorev/.test(advice)) idratazione += 6;
+    if (key === "idratazione" && weather?.current?.main?.temp > 32 && pen > 0) {
+      perche.push("Meteo: caldo intenso (>32 °C) con irrigazione in ritardo.");
+    }
 
-  return { idratazione: clamp(idratazione) };
+    const score = stats[key];
+    if (score >= 75) migliora.push("Ottimo livello: mantieni le cure attuali.");
+    else if (score >= 55) migliora.push("Segui il calendario e ripeti un controllo foto tra 2–3 settimane.");
+    else {
+      migliora.push("Carica una nuova foto dopo aver completato i lavori urgenti in scadenza.");
+      if (pen > 0) migliora.push("Completa i trattamenti o le cure in ritardo nel calendario.");
+    }
+
+    out[key] = { score, perche, migliora, label };
+  }
+
+  return out;
+}
+
+function penalitaCategoriaSuAsse(categoria, asse) {
+  const cat = String(categoria || "").toLowerCase();
+  if (asse === "idratazione") return cat === "irrigazione" || cat === "umettante";
+  if (asse === "nutrizione") return cat === "concime" || cat === "biostimolante";
+  if (asse === "copertura") return cat === "rinnovo";
+  if (asse === "salute_fogliare") return cat === "trattamento";
+  if (asse === "difesa") return cat === "trattamento" || cat === "diserbo";
+  if (asse === "manutenzione") return cat === "taglio" || cat === "arieggiatura" || cat === "pulizia";
+  return false;
 }
 
 /**
  * @param {{ interventi?: object[], analisi?: { vision_json?: object, created_at?: string } | null, weather?: object | null }} input
  */
 export function computePratoStats({ interventi = [], analisi = null, weather = null } = {}) {
-  const oggi = oggiIso();
   const vision = analisi?.vision_json;
-  const vWeight = visionFreshness(analisi?.created_at);
-  const fromVision = scoreFromVision(vision);
-  const scaduti = interventiScadutiPerRadar(interventi, oggi);
-  const fromWeather = scoreFromWeather(weather);
-  const hasOverdue = scaduti.length > 0;
+  const ageDays = diffDays(analisi?.created_at);
+  const baseScores = normalizePunteggiAssi(vision?.punteggi_assi);
+  const hasValidVision = !!baseScores && ageDays <= MAX_VISION_AGE_DAYS;
 
-  const stats = {};
-  const sources = {};
-
-  for (const { key } of PRATO_STAT_AXES) {
-    const visionVal = fromVision?.[key] ?? null;
-    let val = visionVal ?? 52;
-    const penScaduti = penalitaAsseDaScaduti(scaduti, CATEGORIE[key], oggi);
-    val = clamp(val - penScaduti);
-
-    if (key === "idratazione" && fromWeather?.idratazione != null && !vision?.stress_idrici?.segni) {
-      val = clamp(val * 0.94 + fromWeather.idratazione * 0.06);
-    }
-
-    stats[key] = val;
-    sources[key] = {
-      vision: visionVal,
-      penalitaScaduti: penScaduti,
-      meteo: key === "idratazione" ? fromWeather?.idratazione ?? null : null,
+  if (!hasValidVision) {
+    return {
+      stats: { ...EMPTY_STATS },
+      media: 0,
+      insights: buildEmptyInsights(ageDays, !!vision?.punteggi_assi),
+      hasVision: false,
+      isExpired: ageDays > MAX_VISION_AGE_DAYS && !!analisi?.created_at,
+      needsPunteggiAssi: !!vision && !vision?.punteggi_assi,
+      hasInterventi: interventi.length > 0,
+      hasOverdue: interventiPerPenalita(interventi).length > 0,
+      overdueCount: interventiPerPenalita(interventi).length,
+      visionAge: analisi?.created_at ?? null,
+      ageDays,
     };
   }
 
-  let values = Object.values(stats);
-  let media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
+  const decayFactor = Math.max(0, 1 - ageDays / 100);
+  const { penalita, scaduti } = getPenalitaCalendario(interventi);
+  const hasOverdue = scaduti.length > 0;
 
-  if (!hasOverdue) {
-    const mediaFloor = minMediaDaStatoVision(vision);
-    if (mediaFloor != null && media < mediaFloor) {
-      const boost = mediaFloor - media;
-      for (const { key } of PRATO_STAT_AXES) {
-        stats[key] = clamp(stats[key] + boost);
-      }
-      values = Object.values(stats);
-      media = clamp(values.reduce((a, b) => a + b, 0) / values.length);
+  const stats = {};
+  let total = 0;
+
+  for (const { key } of PRATO_STAT_AXES) {
+    const raw = baseScores[key];
+    let score = raw * decayFactor - penalita[key];
+
+    if (key === "idratazione" && weather?.current?.main?.temp > 32 && penalita.idratazione > 0) {
+      score -= 10;
     }
+
+    stats[key] = clamp(score);
+    total += stats[key];
   }
 
-  const insights = buildAllAxisInsights({
-    stats,
-    sources,
-    vision,
-    interventi,
+  const media = clamp(total / PRATO_STAT_AXES.length);
+  const insights = buildInsights(stats, {
+    penalita,
+    baseScores,
+    ageDays,
+    decayFactor,
+    hasOverdue,
     scaduti,
     weather,
-    oggi,
-    hasVision: !!fromVision,
-    hasOverdue,
-    visionAge: analisi?.created_at,
-    freshness: vWeight,
   });
 
   return {
     stats,
     media,
-    sources,
     insights,
-    hasVision: !!fromVision,
+    hasVision: true,
+    isExpired: false,
+    needsPunteggiAssi: false,
     hasInterventi: interventi.length > 0,
     hasOverdue,
     overdueCount: scaduti.length,
     visionAge: analisi?.created_at ?? null,
-    freshness: vWeight,
+    ageDays,
+    decayFactor,
+    penalita,
   };
 }
 
-function lavoriApertiPerCategorie(interventi, categorie, oggi) {
-  return interventi.filter(
-    (i) =>
-      i.stato === "pianificato" &&
-      categorie.includes(i.categoria) &&
-      i.data_prevista &&
-      i.data_prevista <= oggi,
-  );
-}
-
-function livello(score) {
-  if (score >= 75) return "buono";
-  if (score >= 55) return "discreto";
-  return "basso";
-}
-
-/**
- * @returns {{ score: number, perche: string[], migliora: string[] }}
- */
-export function buildAxisInsight(key, ctx) {
-  const { stats, sources, vision, interventi, scaduti, weather, oggi, hasVision, hasOverdue, visionAge, freshness } =
-    ctx;
-  const score = stats[key] ?? 50;
-  const perche = [];
-  const migliora = [];
-  const lv = livello(score);
-
-  if (!hasVision && !interventi.length) {
-    perche.push("Valore stimato: manca una foto recente e pochi dati in calendario.");
-    migliora.push("Carica una foto del prato e completa i lavori in agenda.");
-    return { score, perche, migliora };
-  }
-
-  if (sources[key]?.vision != null) {
-    perche.push(`Dalla foto: ~${sources[key].vision}/100.`);
-  }
-  if (sources[key]?.penalitaScaduti > 0) {
-    const n = (scaduti || []).filter((i) => CATEGORIE[key].includes(i.categoria)).length;
-    perche.push(
-      `${n} lavoro/i in ritardo (data già passata) abbassa questo indicatore di ~${sources[key].penalitaScaduti} punti.`,
-    );
-  } else if (hasVision && !hasOverdue) {
-    perche.push("Nessun lavoro scaduto: il punteggio riflette solo la foto (i lavori futuri non contano).");
-  }
-  if (hasVision && isVisionEccellente(vision) && sources[key]?.vision != null) {
-    perche.push("Foto: prato in ottime condizioni.");
-  }
-  if (key === "idratazione" && sources[key]?.meteo != null) {
-    perche.push(`Meteo attuale: ~${sources[key].meteo}/100 (umidità e temperature).`);
-  }
-
-  if (visionAge) {
-    const giorni = giorniTra(new Date(visionAge).toISOString().slice(0, 10), oggi);
-    if (giorni > 30) perche.push(`Foto di ${giorni} giorni fa — aggiorna con controllo mensile.`);
-    else if (freshness < 0.35) perche.push("Foto non recentissima: peso ridotto sull'analisi visiva.");
-  }
-
-  const problems = testoProblemi(vision);
-
-  if (key === "idratazione") {
-    if (vision?.stress_idrici?.segni) perche.push("Segni di stress idrico nella foto.");
-    if (weather?.advice?.status) perche.push(`Meteo: ${weather.advice.status}.`);
-    if (lv === "basso") {
-      migliora.push("Irriga in modo regolare al mattino; valuta agente umettante in estate.");
-      if (lavoriApertiPerCategorie(interventi, ["irrigazione", "umettante"], oggi).length) {
-        migliora.push("Completa irrigazione/umettante in scadenza nel calendario.");
-      }
-    } else migliora.push("Mantieni irrigazione costante; evita ristagni.");
-  }
-
-  if (key === "nutrizione") {
-    if (/giall|cloros|carenza|clorosi/.test(problems)) perche.push("Possibile carenza nutrizionale visibile.");
-    if (lv === "basso") {
-      migliora.push("Programma concimazione (NPK / microelementi) nei periodi indicati.");
-      if (lavoriApertiPerCategorie(interventi, ["concime", "biostimolante"], oggi).length) {
-        migliora.push("Esegui concimi o biostimolanti in agenda.");
-      }
-    } else migliora.push("Continua concimazioni di mantenimento secondo calendario.");
-  }
-
-  if (key === "copertura") {
-    if (/calv|dirad|patch|vuot|ralo/.test(problems)) perche.push("Zone diradate o calve in foto.");
-    if (lv === "basso") migliora.push("Valuta rinnovo/overseeding e concimi di ripresa.");
-    else migliora.push("Monitora zone rade; semina chirurgica se necessario.");
-  }
-
-  if (key === "salute_fogliare") {
-    if (vision?.feltro_thatch?.presente) perche.push("Feltro/thatch rilevato.");
-    if (vision?.foglie_debris?.eccesso_foglie) perche.push("Troppo detrito fogliare.");
-    if (/necros|macchl|fungh/.test(problems)) perche.push("Segni fogliari o sospetto patogeno.");
-    if (lv === "basso") migliora.push("Arieggiatura leggera, raccolta foglie, eventuale fungicida se confermato.");
-    else migliora.push("Mantieni taglio corretto e pulizia superficie.");
-  }
-
-  if (key === "difesa") {
-    if ((vision?.malattie_sospette || []).length) perche.push("Malattie sospette in analisi.");
-    if ((vision?.erbette_infestanti || []).length) perche.push("Erbette infestanti segnalate.");
-    if (/larv|popillia|insett|parassit/.test(problems)) perche.push("Rischio parassiti/larve (es. popillia).");
-    if (lv === "basso") {
-      migliora.push("Valuta trattamento fitosanitario mirato (es. Fly per larve sotto prato).");
-      if (lavoriApertiPerCategorie(interventi, ["trattamento", "diserbo"], oggi).length) {
-        migliora.push("Completa trattamenti in scadenza.");
-      }
-    } else migliora.push("Monitoraggio mensile con foto; intervieni solo se compaiono danni.");
-  }
-
-  if (key === "manutenzione") {
-    if (vision?.taglio?.giudizio === "troppo_basso") perche.push("Taglio troppo basso.");
-    if (vision?.taglio?.giudizio === "troppo_alto") perche.push("Erba troppo alta al taglio.");
-    if (lv === "basso") {
-      migliora.push("Riprendi tagli regolari, scarifica/arieggia se c'è feltro.");
-      if (lavoriApertiPerCategorie(interventi, ["taglio", "arieggiatura", "pulizia"], oggi).length) {
-        migliora.push("Spunta taglio e pulizia in calendario.");
-      }
-    } else migliora.push("Mantieni frequenza taglio e scarifica stagionale.");
-  }
-
-  if (!migliora.length) {
-    migliora.push(lv === "buono" ? "Ottimo livello: continua così." : "Segui il calendario per stabilizzare il valore.");
-  }
-
-  return { score, perche, migliora };
-}
-
-function buildAllAxisInsights(ctx) {
+function buildEmptyInsights(ageDays, hadPartialScores) {
   const out = {};
-  for (const { key } of PRATO_STAT_AXES) {
-    out[key] = buildAxisInsight(key, ctx);
+  for (const { key, label } of PRATO_STAT_AXES) {
+    const perche = [];
+    const migliora = ["Carica una foto recente del prato (analisi in Chat)."];
+    if (ageDays > MAX_VISION_AGE_DAYS) {
+      perche.push(`Ultima analisi troppo vecchia (${ageDays} giorni, max ${MAX_VISION_AGE_DAYS}).`);
+    } else if (hadPartialScores) {
+      perche.push("Analisi precedente senza punteggi per asse: serve una nuova foto.");
+    } else {
+      perche.push("Nessuna foto con punteggi disponibile.");
+    }
+    out[key] = { score: 0, perche, migliora, label };
   }
   return out;
 }
 
-export function labelStatoPrato(media) {
-  if (media >= 80) return "Ottimo";
-  if (media >= 66) return "Buono";
+export function buildAxisInsight(key, ctx) {
+  return ctx?.insights?.[key] ?? { score: 0, perche: [], migliora: [] };
+}
+
+export function labelStatoPrato(media, hasVision = false) {
+  if (!hasVision) return "Dato non disponibile";
+  if (media >= 85) return "Ottimo";
+  if (media >= 70) return "Buono";
   if (media >= 50) return "Discreto";
   if (media >= 36) return "Da recuperare";
   return "Critico";

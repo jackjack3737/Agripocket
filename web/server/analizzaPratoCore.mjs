@@ -6,6 +6,29 @@ import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
 
+const ASSI_KEYS = [
+  "idratazione",
+  "nutrizione",
+  "copertura",
+  "salute_fogliare",
+  "difesa",
+  "manutenzione",
+];
+
+function normalizePunteggiAssi(vision) {
+  const raw = vision?.punteggi_assi;
+  if (!raw || typeof raw !== "object") return vision;
+  const out = {};
+  for (const key of ASSI_KEYS) {
+    const n = Number(raw[key]);
+    if (Number.isFinite(n)) out[key] = Math.max(0, Math.min(100, Math.round(n)));
+  }
+  if (Object.keys(out).length === ASSI_KEYS.length) {
+    vision.punteggi_assi = out;
+  }
+  return vision;
+}
+
 async function queryKnowledgeBase(admin, embedding) {
   const attempts = [
     { match_count: 6, match_threshold: 0.22 },
@@ -134,6 +157,14 @@ Rispondi SOLO JSON valido (italiano), forma:
   "parassiti_sottoprato": [
     { "tipo": "popillia|otiorrinco|altro", "segni": "zone marroni, prato che si stacca, larve visibili o sospette", "gravita": "bassa|media|alta", "note": "" }
   ],
+  "punteggi_assi": {
+    "idratazione": "numero intero 0-100 (turgidità, segni siccità)",
+    "nutrizione": "numero intero 0-100 (colore verde, vigore)",
+    "copertura": "numero intero 0-100 (densità, assenza buchi/calve)",
+    "salute_fogliare": "numero intero 0-100 (assenza lesioni, macchie, funghi visibili)",
+    "difesa": "numero intero 0-100 (assenza infestanti/parassiti visibili)",
+    "manutenzione": "numero intero 0-100 (altezza taglio, feltro, detrito)"
+  },
   "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili"
 }
 Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce con confidenza bassa e motivo.
@@ -145,7 +176,13 @@ VALUTAZIONE stato_generale (importante per il punteggio utente):
 - "critico": solo con danni gravi estesi.
 - Se il prato appare sano e curato, NON usare "discreto" per prudenza: usa "ottimo" o "buono".
 - problemi_rilevati: solo difetti REALI e visibili; se il prato è bello lascia [] o al massimo 1 voce "bassa".
-- malattie_sospette, erbette_infestanti, parassiti_sottoprato: array vuoti se non vedi evidenza chiara (non ipotizzare).`;
+- malattie_sospette, erbette_infestanti, parassiti_sottoprato: array vuoti se non vedi evidenza chiara (non ipotizzare).
+
+PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
+- Compila punteggi_assi con 6 interi 0-100, coerenti con ciò che vedi in foto (non con il calendario).
+- Prato uniformemente verde, denso e curato: valori tipici 85-95 su tutti gli assi.
+- Piccole imperfezioni locali: 70-84; problemi evidenti ma gestibili: 50-69; danni gravi: sotto 50.
+- stato_generale deve essere coerente con la media dei punteggi_assi.`;
 
   const visionRaw = await geminiGenerate(
     geminiKey,
@@ -159,6 +196,7 @@ VALUTAZIONE stato_generale (importante per il punteggio utente):
   } catch {
     vision = { sintesi_visiva: visionRaw, query_ricerca_kb: visionRaw.slice(0, 200) };
   }
+  vision = normalizePunteggiAssi(vision);
 
   const speciesFromVision = (vision.specie_probabili || [])
     .map((s) => (typeof s === "string" ? s : s?.nome))

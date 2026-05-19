@@ -10,7 +10,9 @@ import {
 } from "./prodottiCatalogo.mjs";
 import { concimeAmmessoPerProfilo } from "./livelloConcimi.mjs";
 import { catalogoAmmessoSenzaFoto } from "./regoleFitofarmaci.mjs";
-import { isProdottoFitofarmaco } from "./sicurezzaProdotti.mjs";
+import { isProdottoAmmessoConsumer, isProdottoFitofarmaco } from "./sicurezzaProdotti.mjs";
+
+const MAX_EXTRA_CATALOGO = 18;
 
 const MESI_IT = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
 
@@ -80,6 +82,7 @@ function prioritaCatalogo(prodotto, tipo, dataIso) {
 }
 
 function prodottoAmmessoAlCalendario(prodotto, profilo) {
+  if (!isProdottoAmmessoConsumer(prodotto)) return false;
   if (!mappaTipoProdotto(prodotto)) return false;
   if (!catalogoAmmessoSenzaFoto(prodotto)) return false;
   if (!concimeAmmessoPerProfilo(prodotto, profilo)) return false;
@@ -138,6 +141,7 @@ export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi
   const extra = [];
 
   for (const p of eligibili) {
+    if (extra.length >= MAX_EXTRA_CATALOGO) break;
     if (giaCopertoDaPiano(interventiPiano, p) || giaCopertoDaPiano(extra, p)) continue;
 
     const row = interventoDaProdotto(p, profilo, oggi);

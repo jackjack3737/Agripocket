@@ -51,9 +51,32 @@ export function puoCalcolareDose(prodotto, profilo) {
   return superficieMqVerificata(profilo) != null;
 }
 
+/** Classificazione legale (DB `categoria_legale` o euristica su `categoria`). */
+export function inferCategoriaLegale(prodotto) {
+  const db = String(prodotto?.categoria_legale || "").toUpperCase();
+  if (db) return db;
+  const cat = String(prodotto?.categoria || "").toUpperCase();
+  if (
+    cat.includes("CONCIME") ||
+    cat === "SEMENTI" ||
+    cat === "BAGNANTE" ||
+    cat === "BIOSTIMOLANTE" ||
+    cat === "BIOATTIVATO" ||
+    cat === "AMMENDANTE"
+  ) {
+    return "CONCIME";
+  }
+  if (CATEGORIE_FITO_CONSUMER.has(cat)) return "PFNPO";
+  if (isProdottoFitofarmaco(prodotto)) return "PROFESSIONALE";
+  return "ALTRO";
+}
+
 /** Esclude fitofarmaci solo uso professionale / patentino. */
 export function isProdottoAmmessoConsumer(prodotto) {
+  const legale = inferCategoriaLegale(prodotto);
+  if (legale === "PROFESSIONALE") return false;
   if (!isProdottoFitofarmaco(prodotto)) return true;
+  if (legale === "PFNPO") return true;
   const cat = String(prodotto?.categoria || "").toUpperCase();
   if (CATEGORIE_FITO_CONSUMER.has(cat)) return true;
   const blob = `${prodotto?.nome || ""} ${prodotto?.descrizione || ""} ${prodotto?.composizione || ""}`.toLowerCase();

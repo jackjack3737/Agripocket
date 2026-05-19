@@ -530,8 +530,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         <section className="dash-card dash-card--radar">
           <h2 className="dash-card__title">Stato prato</h2>
           <p className="dash-card__sub">
-            Punteggio dalla <strong>foto</strong>. Solo i lavori <strong>scaduti</strong> (data già passata) lo
-            abbassano — i lavori di mesi futuri non contano e non alzano il voto.
+            Punteggio dalla <strong>foto</strong> (valida 30 giorni). Solo i lavori <strong>scaduti</strong> lo
+            abbassano, con un tetto di −15 punti per asse.
           </p>
           {loading ? (
             <p className="dash-card__loading">Calcolo stato…</p>
@@ -540,26 +540,42 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
               stats={pratoRadar.stats}
               media={pratoRadar.media}
               insights={pratoRadar.insights}
-              statoLabel={labelStatoPrato(pratoRadar.media)}
+              hasVision={pratoRadar.hasVision}
+              statoLabel={labelStatoPrato(pratoRadar.media, pratoRadar.hasVision)}
               compact
             />
           )}
-          {ultimaAnalisi?.created_at ? (
+          {!pratoRadar.hasVision ? (
+            <p className="dash-card__meta dash-card__meta--radar">
+              {pratoRadar.isExpired ? (
+                <>
+                  Foto scaduta ({pratoRadar.ageDays} giorni).{" "}
+                  <Link to="/chat">Carica una nuova foto</Link>.
+                </>
+              ) : pratoRadar.needsPunteggiAssi ? (
+                <>
+                  Analisi precedente senza punteggi per asse.{" "}
+                  <Link to="/chat">Rifai l&apos;analisi foto</Link>.
+                </>
+              ) : (
+                <>
+                  <Link to="/chat">Carica una foto</Link> per attivare l&apos;esagono.
+                </>
+              )}
+            </p>
+          ) : ultimaAnalisi?.created_at ? (
             <p className="dash-card__meta dash-card__meta--radar">
               Ultima foto:{" "}
               {new Date(ultimaAnalisi.created_at).toLocaleDateString("it-IT", {
                 day: "numeric",
                 month: "short",
               })}
+              {pratoRadar.ageDays > 0 ? ` (${pratoRadar.ageDays} gg fa)` : " (oggi)"}
               {pratoRadar.hasOverdue
-                ? ` · ${pratoRadar.overdueCount} lavori in ritardo abbassano il punteggio`
+                ? ` · ${pratoRadar.overdueCount} lavori scaduti (max −15 pt per asse)`
                 : null}
             </p>
-          ) : (
-            <p className="dash-card__meta dash-card__meta--radar">
-              <Link to="/chat">Carica una foto</Link> per aggiornare l&apos;esagono.
-            </p>
-          )}
+          ) : null}
         </section>
 
         <section className="dash-card dash-card--profile dash-card--wide">

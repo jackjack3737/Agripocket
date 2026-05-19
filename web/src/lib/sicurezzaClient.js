@@ -12,7 +12,7 @@ Le dosi automatiche riguardano solo concimi e biostimolanti non fitosanitari, e 
 
 Per fungicidi, diserbanti e insetticidi mostriamo solo riferimenti di catalogo a uso domestico (PFNPO), senza quantità da applicare. Non acquistare né applicare prodotti professionali senza patentino.
 
-Le foto del giardino possono essere conservate per l'analisi. L'uso dei consigli è sotto la tua esclusiva responsabilità.`;
+Le foto del giardino sono archiviate in area privata (accesso solo al tuo account, URL temporanei) per l'analisi. La mappa del prato viene salvata con coordinate approssimate (~11 m). L'uso dei consigli è sotto la tua esclusiva responsabilità.`;
 
 const FITO_CATEGORIE = new Set(["diserbo", "trattamento"]);
 

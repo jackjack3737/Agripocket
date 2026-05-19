@@ -205,10 +205,13 @@ export async function persistAnalisiAndInterventi(
     throw new Error(`Salvataggio analisi: ${analisiErr.message}`);
   }
 
-  if (imageBase64 && analisi?.id) {
-    const foto = await uploadAnalisiFoto(admin, userId, analisi.id, imageBase64, mimeType);
-    if (foto.foto_url) {
-      await aggiornaAnalisiFoto(admin, analisi.id, foto);
+  const analisiId = analisi.id;
+
+  try {
+  if (imageBase64 && analisiId) {
+    const foto = await uploadAnalisiFoto(admin, userId, analisiId, imageBase64, mimeType);
+    if (foto.foto_path) {
+      await aggiornaAnalisiFoto(admin, analisiId, foto);
     }
   }
 
@@ -226,7 +229,7 @@ export async function persistAnalisiAndInterventi(
 
   let saved = [];
   if (arricchiti.length) {
-    const rows = arricchiti.map((i) => rowIntervento(userId, analisi.id, i, "ia_foto"));
+    const rows = arricchiti.map((i) => rowIntervento(userId, analisiId, i, "ia_foto"));
     saved = await insertInterventi(admin, rows);
   }
 
@@ -236,7 +239,7 @@ export async function persistAnalisiAndInterventi(
       pianoAggiornato = await integraFotoNelPiano({
         admin,
         userId,
-        analisiId: analisi.id,
+        analisiId,
         profilo,
         vision,
         report,
@@ -253,10 +256,25 @@ export async function persistAnalisiAndInterventi(
   if (pianoAggiornato?.inseriti?.length) tutti.push(...pianoAggiornato.inseriti);
 
   return {
-    analisiId: analisi.id,
+    analisiId,
     interventi: tutti,
     tablesMissing: false,
     pianoAggiornato,
     urgenti: saved,
   };
+  } catch (e) {
+    await rollbackAnalisiParziale(admin, userId, analisiId);
+    throw e;
+  }
+}
+
+async function rollbackAnalisiParziale(admin, userId, analisiId) {
+  if (!analisiId) return;
+  try {
+    await admin.from("prato_interventi").delete().eq("analisi_id", analisiId);
+    await admin.from("prato_interventi").delete().eq("user_id", userId).eq("fonte", "ia_foto");
+    await admin.from("prato_analisi").delete().eq("id", analisiId);
+  } catch (err) {
+    console.warn("[persistAnalisi] rollback:", err.message);
+  }
 }

@@ -1,0 +1,202 @@
+# Prompt per Gemini — Riparare l’esagono “Stato prato” (AgriPocket)
+
+Copia tutto il testo sotto la riga --- in Gemini (o Claude) e chiedi: **progetta una nuova logica di punteggio + pseudocodice/ patch per `pratoStats.js`**, oppure **riscrivi il file** mantenendo l’interfaccia esistente.
+
+---
+
+## 1. Contesto prodotto
+
+**AgriPocket** è una web app React (Vite) per giardinieri italiani con prato. Stack: Supabase (profilo, calendario, analisi foto), API Vercel serverless + Gemini.
+
+Sulla **Dashboard** (`/dashboard`) c’è una card **“Stato prato”** con un **radar esagonale** (6 assi, 0–100) + media centrale + etichetta (Ottimo / Buono / Discreto / …).
+
+**Promessa UX mostrata all’utente:**
+- Il punteggio viene **dalla foto** del prato (analisi visiva AI).
+- Solo i lavori **già scaduti** (data_prevista < oggi, non completati) **abbassano** il voto.
+- I lavori **futuri** (anche nel calendario stagionale) **non devono** influire.
+
+**Problema reale:** l’utente dice che **“l’esagono non funziona per niente”** — valori che non rispecchiano un prato sano (es. media ~62 su foto bellissima), assi incoerenti tra loro, oppure esagono “piatto” / inutile anche dopo aver caricato foto.
+
+---
+
+## 2. Architettura tecnica (file da modificare)
+
+| File | Ruolo |
+|------|--------|
+| `web/src/lib/pratoStats.js` | **Cuore logica**: `computePratoStats`, `buildAxisInsight`, `labelStatoPrato` |
+| `web/src/components/PratoRadar.jsx` | SVG radar + legenda + tooltip (solo visualizzazione) |
+| `web/src/pages/Dashboard.jsx` | Chiama `computePratoStats({ interventi, analisi: ultimaAnalisi, weather })` |
+| `web/src/lib/dashboard.js` | `loadUltimaAnalisi` → `prato_analisi.vision_json` |
+| `web/server/analizzaPratoCore.mjs` | Prompt Gemini che produce `vision_json` dalla foto |
+
+**Input di `computePratoStats`:**
+```js
+{
+  interventi: [],           // tutti da prato_interventi (pianificato/completato)
+  analisi: { vision_json, created_at } | null,  // ultima riga prato_analisi
+  weather: { current, history, advice } | null  // OpenWeather bundle client
+}
+```
+
+**Output:**
+```js
+{
+  stats: { idratazione, nutrizione, copertura, salute_fogliare, difesa, manutenzione }, // 0-100
+  media: number,
+  insights: { [asse]: { score, perche: string[], migliora: string[] } },
+  hasVision, hasOverdue, overdueCount, ...
+}
+```
+
+---
+
+## 3. I 6 assi
+
+```js
+PRATO_STAT_AXES = [
+  { key: "idratazione", label: "Idratazione" },
+  { key: "nutrizione", label: "Nutrizione" },
+  { key: "copertura", label: "Copertura" },
+  { key: "salute_fogliare", label: "Salute fogliare" },
+  { key: "difesa", label: "Difesa" },
+  { key: "manutenzione", label: "Manutenzione" },
+]
+```
+
+---
+
+## 4. Schema `vision_json` (da Gemini Vision)
+
+Prodotto da `analizzaPratoCore.mjs` dopo foto utente:
+
+```json
+{
+  "sintesi_visiva": "string",
+  "stato_generale": "ottimo|buono|discreto|critico",
+  "problemi_rilevati": [{ "problema": "", "gravita": "bassa|media|alta", "dettaglio": "" }],
+  "taglio": { "giudizio": "troppo_basso|corretto|troppo_alto|non_valutabile", ... },
+  "feltro_thatch": { "presente": true|false },
+  "foglie_debris": { "eccesso_foglie": true|false },
+  "stress_idrici": { "segni": true|false },
+  "malattie_sospette": [],
+  "erbette_infestanti": [],
+  "parassiti_sottoprato": []
+}
+```
+
+Il prompt vision chiede esplicitamente: prato bello → `ottimo`/`buono`, non `discreto` per prudenza; problemi solo se reali.
+
+**Se il JSON vision fallisce il parse:** si salva un oggetto minimale senza `stato_generale` → la logica cade su default ~58 e penalità incoerenti.
+
+---
+
+## 5. Logica attuale in `pratoStats.js` (sintesi)
+
+### 5.1 Da foto (`scoreFromVision`)
+
+1. Se `isVisionEccellente(vision)` → assi alti (~88–94) con piccole correzioni feltro.
+2. Altrimenti `base = STATO_MAP[stato_generale]` → ottimo:90, buono:76, discreto:54, critico:28.
+3. Penalità per keyword in problemi (media/alta), stress idrico, feltro, taglio, malattie, erbe, parassiti.
+4. Asse `difesa` parte da 90/82 e scala con malattie/erbe/parassiti.
+
+### 5.2 Da calendario (solo scaduti)
+
+- `interventiPerStatoRadar`: esclude `controllo_mensile`, priorità `bassa`, titoli `Catalogo —`.
+- `interventiScadutiPerRadar`: `stato === "pianificato"` AND `data_prevista < oggi`.
+- Penalità per asse tramite `CATEGORIE`:
+  - idratazione ← irrigazione, umettante
+  - nutrizione ← concime, biostimolante
+  - copertura ← rinnovo
+  - difesa ← trattamento, diserbo
+  - manutenzione ← taglio, arieggiatura, pulizia
+  - **salute_fogliare: NESSUNA categoria mappata** → non riceve mai penalità da calendario
+
+Penalità max ~32 per asse, dipende da priorità e giorni di ritardo.
+
+### 5.3 Meteo
+
+Solo asse **idratazione**, blend 6% se non c’è stress idrico in foto.
+
+### 5.4 Media e “pavimento”
+
+- Media = media aritmetica dei 6 assi.
+- Se **nessun** lavoro scaduto: `minMediaDaStatoVision` può alzare tutti gli assi per portare media a minimo 84 (ottimo), 74/70 (buono), 58 (discreto senza problemi).
+- Se **ci sono** scaduti: **nessun pavimento** → prato bello + calendario pieno di date passate = voto basso.
+
+### 5.5 Senza foto
+
+Se `vision_json` assente: ogni asse default **52**, media **52**, etichetta “Discreto”.
+
+### 5.6 Codice morto / incoerenze
+
+- `visionFreshness(created_at)` è calcolato ma **non modifica più i punteggi** (resta solo in `insights`).
+- Documentazione interna dice “peso freschezza foto” ma non è applicato.
+- Filtri calendario UI (Trattamenti/Giardino) **non** filtrano il radar: usa **tutti** gli `interventi`.
+
+---
+
+## 6. Perché probabilmente “non funziona” (ipotesi da verificare)
+
+1. **Foto non usata:** `ultimaAnalisi` senza `vision_json` valido → esagono piatto a 52.
+2. **Vision pessimista:** Gemini restituisce `discreto` + problemi media → base 54 + penalità → media ~55–65 anche su prati curati.
+3. **Troppi scaduti:** piano stagionale denso (28–45+ voci da IA + catalogo); molte date nel passato se utente non spunta lavori → penalità cumulative su più assi.
+4. **`isVisionEccellente` troppo rigida:** esclude casi `buono` con 2 problemi media, stress_idrici false positive, ecc.
+5. **Assi sbilanciati:** `difesa` calcolata diversamente; `salute_fogliare` non collegata al calendario ma penalizzata solo da vision.
+6. **Mismatch UX:** utente pensa che spuntare lavori o filtrare calendario cambi l’esagono — non succede per i futuri, ma gli scaduti sì.
+7. **Nessun collegamento** tra `sintesi_visiva` testuale e numeri: difficile capire “perché 62”.
+
+---
+
+## 7. Comportamento desiderato (target)
+
+Progetta una logica che:
+
+1. **Senza foto recente (< 30 gg):** mostra stato “non disponibile” o stima conservativa, non fingere precisione (52 su tutti).
+2. **Con foto:** i 6 assi devono essere **leggibili e coerenti** con `stato_generale` e problemi strutturati (non solo regex su testo libero).
+3. **Calendario:** penalizzare solo scaduti **rilevanti** (es. max 2–3 penalità totali, o cap per asse, o solo fonte `ia_foto` / priorità alta) — **mai** far crollare un prato `ottimo` sotto 70 per 10 concimi stagionali non fatti.
+4. **Prato sano in foto:** media tipica **78–92**, non 62.
+5. **Trasparenza:** ogni asse spiega in `perche[]` contributo % foto vs calendario vs meteo.
+6. **Opzionale:** usare `visionFreshness` o età foto per attenuare fiducia.
+7. **Allineamento assi:** mappare trattamenti/fungicidi anche su `salute_fogliare` se appropriato.
+
+Mantieni export:
+- `computePratoStats`, `buildAxisInsight`, `labelStatoPrato`, `PRATO_STAT_AXES`
+
+---
+
+## 8. Cosa vogliamo da te (Gemini)
+
+1. **Diagnosi** delle cause più probabili del malfunction (punti 1–7).
+2. **Specifica algoritmica** nuova (formule, pesi, cap, soglie) in italiano chiaro.
+3. **Pseudocodice o codice JavaScript completo** per sostituire `web/src/lib/pratoStats.js`.
+4. Se serve, **modifiche minime** al prompt vision in `analizzaPratoCore.mjs` (campi numerici espliciti per asse? es. `punteggi_assi: { idratazione: 85, ... }` generati da Gemini).
+5. **3 scenari test** con input/output attesi:
+   - Foto ottimo, zero scaduti → media ≥ 85
+   - Foto buono, 2 scaduti media priorità → media 70–80
+   - Nessuna foto, 5 scaduti → messaggio “carica foto”, non esagono finto
+
+---
+
+## 9. Esempio snippet attuale (entry point)
+
+```javascript
+export function computePratoStats({ interventi = [], analisi = null, weather = null } = {}) {
+  const vision = analisi?.vision_json;
+  const fromVision = scoreFromVision(vision);
+  const scaduti = interventiScadutiPerRadar(interventi, oggiIso());
+  // per ogni asse: val = (fromVision[asse] ?? 52) - penalitaScaduti
+  // media + eventuale boost minMediaDaStatoVision se !hasOverdue
+}
+```
+
+---
+
+## 10. Repo
+
+GitHub: progetto AgriPocket, cartella `web/`. Deploy: Vercel. Non serve accesso al DB: lavora su logica pura + contratto JSON sopra.
+
+**Non** proporre solo “cambiare colori del grafico”: il problema è il **calcolo dei numeri**, non il componente SVG.
+
+---
+
+Fine prompt. Incolla in Gemini e allega opzionalmente il file completo `web/src/lib/pratoStats.js` dal repo.

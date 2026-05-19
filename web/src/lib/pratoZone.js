@@ -67,6 +67,40 @@ export function buildPratoZonePayload(poligono, zone) {
   };
 }
 
+const GEO_DECIMALS = 4;
+
+function roundCoord(n) {
+  if (!Number.isFinite(n)) return n;
+  const f = 10 ** GEO_DECIMALS;
+  return Math.round(n * f) / f;
+}
+
+/** Riduce precisione GPS (~11 m) prima del salvataggio (minimizzazione dati). */
+export function anonymizePratoZoneForStorage(raw) {
+  const z = normalizePratoZone(raw);
+  z.poligono = z.poligono.map((p) => ({ lat: roundCoord(p.lat), lng: roundCoord(p.lng) }));
+  z.zone = z.zone.map((item) => {
+    if (item.tipo === "irrigatore") {
+      return { ...item, lat: roundCoord(item.lat), lng: roundCoord(item.lng) };
+    }
+    if (item.path) {
+      return {
+        ...item,
+        path: item.path.map((p) => ({ lat: roundCoord(p.lat), lng: roundCoord(p.lng) })),
+      };
+    }
+    if (item.from && item.to) {
+      return {
+        ...item,
+        from: { lat: roundCoord(item.from.lat), lng: roundCoord(item.from.lng) },
+        to: { lat: roundCoord(item.to.lat), lng: roundCoord(item.to.lng) },
+      };
+    }
+    return item;
+  });
+  return z;
+}
+
 /**
  * Aggiorna mappa: sostituisce le zone dei tipi indicati e opzionalmente il poligono.
  * @param {unknown} existing

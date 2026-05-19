@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 import { ensurePreEmergenzaAnnuali, valutaPreEmergenzaAnnuali } from "./preEmergenzaAnnuali.mjs";
 import { arricchisciInterventoConProdotto, loadProdotti } from "./prodottiCatalogo.mjs";
+import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
 import { integraCatalogoNelPiano } from "./pianoDaCatalogo.mjs";
 import { mergeControlliMensili } from "./controlliMensili.mjs";
 import { hintParassitiRegionali } from "./parassitiPrato.mjs";
@@ -208,7 +209,7 @@ Rispondi SOLO JSON:
 }
 
 Regole:
-- Minimo 50 interventi, massimo 90, distribuiti su tutto l'anno (non ammassare tutto in una settimana).
+- Minimo 28 interventi, massimo 45 (calendario da giardino, non gestione stadio): distribuiti su tutto l'anno (non ammassare tutto in una settimana).
 - Date reali tra ${oggi} e ${fine}; rispetta stagionalità climatica italiana e località.
 - In inverno (dic-feb) meno tagli, più pianificazione; picco concimi primavera/autunno.
 - Evita duplicati lo stesso giorno con stesso titolo.
@@ -346,6 +347,11 @@ export async function generaPianoStagionale({ authHeader, env }) {
 
   if (!profilo?.localita?.trim()) {
     throw new Error("Completa il profilo con la località (mappa onboarding) prima di generare il calendario.");
+  }
+  if (!superficieMqVerificata(profilo)) {
+    throw new Error(
+      "Imposta i m² del prato sulla mappa (profilo) prima di generare il calendario: servono per dosi e priorità in sicurezza.",
+    );
   }
 
   const oggi = new Date().toISOString().slice(0, 10);
