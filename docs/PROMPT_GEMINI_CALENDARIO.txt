@@ -1,0 +1,111 @@
+# Prompt per Gemini — Revisione calendario interventi AgriPocket
+
+Copia tutto sotto la riga --- in Gemini. Allega opzionalmente i file elencati in fondo.
+
+---
+
+## Ruolo
+
+Sei revisore **agronomo turfgrass** + **architetto software** + **PM B2C**. Analizza il **calendario lavori** di AgriPocket (web app prato da giardino, Italia). Non essere generico: ogni critica con impatto e fix proposto.
+
+## Contesto rapido
+
+- **URL:** https://agripocket-azure.vercel.app/dashboard
+- **Repo:** github.com/jackjack3737/Agripocket (cartella `web/`)
+- **Utente tipo:** proprietario giardino, non greenkeeper professionale
+- **Stack:** React, Supabase `prato_interventi`, Gemini 2.5 Flash, Vercel API
+
+## Cosa fa il calendario oggi
+
+1. **Genera piano annuale** (28–45 lavori da Gemini + fino a 18 voci catalogo prodotti + 12 controlli foto mensili).
+2. **Aggiorna da foto** (urgenze `ia_foto` + opzionale modifica piano stagionale via AI).
+3. **Mostra** accordion mese→giorno, checkbox completamento, pin «Mantieni al rigenera».
+4. **Filtra** per Trattamenti / Lavori giardino / Mese / Anno.
+5. **Dosature** automatiche solo concimi/biostimolanti se m² sulla mappa; fitofarmaci senza dose.
+
+## Tabella `prato_interventi` (campi principali)
+
+- `categoria`: taglio | irrigazione | concime | trattamento | pulizia | diserbo | arieggiatura | biostimolante | umettante | rinnovo | altro
+- `fonte`: **calendario_stagionale** | **ia_foto** | **controllo_mensile**
+- `priorita`, `stato` (pianificato/completato), `data_prevista`, `manual_override`
+- `prodotto_*`, `dose_*` (solo se non fitofarmaco e m² ok)
+
+## Pipeline «Genera piano annuale»
+
+```
+Profilo (localita, m², zone mappa, obiettivo, robot taglio…)
+  → RAG knowledge base (Bottos, turfgrass)
+  → Gemini JSON 28-45 interventi datati
+  → Post: pre-emergenza meteo, filtro fitofarmaci curativi, overseed ombra
+  → Arricchimento catalogo Prodotti (dosi)
+  → + max 18 righe "Catalogo — prodotto"
+  → + controlli mensili foto
+  → DELETE calendario_stagionale non pinati → INSERT
+```
+
+**Rigenera:** cancella solo `calendario_stagionale` pianificati senza `manual_override`. Non tocca `ia_foto` né completati.
+
+**Auto-trigger:** se utente ha località ma zero `calendario_stagionale`, dashboard avvia generazione automatica (1-2 min).
+
+## Pipeline «Analisi foto» (/chat)
+
+```
+Foto → vision_json + report Markdown
+  → interventi urgenti (fonte ia_foto), replace precedenti ia_foto pianificati
+  → opz. integraFotoNelPiano: Gemini aggiunge/modifica/rimuove voci calendario_stagionale
+```
+
+## UI — comportamenti da valutare
+
+| Comportamento | Dettaglio |
+|---------------|-----------|
+| Timeline mese | Mostra solo `data_prevista >= oggi` |
+| Scaduti | Restano in DB, **non** in timeline, ma penalizzano esagono (−max 15/asse) |
+| Filtro Trattamenti | concime, biostim, umettante, rinnovo, trattamento, diserbo — **no** controlli mensili |
+| Filtro Giardino | taglio, arieggiatura, pulizia, irrigazione |
+| Solo controlli mensili | Banner se piano annuale mai generato |
+| Pin | Solo calendario_stagionale |
+
+## Problemi noti / storici
+
+1. Utenti vedevano **solo** controlli mensili → piano non generato (fix: `haCalendarioStagionale` vs `interventi.length`).
+2. **Troppi** lavori (50–90) → ora 28–45 + cap catalogo 18.
+3. Rigenera cancellava tutto → ora `manual_override`.
+4. **Scaduti invisibili** ma contano per esagono → confusione UX.
+5. Fitofarmaci in calendario senza problema visibile → filtro `visioneMostraDifetti`.
+6. Generazione **bloccata** senza m² mappa (voluto per dosi).
+
+## Output che vogliamo da te
+
+1. **Executive summary** — calendario pronto per giardiniere medio? sì/no e perché.
+2. **Diagramma ASCII** flusso dati (profilo → piano → foto → UI).
+3. **Top 10 criticità** P0/P1/P2 con remediation.
+4. **Densità ideale** — quante voci/anno per B2C? come raggruppare (settimana vs giorno)?
+5. **Regole business** riscritte (pseudocodice) per:
+   - cosa inserire nel piano Gemini vs catalogo vs solo su richiesta foto;
+   - gestione scaduti / reminder;
+   - rigenera piano senza perdere lavoro utente.
+6. **3 scenari test** (profilo + stagione + foto) → estratto calendario atteso (10–15 righe esempio).
+7. **Prompt Gemini migliorato** (estratto JSON interventi) se quello attuale è debole.
+
+## File da leggere (ordine suggerito)
+
+1. `web/src/lib/dashboard.js`
+2. `web/src/pages/Dashboard.jsx` (sezione calendario)
+3. `web/server/pianoStagionale.mjs`
+4. `web/server/pianoDaCatalogo.mjs`
+5. `web/server/interventiFromReport.mjs`
+6. `web/server/aggiornaPianoDaFoto.mjs`
+7. `web/server/regoleFitofarmaci.mjs`
+8. `docs/RELAZIONE_CALENDARIO_GEMINI.md` (questa relazione estesa)
+
+## Vincoli non negoziabili
+
+- Fitofarmaci: **no dose automatica** in app B2C.
+- Superficie: **no fallback** m² per dosi.
+- Italia: stagionalità e normativa PAN nel ragionamento.
+- Non proporre solo «migliorare i colori UI» — focus su **logica calendario e agronomia**.
+
+---
+
+Fine prompt.

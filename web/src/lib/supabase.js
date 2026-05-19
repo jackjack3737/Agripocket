@@ -103,6 +103,7 @@ export async function savePratoProfilo(userId, profile) {
     irrigazione: profile.irrigazione,
     eta_prato: profile.eta_prato || null,
     obiettivo: profile.obiettivo || null,
+    livello_impegno: profile.livello_impegno || "base",
     frequenza_taglio: profile.frequenza_taglio || null,
     altezza_taglio_cm: profile.altezza_taglio_cm || null,
     animali: profile.animali || null,

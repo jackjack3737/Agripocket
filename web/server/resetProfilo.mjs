@@ -16,6 +16,7 @@ const PROFILO_VUOTO = {
   disclaimer_accettato_at: null,
   eta_prato: null,
   obiettivo: null,
+  livello_impegno: "base",
   frequenza_taglio: null,
   altezza_taglio_cm: null,
   animali: null,

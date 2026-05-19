@@ -1,6 +1,7 @@
 /** Etichette e testo profilo per prompt IA (livello A + C). */
 
 import { formatLivelloConcimiForPrompt } from "./livelloConcimi.mjs";
+import { testoLivelloPerPrompt } from "./livelloImpegno.mjs";
 import { formatIrrigationForPrompt, formatOmbraSeedForPrompt, formatZonesForPrompt } from "./pratoZone.mjs";
 
 const ETA = {
@@ -17,6 +18,7 @@ const OBIETTIVO = {
 };
 const FREQ_TAGLIO = {
   settimanale: "Taglio settimanale",
+  robot: "Robot tagliaerba (micro-tagli frequenti)",
   quindicinale: "Taglio ogni 10–14 giorni",
   raro: "Taglio raro",
   non_so: "Frequenza taglio non indicata",
@@ -115,6 +117,7 @@ export function formatProfileForPrompt(p) {
   if (irrig) base.push(`Programma irrigazione suggerito (da mappa):\n${irrig}`);
 
   base.push(formatLivelloConcimiForPrompt(p));
+  base.push(testoLivelloPerPrompt(p));
 
   return base.length ? base.join("\n") : "Profilo prato: minimo.";
 }

@@ -1,5 +1,7 @@
 /** Statistiche esagono prato (0–100): base da Gemini `punteggi_assi`, decadimento tempo, cap calendario. */
 
+import { resolvePunteggiAssi } from "./punteggiAssi.js";
+
 export const PRATO_STAT_AXES = [
   { key: "idratazione", label: "Idratazione" },
   { key: "nutrizione", label: "Nutrizione" },
@@ -33,20 +35,6 @@ function diffDays(dateString) {
   const past = new Date(dateString);
   const now = new Date();
   return Math.floor((now - past) / (1000 * 60 * 60 * 24));
-}
-
-function normalizePunteggiAssi(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const out = {};
-  let valid = 0;
-  for (const { key } of PRATO_STAT_AXES) {
-    const n = Number(raw[key]);
-    if (Number.isFinite(n)) {
-      out[key] = clamp(n);
-      valid += 1;
-    }
-  }
-  return valid === PRATO_STAT_AXES.length ? out : null;
 }
 
 /** Esclude controlli mensili, priorità bassa e voci catalogo automatiche. */
@@ -88,7 +76,8 @@ function getPenalitaCalendario(interventi) {
 }
 
 function buildInsights(stats, ctx) {
-  const { penalita, baseScores, ageDays, decayFactor, hasOverdue, scaduti, weather } = ctx;
+  const { penalita, baseScores, ageDays, decayFactor, hasOverdue, scaduti, weather, punteggiFromFallback } =
+    ctx;
   const out = {};
 
   for (const { key, label } of PRATO_STAT_AXES) {
@@ -97,7 +86,11 @@ function buildInsights(stats, ctx) {
     const base = baseScores[key];
     const pen = penalita[key];
 
-    perche.push(`Dalla foto: ${base}/100 (valutazione visiva AI).`);
+    perche.push(
+      punteggiFromFallback
+        ? `Stima da foto: ~${base}/100 (da stato visivo dell'analisi).`
+        : `Dalla foto: ${base}/100 (valutazione visiva AI).`,
+    );
     if (ageDays > 0) {
       perche.push(
         `Foto di ${ageDays} giorni fa: decadimento −${Math.round((1 - decayFactor) * 100)}% sul punteggio base.`,
@@ -146,20 +139,34 @@ function penalitaCategoriaSuAsse(categoria, asse) {
 /**
  * @param {{ interventi?: object[], analisi?: { vision_json?: object, created_at?: string } | null, weather?: object | null }} input
  */
+function parseVisionJson(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export function computePratoStats({ interventi = [], analisi = null, weather = null } = {}) {
-  const vision = analisi?.vision_json;
+  const vision = parseVisionJson(analisi?.vision_json);
   const ageDays = diffDays(analisi?.created_at);
-  const baseScores = normalizePunteggiAssi(vision?.punteggi_assi);
+  const resolved = resolvePunteggiAssi(vision);
+  const baseScores = resolved?.scores ?? null;
   const hasValidVision = !!baseScores && ageDays <= MAX_VISION_AGE_DAYS;
 
   if (!hasValidVision) {
     return {
       stats: { ...EMPTY_STATS },
       media: 0,
-      insights: buildEmptyInsights(ageDays, !!vision?.punteggi_assi),
+      insights: buildEmptyInsights(ageDays, !!vision),
       hasVision: false,
       isExpired: ageDays > MAX_VISION_AGE_DAYS && !!analisi?.created_at,
-      needsPunteggiAssi: !!vision && !vision?.punteggi_assi,
+      needsPunteggiAssi: !!vision && !!analisi?.created_at && ageDays <= MAX_VISION_AGE_DAYS,
       hasInterventi: interventi.length > 0,
       hasOverdue: interventiPerPenalita(interventi).length > 0,
       overdueCount: interventiPerPenalita(interventi).length,
@@ -196,6 +203,7 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
     hasOverdue,
     scaduti,
     weather,
+    punteggiFromFallback: resolved?.fromFallback ?? false,
   });
 
   return {
@@ -205,6 +213,7 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
     hasVision: true,
     isExpired: false,
     needsPunteggiAssi: false,
+    punteggiFromFallback: resolved?.fromFallback ?? false,
     hasInterventi: interventi.length > 0,
     hasOverdue,
     overdueCount: scaduti.length,
@@ -215,17 +224,17 @@ export function computePratoStats({ interventi = [], analisi = null, weather = n
   };
 }
 
-function buildEmptyInsights(ageDays, hadPartialScores) {
+function buildEmptyInsights(ageDays, hasAnalisi) {
   const out = {};
   for (const { key, label } of PRATO_STAT_AXES) {
     const perche = [];
     const migliora = ["Carica una foto recente del prato (analisi in Chat)."];
     if (ageDays > MAX_VISION_AGE_DAYS) {
       perche.push(`Ultima analisi troppo vecchia (${ageDays} giorni, max ${MAX_VISION_AGE_DAYS}).`);
-    } else if (hadPartialScores) {
-      perche.push("Analisi precedente senza punteggi per asse: serve una nuova foto.");
+    } else if (hasAnalisi) {
+      perche.push("Analisi salvata ma senza dati sufficienti per i 6 assi: rifai l'analisi foto.");
     } else {
-      perche.push("Nessuna foto con punteggi disponibile.");
+      perche.push("Nessuna analisi foto ancora.");
     }
     out[key] = { score: 0, perche, migliora, label };
   }

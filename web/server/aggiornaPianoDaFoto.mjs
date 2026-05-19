@@ -9,6 +9,11 @@ import {
   filtraInterventiFitofarmacoCurativo,
   isInterventoFitofarmacoCurativo,
 } from "./regoleFitofarmaci.mjs";
+import {
+  bloccoTermicoEstivo,
+  buildInterventiPatologiaEmergenza,
+  rimuoviRoutineCalendario,
+} from "./sanitizzaCalendario.mjs";
 
 function oggiIso() {
   return new Date().toISOString().slice(0, 10);
@@ -37,7 +42,14 @@ function rowFromIntervento(userId, analisiId, i, fonte) {
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
+    manual_override: i.manual_override ?? fonte === "ia_foto",
   };
+}
+
+function addDaysIso(iso, n) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -160,6 +172,37 @@ export async function integraFotoNelPiano({
   const inseriti = [];
   const aggiornati = [];
   let annullati = 0;
+  let concimiRimossi = 0;
+  const oggi = oggiIso();
+
+  const emergenza = buildInterventiPatologiaEmergenza(vision, profilo, oggi);
+  if (emergenza.aggiunti.length) {
+    const fine = addDaysIso(oggi, emergenza.finestraGiorni ?? 21);
+    const { data: concimiFuturi } = await admin
+      .from("prato_interventi")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("categoria", "concime")
+      .eq("stato", "pianificato")
+      .gt("data_prevista", oggi)
+      .lte("data_prevista", fine);
+
+    for (const row of concimiFuturi || []) {
+      const { error } = await admin.from("prato_interventi").delete().eq("id", row.id).eq("user_id", userId);
+      if (!error) concimiRimossi += 1;
+    }
+
+    for (const raw of emergenza.aggiunti) {
+      let item = arricchisciInterventoConProdotto(raw, profilo, prodotti, vision);
+      item = bloccoTermicoEstivo([item])[0];
+      const { data, error } = await admin
+        .from("prato_interventi")
+        .insert(rowFromIntervento(userId, analisiId, item, "ia_foto"))
+        .select("*")
+        .single();
+      if (!error && data) inseriti.push(data);
+    }
+  }
 
   for (const id of piano.annulla_ids || []) {
     const { error } = await admin
@@ -199,14 +242,19 @@ export async function integraFotoNelPiano({
     if (!raw?.titolo?.trim() || !raw?.data_prevista) continue;
     if (giorniDaOggi(raw.data_prevista) < 0) continue;
 
-    let item = {
-      titolo: String(raw.titolo).trim().slice(0, 120),
-      descrizione: String(raw.descrizione || "").trim(),
-      priorita: raw.priorita || "media",
-      categoria: raw.categoria || "trattamento",
-      data_prevista: raw.data_prevista,
-      ordine: ordineBase++,
-    };
+    let item = bloccoTermicoEstivo(
+      rimuoviRoutineCalendario([
+        {
+          titolo: String(raw.titolo).trim().slice(0, 120),
+          descrizione: String(raw.descrizione || "").trim(),
+          priorita: raw.priorita || "media",
+          categoria: raw.categoria || "trattamento",
+          data_prevista: raw.data_prevista,
+          ordine: ordineBase++,
+        },
+      ]),
+    )[0];
+    if (!item) continue;
 
     if (
       isInterventoFitofarmacoCurativo(item) &&
@@ -240,6 +288,7 @@ export async function integraFotoNelPiano({
     inseritiCalendario: inseriti.length,
     aggiornatiCalendario: aggiornati.length,
     annullatiCalendario: annullati,
+    concimiRimossiPatologia: concimiRimossi,
     inseriti,
     aggiornati,
   };

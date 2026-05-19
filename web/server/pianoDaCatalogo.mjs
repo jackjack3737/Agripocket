@@ -9,10 +9,9 @@ import {
   periodoCompatibile,
 } from "./prodottiCatalogo.mjs";
 import { concimeAmmessoPerProfilo } from "./livelloConcimi.mjs";
+import { configLivelloImpegno } from "./livelloImpegno.mjs";
 import { catalogoAmmessoSenzaFoto } from "./regoleFitofarmaci.mjs";
 import { isProdottoAmmessoConsumer, isProdottoFitofarmaco } from "./sicurezzaProdotti.mjs";
-
-const MAX_EXTRA_CATALOGO = 18;
 
 const MESI_IT = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
 
@@ -115,7 +114,7 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
   if (prodotto.periodo_uso) desc = [desc, `Periodo d'uso indicato: ${prodotto.periodo_uso}.`].filter(Boolean).join(" ");
 
   const base = {
-    titolo: `Catalogo — ${prodotto.nome}`.slice(0, 120),
+    titolo: String(prodotto.nome || "Prodotto catalogo").slice(0, 120),
     descrizione: desc || `Applicazione da catalogo (${prodotto.categoria}).`,
     categoria: tipo.categoria,
     priorita,
@@ -137,11 +136,19 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
  * @param {object[]} interventiPiano - già arricchiti da Gemini
  */
 export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi) {
-  const eligibili = prodotti.filter((p) => prodottoAmmessoAlCalendario(p, profilo));
+  const cfg = configLivelloImpegno(profilo);
+  const eligibili = prodotti.filter((p) => {
+    if (!prodottoAmmessoAlCalendario(p, profilo)) return false;
+    const tipo = mappaTipoProdotto(p);
+    if (!cfg.liquidiMensili && (tipo?.tipo === "liquido" || tipo?.categoria === "umettante")) {
+      return false;
+    }
+    return true;
+  });
   const extra = [];
 
   for (const p of eligibili) {
-    if (extra.length >= MAX_EXTRA_CATALOGO) break;
+    if (extra.length >= cfg.maxCatalogo) break;
     if (giaCopertoDaPiano(interventiPiano, p) || giaCopertoDaPiano(extra, p)) continue;
 
     const row = interventoDaProdotto(p, profilo, oggi);

@@ -15,17 +15,48 @@ const ASSI_KEYS = [
   "manutenzione",
 ];
 
-function normalizePunteggiAssi(vision) {
+function parseScoreValue(val) {
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return Math.max(0, Math.min(100, Math.round(val)));
+  }
+  if (typeof val === "string") {
+    const m = val.match(/\b(\d{1,3})\b/);
+    if (m) {
+      const n = Number(m[1]);
+      if (n >= 0 && n <= 100) return n;
+    }
+  }
+  return null;
+}
+
+function inferPunteggiAssi(vision) {
+  const STATO_BASE = { ottimo: 88, buono: 78, discreto: 58, critico: 32 };
   const raw = vision?.punteggi_assi;
-  if (!raw || typeof raw !== "object") return vision;
   const out = {};
+  if (raw && typeof raw === "object") {
+    for (const key of ASSI_KEYS) {
+      const n = parseScoreValue(raw[key]);
+      if (n != null) out[key] = n;
+    }
+  }
+  if (Object.keys(out).length === ASSI_KEYS.length) return out;
+
+  const base = STATO_BASE[String(vision?.stato_generale || "").toLowerCase()];
+  if (base == null && Object.keys(out).length === 0) return null;
+
+  const fb = base ?? 70;
+  const filled = {};
   for (const key of ASSI_KEYS) {
-    const n = Number(raw[key]);
-    if (Number.isFinite(n)) out[key] = Math.max(0, Math.min(100, Math.round(n)));
+    filled[key] = out[key] ?? fb;
   }
-  if (Object.keys(out).length === ASSI_KEYS.length) {
-    vision.punteggi_assi = out;
-  }
+  if (vision?.stress_idrici?.segni) filled.idratazione = Math.max(0, filled.idratazione - 14);
+  if (vision?.feltro_thatch?.presente) filled.manutenzione = Math.max(0, filled.manutenzione - 10);
+  return filled;
+}
+
+function normalizePunteggiAssi(vision) {
+  const filled = inferPunteggiAssi(vision);
+  if (filled) vision.punteggi_assi = filled;
   return vision;
 }
 
@@ -158,12 +189,12 @@ Rispondi SOLO JSON valido (italiano), forma:
     { "tipo": "popillia|otiorrinco|altro", "segni": "zone marroni, prato che si stacca, larve visibili o sospette", "gravita": "bassa|media|alta", "note": "" }
   ],
   "punteggi_assi": {
-    "idratazione": "numero intero 0-100 (turgidità, segni siccità)",
-    "nutrizione": "numero intero 0-100 (colore verde, vigore)",
-    "copertura": "numero intero 0-100 (densità, assenza buchi/calve)",
-    "salute_fogliare": "numero intero 0-100 (assenza lesioni, macchie, funghi visibili)",
-    "difesa": "numero intero 0-100 (assenza infestanti/parassiti visibili)",
-    "manutenzione": "numero intero 0-100 (altezza taglio, feltro, detrito)"
+    "idratazione": 85,
+    "nutrizione": 85,
+    "copertura": 85,
+    "salute_fogliare": 85,
+    "difesa": 85,
+    "manutenzione": 85
   },
   "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili"
 }
@@ -179,7 +210,7 @@ VALUTAZIONE stato_generale (importante per il punteggio utente):
 - malattie_sospette, erbette_infestanti, parassiti_sottoprato: array vuoti se non vedi evidenza chiara (non ipotizzare).
 
 PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
-- Compila punteggi_assi con 6 interi 0-100, coerenti con ciò che vedi in foto (non con il calendario).
+- Compila punteggi_assi con 6 NUMERI INTERI (non stringhe), uno per asse, da 0 a 100.
 - Prato uniformemente verde, denso e curato: valori tipici 85-95 su tutti gli assi.
 - Piccole imperfezioni locali: 70-84; problemi evidenti ma gestibili: 50-69; danni gravi: sotto 50.
 - stato_generale deve essere coerente con la media dei punteggi_assi.`;

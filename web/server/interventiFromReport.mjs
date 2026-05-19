@@ -5,6 +5,7 @@ import {
 import { filtraInterventiFitofarmacoCurativo } from "./regoleFitofarmaci.mjs";
 import { integraFotoNelPiano } from "./aggiornaPianoDaFoto.mjs";
 import { aggiornaAnalisiFoto, uploadAnalisiFoto } from "./uploadAnalisiFoto.mjs";
+import { rimuoviRoutineCalendario } from "./sanitizzaCalendario.mjs";
 
 const PRIORITY_ORDER = { alta: 0, media: 1, bassa: 2 };
 
@@ -75,7 +76,7 @@ function rowIntervento(userId, analisiId, i, fonte) {
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
-    manual_override: false,
+    manual_override: fonte === "ia_foto" ? true : !!i.manual_override,
   };
   if (i.avviso_fitofarmaco) {
     row.dose_totale = null;
@@ -223,7 +224,7 @@ export async function persistAnalisiAndInterventi(
     .eq("stato", "pianificato");
 
   const prodotti = await loadProdotti(admin);
-  let arricchiti = (interventi ?? []).map((i) =>
+  let arricchiti = rimuoviRoutineCalendario(interventi ?? []).map((i) =>
     arricchisciInterventoConProdotto(i, profilo, prodotti, vision),
   );
 

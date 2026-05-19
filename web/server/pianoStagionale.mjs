@@ -8,6 +8,8 @@ import { mergeControlliMensili } from "./controlliMensili.mjs";
 import { hintParassitiRegionali } from "./parassitiPrato.mjs";
 import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
 import { formatProfileForPrompt } from "./profileContext.mjs";
+import { configLivelloImpegno, testoLivelloPerPrompt } from "./livelloImpegno.mjs";
+import { sanitizzaPianoCompleto } from "./sanitizzaCalendario.mjs";
 import {
   REGOLE_FITOFARMACI_PROMPT,
   filtraInterventiFitofarmacoCurativo,
@@ -162,14 +164,17 @@ export async function buildPianoInterventi(profilo, env, admin, { vision = null 
     .join("\n\n");
 
   const mese = new Date().toLocaleString("it-IT", { month: "long", year: "numeric" });
+  const cfgLivello = configLivelloImpegno(profilo);
 
-  const prompt = `Sei il miglior agronomo di tappeto erboso in Italia. Crea un CALENDARIO LAVORI completo, giorno per giorno (date precise), per i prossimi 12 mesi.
+  const prompt = `Sei il miglior agronomo di tappeto erboso in Italia. Crea un CALENDARIO LAVORI strategico, giorno per giorno (date precise), per i prossimi 12 mesi.
 
 Oggi: ${oggi} (${mese})
 Periodo piano: da ${oggi} a ${fine}
 
 Profilo sito:
 ${formatProfileForPrompt(profilo)}
+
+${testoLivelloPerPrompt(profilo)}
 
 ${weatherBlock}
 
@@ -182,15 +187,14 @@ ${kb || "(usa best practice italiane per prato da giardino)"}
 
 Nota: dopo la generazione, il sistema aggiunge automaticamente al calendario tutti i prodotti idonei del catalogo Bottos (concimi liquidi/granulari, ammendanti, biostimolanti, umettanti, trattamenti) con priorità bassa/media — non serve elencarli tutti qui.
 
-Obiettivo: elencare TUTTI i lavori tipici del prato, con data_prevista specifica YYYY-MM-DD:
+Obiettivo: elencare i lavori STRATEGICI del prato (NON taglio né irrigazione generica — gestiti dall'app come abitudini), con data_prevista YYYY-MM-DD:
 - Concimazioni (NPK, autunno/primavera, slow, microelementi, ferro)
-- Diserbi: pre-emergenza setaria/digitaria (annualità estive) quando il blocco termico sopra indica finestra aperta; post-emergenza selettivo se erbe già visibili
+- Diserbi: pre-emergenza setaria/digitaria quando il blocco termico indica finestra aperta; post-emergenza selettivo se erbe visibili
 - Arieggiazione / scarifica / svasatura
-- Taglio (frequenza stagionale, altezza cm)
-- Biostimolanti e stress (caldo, siccità)
-- Agenti umettanti / miglioratori irrigazione
+- Biostimolanti e stress (caldo, siccità) — in luglio/agosto NO concimi azotati, solo antistress
+- Agenti umettanti (solo livello Pro/Greenkeeper)
 - Solo marca BOTTOS per concimi, biostimolanti, umettanti, ammendanti
-- Rinnovo / overseeding: se la mappa indica zone ombra, usa miscela e quantità seme (g/m²) già nel profilo — un intervento dedicato alle zone ombra
+- Rinnovo / overseeding zone ombra se indicate in mappa
 - Pulizia foglie, controllo feltro, bordi
 
 ${REGOLE_FITOFARMACI_PROMPT}
@@ -208,15 +212,18 @@ Rispondi SOLO JSON:
   ]
 }
 
-Regole:
-- Minimo 28 interventi, massimo 45 (calendario da giardino, non gestione stadio): distribuiti su tutto l'anno (non ammassare tutto in una settimana).
-- Date reali tra ${oggi} e ${fine}; rispetta stagionalità climatica italiana e località.
-- In inverno (dic-feb) meno tagli, più pianificazione; picco concimi primavera/autunno.
-- Evita duplicati lo stesso giorno con stesso titolo.
-- priorita alta per finestre critiche: overseeding, pre-emergenza setaria/digitaria (se finestra termica aperta), stress caldo.
-- Non spostare la pre-emergenza setaria/digitaria a febbraio se il meteo indica finestra aperta ora (mag-giu in pianura padana).
-- Adatta a obiettivo, uso, frequenza taglio (se robot: micro-tagli frequenti, altezza costante) e livello concimi indicato nel profilo (professionali vs blandi).
-- Non inserire tutti i concimi del catalogo: rispetta il livello concimi del profilo (estetico→NPK/ferro; bassa manutenzione→slow/universali).`;
+REGOLE TASSATIVE:
+1. LIVELLO UTENTE: ${testoLivelloPerPrompt(profilo)}. Massimo ${cfgLivello.maxInterventi} interventi strategici. Se Base, ignora trattamenti liquidi mensili ripetuti.
+2. ROUTINE: NON generare mai task per taglio o irrigazione generica (settimanali o ricorrenti).
+3. TANK-MIX: Se in un mese prevedi più prodotti liquidi compatibili (es. Tryko Plus + Vigor Liquid, Pre-Stress + Always), uniscili in UN solo intervento "Tank-Mix: [Nome]" con miscela in descrizione.
+
+Regole aggiuntive:
+- Distribuisci su tutto l'anno (non ammassare in una settimana).
+- Date reali tra ${oggi} e ${fine}; stagionalità italiana e località.
+- Picco concimi primavera/autunno; luglio-agosto solo biostimolanti antistress, mai concimi azotati.
+- Evita duplicati stesso giorno con stesso titolo.
+- priorita alta per overseeding, pre-emergenza, stress caldo.
+- Adatta a obiettivo e livello concimi del profilo.`;
 
   const raw = await geminiGenerate(geminiKey, prompt, { maxTokens: 16384 });
   let parsed;
@@ -383,7 +390,8 @@ export async function generaPianoStagionale({ authHeader, env }) {
   );
   const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(conCatalogo, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
-  const saved = await persistPianoStagionale(admin, userData.user.id, conControlli, profilo);
+  const sanitizzati = sanitizzaPianoCompleto(conControlli, profilo, oggi);
+  const saved = await persistPianoStagionale(admin, userData.user.id, sanitizzati, profilo);
 
   return {
     count: saved.count,

@@ -38,6 +38,7 @@ import {
   isInterventoFitofarmaco,
   superficieMqVerificata,
 } from "../lib/sicurezzaClient";
+import { abitudiniDaProfilo } from "../lib/abitudiniPrato.js";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
@@ -80,14 +81,41 @@ function ImportanzaIndicatore({ priorita }) {
   );
 }
 
+function AbitudiniPratoCard({ profile }) {
+  const abitudini = useMemo(() => abitudiniDaProfilo(profile), [profile]);
+  if (!abitudini.length) return null;
+  return (
+    <section className="dash-card dash-abitudini">
+      <h2 className="dash-card__title">Le tue abitudini</h2>
+      <p className="dash-card__lead">
+        Taglio e irrigazione non compaiono nel calendario lavori: segui queste routine dal profilo.
+      </p>
+      <ul className="dash-abitudini__list">
+        {abitudini.map((a) => (
+          <li key={a.id} className="dash-abitudini__item">
+            <span className="dash-abitudini__icon" aria-hidden>
+              {a.icon}
+            </span>
+            <div className="dash-abitudini__body">
+              <strong>{a.titolo}</strong>
+              <p>{a.descrizione}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function InterventoRow({ item, onToggle, onPin }) {
   const done = item.stato === "completato";
   const fito = isInterventoFitofarmaco(item);
   const mostraDose = !fito && item.dose_totale != null && item.dose_unita;
   const controlloMensile = item.fonte === "controllo_mensile";
+  const inRitardo = !!item.isRitardo;
   return (
     <li
-      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}${controlloMensile ? " intervento-row--controllo" : ""}`}
+      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}${controlloMensile ? " intervento-row--controllo" : ""}${inRitardo ? " intervento-row--ritardo" : ""}`}
     >
       <label className="intervento-row__check">
         <input
@@ -99,10 +127,20 @@ function InterventoRow({ item, onToggle, onPin }) {
       </label>
       <div className="intervento-row__body">
         <div className="intervento-row__top">
-          <time className="intervento-row__date" dateTime={item.data_prevista || undefined}>
-            {formatDataIt(item.data_prevista)}
+          <time
+            className="intervento-row__date"
+            dateTime={item.data_originale || item.data_prevista || undefined}
+          >
+            {inRitardo && item.data_originale
+              ? `Era ${formatDataIt(item.data_originale)}`
+              : formatDataIt(item.data_prevista)}
           </time>
           <span className="intervento-pill intervento-pill--cat">{CATEGORIA_LABEL[item.categoria] || "Altro"}</span>
+          {inRitardo ? (
+            <span className="intervento-pill intervento-pill--ritardo" title={`Scaduto il ${formatDataIt(item.data_originale)}`}>
+              In ritardo
+            </span>
+          ) : null}
           <ImportanzaIndicatore priorita={item.priorita} />
           {item.manual_override ? (
             <span className="intervento-pill intervento-pill--pin" title="Non viene rimosso alla rigenerazione del piano">
@@ -120,7 +158,7 @@ function InterventoRow({ item, onToggle, onPin }) {
           <p className="intervento-row__prodotto">
             <span className="intervento-row__prodotto-nome">
               {fito ? "Riferimento catalogo: " : ""}
-              {item.titolo?.startsWith("Catalogo —") ? "" : "Principale: "}
+              {item.prodotto_nome !== item.titolo ? "Principale: " : ""}
               {item.prodotto_nome}
             </span>
             {mostraDose ? (
@@ -183,10 +221,15 @@ function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinInterven
       </button>
       {open ? (
         <div className="dash-month__body">
-          {mese.giorni.map(({ data, items }) => (
-            <section key={data} className="dash-day">
+          {mese.giorni.map(({ data, items }) => {
+            const scaduti = items.filter((i) => i.isRitardo).length;
+            return (
+            <section key={data} className={`dash-day${scaduti ? " dash-day--ritardo" : ""}`}>
               <h4 className="dash-day__date">
                 <time dateTime={data}>{formatDataIt(data)}</time>
+                {scaduti ? (
+                  <span className="dash-day__ritardo">{scaduti} in ritardo</span>
+                ) : null}
                 <span className="dash-day__count">{items.length} lavori</span>
               </h4>
               <ul className="intervento-list">
@@ -200,7 +243,8 @@ function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinInterven
                 ))}
               </ul>
             </section>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </section>
@@ -618,6 +662,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         </section>
       </div>
 
+      <AbitudiniPratoCard profile={profile} />
+
       <section className="dash-calendar">
         <div className="dash-calendar__head">
           <h2>Calendario lavori</h2>
@@ -647,7 +693,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         {soloControlliFoto ? (
           <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
             Vedi solo i <strong>controlli foto mensili</strong> perché il piano annuale lavori non è ancora stato
-            generato. Clicca «Genera piano annuale completo» per tagli, concimi, diserbi e tutti i lavori stagionali.
+            generato. Clicca «Genera piano annuale completo» per concimi, diserbi e lavori strategici stagionali.
           </p>
         ) : null}
 

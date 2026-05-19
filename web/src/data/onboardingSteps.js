@@ -192,6 +192,34 @@ export const ONBOARDING_STEPS = [
     ],
   },
   {
+    id: "livello_impegno",
+    field: "livello_impegno",
+    title: "Quanto vuoi impegnarti col prato?",
+    intro:
+      "Definisce quanti trattamenti strategici mettiamo in calendario (concimi, biostimolanti, trattamenti). Taglio e irrigazione restano nelle tue abitudini in Dashboard.",
+    whatToDo: "Scegli il livello che preferisci. Potrai cambiarlo dal profilo in seguito.",
+    options: [
+      {
+        value: "base",
+        label: "Base",
+        desc: "Solo essenziale (~20 interventi/anno)",
+        help: "Concimi principali primavera/autunno e controlli foto. Niente liquidi mensili.",
+      },
+      {
+        value: "pro",
+        label: "Pro",
+        desc: "Cura estiva e preventiva (~35 interventi)",
+        help: "Aggiunge microbiologia preventiva e gestione idrica/biostimolanti estivi.",
+      },
+      {
+        value: "greenkeeper",
+        label: "Greenkeeper",
+        desc: "Massima cura (~50 interventi)",
+        help: "Spoon-feeding, miscele biostimolanti, micorrize e tank-mix liquidi.",
+      },
+    ],
+  },
+  {
     id: "frequenza_taglio",
     field: "frequenza_taglio",
     title: "Ogni quanto tagli?",
@@ -355,6 +383,11 @@ export const LABELS = {
     bassa_manutenzione: "Bassa manutenzione",
     non_so: "—",
   },
+  livello_impegno: {
+    base: "Impegno base",
+    pro: "Impegno Pro",
+    greenkeeper: "Greenkeeper",
+  },
   frequenza_taglio: {
     settimanale: "Taglio settimanale",
     robot: "Robot tagliaerba",
@@ -414,6 +447,7 @@ export function profileSummary(profile) {
     "irrigazione",
     "eta_prato",
     "obiettivo",
+    "livello_impegno",
     "frequenza_taglio",
     "altezza_taglio_cm",
     "animali",

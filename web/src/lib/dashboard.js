@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { filtraCalendarioStrategico } from "./abitudiniPrato.js";
 
 function formatDbError(error) {
   if (error?.code === "PGRST205") {
@@ -180,30 +181,51 @@ export function groupInterventi(list) {
 export function groupInterventiPerGiorno(list, { maxGiorni = 365 } = {}) {
   const oggi = new Date().toISOString().slice(0, 10);
   const pianificati = sortInterventiCronologico(
-    list.filter((i) => i.stato === "pianificato" && i.data_prevista)
+    filtraCalendarioStrategico(
+      list.filter((i) => i.stato === "pianificato" && i.data_prevista),
+    ),
   );
 
   const byDay = new Map();
   for (const item of pianificati) {
-    if (item.data_prevista < oggi) continue;
-    if (!byDay.has(item.data_prevista)) byDay.set(item.data_prevista, []);
-    byDay.get(item.data_prevista).push(item);
+    const inRitardo = item.data_prevista < oggi;
+    const giorno = inRitardo ? oggi : item.data_prevista;
+    if (!byDay.has(giorno)) byDay.set(giorno, []);
+    byDay.get(giorno).push({
+      ...item,
+      isRitardo: inRitardo,
+      data_originale: inRitardo ? item.data_prevista : undefined,
+    });
   }
 
-  return [...byDay.entries()]
-    .slice(0, maxGiorni)
-    .map(([data, items]) => ({
-      data,
-      items: sortInterventiCronologico(items),
-    }));
+  const giorni = [...byDay.entries()].map(([data, items]) => ({
+    data,
+    items: sortInterventiCronologico(
+      [...items].sort((a, b) => (b.isRitardo ? 1 : 0) - (a.isRitardo ? 1 : 0)),
+    ),
+  }));
+
+  giorni.sort((a, b) => {
+    if (a.data === oggi && b.data !== oggi) return -1;
+    if (b.data === oggi && a.data !== oggi) return 1;
+    return a.data.localeCompare(b.data);
+  });
+
+  return giorni.slice(0, maxGiorni);
 }
 
 /** Elenco lineare dei prossimi lavori (fallback se serve). */
 export function prossimiInterventi(list, limit = 120) {
   const oggi = new Date().toISOString().slice(0, 10);
-  return sortInterventiCronologico(
-    list.filter((i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista >= oggi)
-  ).slice(0, limit);
+  const mapped = filtraCalendarioStrategico(
+    list.filter((i) => i.stato === "pianificato" && i.data_prevista),
+  ).map((i) => {
+    if (i.data_prevista < oggi) {
+      return { ...i, isRitardo: true, data_originale: i.data_prevista, data_prevista: oggi };
+    }
+    return i;
+  });
+  return sortInterventiCronologico(mapped).slice(0, limit);
 }
 
 export function haCalendarioStagionale(list) {
@@ -233,7 +255,7 @@ export function filtraInterventiPerCalendario(
   { tipo = "tutti", ambito = "anno", meseCorrente } = {},
 ) {
   const cfg = CALENDARIO_TIPO_FILTRI[tipo] ?? CALENDARIO_TIPO_FILTRI.tutti;
-  let out = list;
+  let out = filtraCalendarioStrategico(list);
 
   if (cfg.categorie) {
     out = out.filter((i) => cfg.categorie.includes(i.categoria));
@@ -250,7 +272,7 @@ export function filtraInterventiPerCalendario(
 export function contaLavoriPianificatiFiltrati(list, opts) {
   const oggi = new Date().toISOString().slice(0, 10);
   return filtraInterventiPerCalendario(list, opts).filter(
-    (i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista >= oggi,
+    (i) => i.stato === "pianificato" && i.data_prevista,
   ).length;
 }
 
