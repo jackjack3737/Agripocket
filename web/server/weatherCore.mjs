@@ -57,11 +57,39 @@ export function getAgronomicAdvice(weather) {
   return { status: "Tempo favorevole", advice: "Buono per taglio e concime.", color: "#2E7D32" };
 }
 
+function isItalianCap(value) {
+  return /^\d{5}$/.test(String(value || "").trim());
+}
+
+/** CAP italiano: Open-Meteo non li risolve (es. 40100 → Dax FR). */
+async function geocodeItalianCap(cap) {
+  const zip = cap.trim();
+  const url =
+    `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}` +
+    `&country=Italy&format=jsonv2&addressdetails=1&limit=1`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "AgriPocket/1.0 (turfgrass app; contact: support@agripocket.local)" },
+  });
+  if (!res.ok) throw new Error(`Geocoding CAP: ${res.status}`);
+  const data = await res.json();
+  const hit = data?.[0];
+  if (!hit) throw new Error(`CAP non trovato in Italia: ${zip}`);
+  const addr = hit.address ?? {};
+  const name = addr.city || addr.town || addr.municipality || addr.village || hit.name || zip;
+  return {
+    lat: Number(hit.lat),
+    lon: Number(hit.lon),
+    name,
+    country: "IT",
+    admin1: addr.state || addr.region,
+  };
+}
+
 async function geocodeOpenMeteo(city) {
   const q = city.trim();
   const url =
     `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}` +
-    `&count=5&language=it`;
+    `&count=8&language=it`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Geocoding meteo: ${res.status}`);
   const data = await res.json();
@@ -111,11 +139,23 @@ async function geocodeOpenWeather(city, apiKey) {
   return { lat: data[0].lat, lon: data[0].lon, name: data[0].name, country: data[0].country };
 }
 
-async function fetchCurrentOpenWeather(city, apiKey) {
-  const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=it`;
+async function fetchCurrentOpenWeatherAt(lat, lon, apiKey) {
+  const url =
+    `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}` +
+    `&appid=${apiKey}&units=metric&lang=it`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.cod !== 200) throw new Error(data.message || "Meteo non disponibile per questa località");
+  return data;
+}
+
+async function fetchCurrentOpenWeatherZip(cap, apiKey) {
+  const url =
+    `https://api.openweathermap.org/data/2.5/weather?zip=${encodeURIComponent(cap)},IT` +
+    `&appid=${apiKey}&units=metric&lang=it`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.cod !== 200) throw new Error(data.message || "Meteo non disponibile per questo CAP");
   return data;
 }
 
@@ -184,23 +224,49 @@ export function formatWeatherForPrompt(bundle) {
  * @param {string} city - città o CAP
  * @param {string} [apiKey] - OpenWeather opzionale
  */
+async function resolveGeo(city, apiKey) {
+  const q = city.trim();
+  if (isItalianCap(q)) {
+    try {
+      return await geocodeItalianCap(q);
+    } catch (capErr) {
+      if (apiKey) {
+        try {
+          return await geocodeOpenWeather(`${q},IT`, apiKey);
+        } catch {
+          throw capErr;
+        }
+      }
+      throw capErr;
+    }
+  }
+  if (apiKey) {
+    try {
+      return await geocodeOpenWeather(q, apiKey);
+    } catch {
+      return geocodeOpenMeteo(q);
+    }
+  }
+  return geocodeOpenMeteo(q);
+}
+
 export async function fetchWeatherBundle(city, apiKey) {
   if (!city?.trim()) throw new Error("Inserisci città o CAP");
 
+  const q = city.trim();
   const key = apiKey?.trim();
-  let geo;
+  const geo = await resolveGeo(q, key);
   let current;
 
   if (key) {
     try {
-      geo = await geocodeOpenWeather(city, key);
-      current = await fetchCurrentOpenWeather(city, key);
+      current = isItalianCap(q)
+        ? await fetchCurrentOpenWeatherZip(q, key)
+        : await fetchCurrentOpenWeatherAt(geo.lat, geo.lon, key);
     } catch {
-      geo = await geocodeOpenMeteo(city);
       current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
     }
   } else {
-    geo = await geocodeOpenMeteo(city);
     current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
   }
 

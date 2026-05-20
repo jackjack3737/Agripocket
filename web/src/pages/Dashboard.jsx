@@ -313,6 +313,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
   const summary = profileSummary(profile);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState("");
   const [interventi, setInterventi] = useState([]);
   const [ultimaAnalisi, setUltimaAnalisi] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -440,12 +441,20 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
   useEffect(() => {
     if (!profile?.localita) {
       setWeather(null);
+      setWeatherError("");
       return;
     }
     setWeatherLoading(true);
+    setWeatherError("");
     fetchMeteoForCity(profile.localita)
-      .then(setWeather)
-      .catch(() => setWeather(null))
+      .then((bundle) => {
+        setWeather(bundle);
+        setWeatherError("");
+      })
+      .catch((e) => {
+        setWeather(null);
+        setWeatherError(e.message || "Meteo non disponibile");
+      })
       .finally(() => setWeatherLoading(false));
   }, [profile?.localita]);
 
@@ -568,6 +577,9 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             </p>
           )}
           {weatherLoading ? <p className="dash-card__loading">Caricamento meteo…</p> : null}
+          {weatherError && !weatherLoading ? (
+            <p className="form-msg form-msg--error">{weatherError}</p>
+          ) : null}
           {weather ? <WeatherCard bundle={weather} compact /> : null}
         </section>
 

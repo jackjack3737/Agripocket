@@ -3,7 +3,7 @@
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 function cacheKey(city) {
-  return `agripocket_meteo_${city.trim().toLowerCase()}`;
+  return `agripocket_meteo_v2_${city.trim().toLowerCase()}`;
 }
 
 export async function fetchMeteoForCity(city) {
