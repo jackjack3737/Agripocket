@@ -76,13 +76,39 @@ function addMonthsYyyyMm(yyyyMm, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Voce calendario «foto mensile» (qualsiasi fonte). */
+export function isControlloMensileFoto(item) {
+  if (item?.fonte === "controllo_mensile") return true;
+  const t = String(item?.titolo || "").toLowerCase();
+  return t.includes("controllo mensile") && t.includes("foto");
+}
+
 /** Inserisce controlli mensili foto mancanti (12 mesi avanti). */
 export async function syncControlliMensili(userId) {
   const oggi = new Date().toISOString().slice(0, 10);
   const list = await loadInterventi(userId);
-  const mesiPresenti = new Set(
-    list.filter((i) => i.fonte === "controllo_mensile").map((i) => (i.data_prevista || "").slice(0, 7)),
-  );
+
+  const byMonth = new Map();
+  for (const item of list.filter(isControlloMensileFoto)) {
+    const mk = (item.data_prevista || "").slice(0, 7);
+    if (!mk) continue;
+    if (!byMonth.has(mk)) byMonth.set(mk, []);
+    byMonth.get(mk).push(item);
+  }
+
+  for (const [, items] of byMonth) {
+    if (items.length <= 1) continue;
+    const keep =
+      items.find((i) => i.fonte === "controllo_mensile") ||
+      items.find((i) => i.stato === "pianificato") ||
+      items[0];
+    for (const dup of items) {
+      if (dup.id === keep.id) continue;
+      await supabase.from("prato_interventi").delete().eq("id", dup.id);
+    }
+  }
+
+  const mesiPresenti = new Set([...byMonth.keys()]);
 
   const rows = [];
   let monthKey = oggi.slice(0, 7);

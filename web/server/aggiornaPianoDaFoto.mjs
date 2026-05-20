@@ -14,6 +14,7 @@ import {
   buildInterventiPatologiaEmergenza,
   rimuoviRoutineCalendario,
 } from "./sanitizzaCalendario.mjs";
+import { estraiPatologieConfermate, registraStoricoPatologie } from "./storicoPatologie.mjs";
 
 function oggiIso() {
   return new Date().toISOString().slice(0, 10);
@@ -175,6 +176,15 @@ export async function integraFotoNelPiano({
   let concimiRimossi = 0;
   const oggi = oggiIso();
 
+  let storicoPatologie = { inseriti: 0, patologie: [] };
+  if (estraiPatologieConfermate(vision).length) {
+    try {
+      storicoPatologie = await registraStoricoPatologie(admin, userId, vision);
+    } catch (e) {
+      console.warn("[piano-foto] storico patologie:", e.message);
+    }
+  }
+
   const emergenza = buildInterventiPatologiaEmergenza(vision, profilo, oggi);
   if (emergenza.aggiunti.length) {
     const fine = addDaysIso(oggi, emergenza.finestraGiorni ?? 21);
@@ -289,6 +299,7 @@ export async function integraFotoNelPiano({
     aggiornatiCalendario: aggiornati.length,
     annullatiCalendario: annullati,
     concimiRimossiPatologia: concimiRimossi,
+    storicoPatologie,
     inseriti,
     aggiornati,
   };

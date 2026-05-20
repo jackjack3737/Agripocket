@@ -9,7 +9,7 @@ import { hintParassitiRegionali } from "./parassitiPrato.mjs";
 import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
 import { formatProfileForPrompt } from "./profileContext.mjs";
 import { configLivelloImpegno, testoLivelloPerPrompt } from "./livelloImpegno.mjs";
-import { sanitizzaPianoCompleto } from "./sanitizzaCalendario.mjs";
+import { applicaRegolaTrasemina, sanitizzaPianoCompleto } from "./sanitizzaCalendario.mjs";
 import {
   REGOLE_FITOFARMACI_PROMPT,
   filtraInterventiFitofarmacoCurativo,
@@ -194,7 +194,7 @@ Obiettivo: elencare i lavori STRATEGICI del prato (NON taglio né irrigazione ge
 - Biostimolanti e stress (caldo, siccità) — in luglio/agosto NO concimi azotati, solo antistress
 - Agenti umettanti (solo livello Pro/Greenkeeper)
 - Solo marca BOTTOS per concimi, biostimolanti, umettanti, ammendanti
-- Rinnovo / overseeding zone ombra se indicate in mappa
+- Overseeding/semina SOLO abbinato ad arieggiatura o scarifica nello stesso mese (vedi regola TRASEMINA)
 - Pulizia foglie, controllo feltro, bordi
 
 ${REGOLE_FITOFARMACI_PROMPT}
@@ -216,6 +216,7 @@ REGOLE TASSATIVE:
 1. LIVELLO UTENTE: ${testoLivelloPerPrompt(profilo)}. Massimo ${cfgLivello.maxInterventi} interventi strategici. Se Base, ignora trattamenti liquidi mensili ripetuti.
 2. ROUTINE: NON generare mai task per taglio o irrigazione generica (settimanali o ricorrenti).
 3. TANK-MIX: Se in un mese prevedi più prodotti liquidi compatibili (es. Tryko Plus + Vigor Liquid, Pre-Stress + Always), uniscili in UN solo intervento "Tank-Mix: [Nome]" con miscela in descrizione.
+4. REGOLA TRASEMINA: Non generare MAI interventi isolati di categoria "rinnovo" (semina/trasemina). Il seme va consigliato ESCLUSIVAMENTE in abbinamento o nello stesso mese di un intervento di "arieggiatura" o "scarifica". Se non c'è arieggiatura nello stesso mese, non c'è trasemina.
 
 Regole aggiuntive:
 - Distribuisci su tutto l'anno (non ammassare in una settimana).
@@ -268,7 +269,9 @@ Regole aggiuntive:
   }
 
   parsedList = filtraInterventiFitofarmacoCurativo(parsedList, { vision, profilo });
+  parsedList = applicaRegolaTrasemina(parsedList);
   parsedList = ensureOmbraOverseedInterventi(parsedList, profilo?.prato_zone, profilo, oggi, addDays);
+  parsedList = applicaRegolaTrasemina(parsedList);
 
   return parsedList;
 }
@@ -294,7 +297,7 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
     stato: "pianificato",
     data_prevista: i.data_prevista,
     ordine: i.ordine,
-    fonte: "calendario_stagionale",
+    fonte: i.fonte || "calendario_stagionale",
     prodotto_id: i.prodotto_id ?? null,
     prodotto_nome: i.prodotto_nome ?? null,
     dose_totale: i.dose_totale ?? null,

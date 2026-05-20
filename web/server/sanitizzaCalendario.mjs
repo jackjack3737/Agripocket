@@ -169,4 +169,40 @@ export function buildInterventiPatologiaEmergenza(vision, profilo, oggi) {
   return { aggiunti: [curativo, recupero], concimiRimossi: 0, finestraGiorni: 21 };
 }
 
+const MESE_AEREGG = /ariegg|scarific|svasatur|feltro|thatch/i;
+
+function meseKey(iso) {
+  return (iso || "").slice(0, 7);
+}
+
+/**
+ * Rinnovo/trasemina solo se nello stesso mese c'è arieggiatura o scarifica.
+ * Rimuove interventi rinnovo isolati generati dall'LLM.
+ */
+export function applicaRegolaTrasemina(interventi) {
+  const byMonth = new Map();
+  for (const i of interventi) {
+    const mk = meseKey(i.data_prevista);
+    if (!mk) continue;
+    if (!byMonth.has(mk)) byMonth.set(mk, { rinnovi: [], arieggiatura: false });
+    const bucket = byMonth.get(mk);
+    const cat = String(i.categoria || "").toLowerCase();
+    if (cat === "rinnovo") bucket.rinnovi.push(i);
+    else if (cat === "arieggiatura" || MESE_AEREGG.test(`${i.titolo} ${i.descrizione}`)) {
+      bucket.arieggiatura = true;
+    }
+  }
+
+  const rinnoviOrfani = new Set();
+  for (const [, bucket] of byMonth) {
+    if (bucket.rinnovi.length && !bucket.arieggiatura) {
+      for (const r of bucket.rinnovi) rinnoviOrfani.add(r);
+    }
+  }
+
+  if (!rinnoviOrfani.size) return interventi;
+
+  return interventi.filter((i) => !rinnoviOrfani.has(i));
+}
+
 export { normalizzaLivelloImpegno };

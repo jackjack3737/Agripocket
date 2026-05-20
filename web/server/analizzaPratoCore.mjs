@@ -60,6 +60,42 @@ function normalizePunteggiAssi(vision) {
   return vision;
 }
 
+const PATTERN_GEOMETRICO_OK = new Set([
+  "circolare",
+  "irregolare",
+  "diffuso",
+  "lineare",
+  "nessuno",
+]);
+
+const COLORI_DOMINANTI_OK = new Set([
+  "verde_scuro",
+  "verde_chiaro",
+  "verde_brillante",
+  "ingiallito_non_valutabile",
+]);
+
+function normalizeColoreDominante(vision) {
+  if (!vision || typeof vision !== "object") return vision;
+  const c = String(vision.colore_dominante || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_");
+  vision.colore_dominante = COLORI_DOMINANTI_OK.has(c) ? c : "ingiallito_non_valutabile";
+  return vision;
+}
+
+function normalizeVisionGeometria(vision) {
+  if (!vision || typeof vision !== "object") return vision;
+  const p = String(vision.pattern_geometrico || "nessuno")
+    .toLowerCase()
+    .trim();
+  vision.pattern_geometrico = PATTERN_GEOMETRICO_OK.has(p) ? p : "nessuno";
+  vision.danno_localizzato = Boolean(vision.danno_localizzato);
+  vision.diagnosi_avanzata = String(vision.diagnosi_avanzata || "").trim().slice(0, 900);
+  return vision;
+}
+
 async function queryKnowledgeBase(admin, embedding) {
   const attempts = [
     { match_count: 6, match_threshold: 0.22 },
@@ -178,13 +214,17 @@ Rispondi SOLO JSON valido (italiano), forma:
     { "nome": "Lolium perenne", "confidenza": "alta|media|bassa", "motivo": "perché dalla foto" }
   ],
   "stato_generale": "ottimo|buono|discreto|critico",
+  "colore_dominante": "verde_scuro|verde_chiaro|verde_brillante|ingiallito_non_valutabile",
   "problemi_rilevati": [{ "problema": "", "gravita": "bassa|media|alta", "dettaglio": "" }],
   "taglio": { "altezza_stimata_cm": "", "giudizio": "troppo_basso|corretto|troppo_alto|non_valutabile", "note": "" },
   "feltro_thatch": { "presente": true|false, "note": "" },
   "foglie_debris": { "eccesso_foglie": true|false, "note": "" },
   "stress_idrici": { "segni": true|false, "note": "" },
-  "malattie_sospette": [],
-  "erbette_infestanti": [],
+  "pattern_geometrico": "circolare|irregolare|diffuso|lineare|nessuno",
+  "danno_localizzato": false,
+  "diagnosi_avanzata": "Incrocia pattern visivo con zone critiche (ombra, irrigatori, bordi, passaggio). Es. macchie circolari → sospetto fungino; ingiallimento diffuso → stress idrico o carenza N.",
+  "malattie_sospette": [{ "nome": "", "gravita": "bassa|media|alta", "note": "" }],
+  "erbette_infestanti": [{ "nome": "", "gravita": "bassa|media|alta", "note": "" }],
   "parassiti_sottoprato": [
     { "tipo": "popillia|otiorrinco|altro", "segni": "zone marroni, prato che si stacca, larve visibili o sospette", "gravita": "bassa|media|alta", "note": "" }
   ],
@@ -209,6 +249,15 @@ VALUTAZIONE stato_generale (importante per il punteggio utente):
 - problemi_rilevati: solo difetti REALI e visibili; se il prato è bello lascia [] o al massimo 1 voce "bassa".
 - malattie_sospette, erbette_infestanti, parassiti_sottoprato: array vuoti se non vedi evidenza chiara (non ipotizzare).
 
+DIAGNOSTICA SPAZIALE (obbligatoria):
+- pattern_geometrico: forma del danno (circolare tipico funghi a ciambella; diffuso = stress/clorosi; lineare = passaggio/irrigazione).
+- danno_localizzato: true se il problema è in macchie/zone, false se uniforme su tutto il tappeto.
+- diagnosi_avanzata: 2-4 frasi da greenkeeper collegando pattern + contesto profilo (ombra, bordi, irrigatori).
+
+COLORE FOGLIARE (obbligatorio per color-matching sementi):
+- colore_dominante: genetica cromatica del prato sano (verde scuro / chiaro / brillante). Se ingiallimento da stress o carenza evidente, usa ingiallito_non_valutabile.
+- Determina il colore del tappeto sano, non delle macchie malate. Serve per consigliare la semente corretta in trasemina ed evitare l'effetto arlecchino.
+
 PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
 - Compila punteggi_assi con 6 NUMERI INTERI (non stringhe), uno per asse, da 0 a 100.
 - Prato uniformemente verde, denso e curato: valori tipici 85-95 su tutti gli assi.
@@ -228,6 +277,8 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
     vision = { sintesi_visiva: visionRaw, query_ricerca_kb: visionRaw.slice(0, 200) };
   }
   vision = normalizePunteggiAssi(vision);
+  vision = normalizeVisionGeometria(vision);
+  vision = normalizeColoreDominante(vision);
 
   const speciesFromVision = (vision.specie_probabili || [])
     .map((s) => (typeof s === "string" ? s : s?.nome))

@@ -240,6 +240,15 @@ export function ensureOmbraOverseedInterventi(interventi, pratoZone, profilo, og
   return [
     ...interventi,
     {
+      titolo: "Arieggiatura leggera pre-overseeding (zone ombra)",
+      descrizione:
+        "Scarifica/arieggiatura superficiale sulle zone ombra prima della semina, per migliorare il contatto seme-terreno.",
+      priorita: seed.pctTotal >= 40 ? "alta" : "media",
+      categoria: "arieggiatura",
+      data_prevista: data,
+      ordine: 4199,
+    },
+    {
       titolo: `Overseeding zone ombra (${seed.totalMq} m²)`,
       descrizione: [
         `Rinnovo mirato sulle ${seed.zones.length} zone in ombra (${seed.totalMq} m², ${seed.pctTotal}% prato).`,

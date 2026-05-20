@@ -5,6 +5,12 @@ import {
   preferisciPoolBottos,
 } from "./bottosFitofarmaci.mjs";
 import { bonusConcimePerProfilo, livelloConcimiTarget, tierConcime } from "./livelloConcimi.mjs";
+import { bonusLivelloImpegno, filtraPoolPerLivelloImpegno } from "./livelloProdotti.mjs";
+import {
+  appendNotaMatchCromatico,
+  filtraPoolSementiPerColore,
+  scoreMatchCromaticoSemente,
+} from "./colorMatchingSementi.mjs";
 import {
   analizzaParassiti,
   filtraInsetticidaPerParassita,
@@ -200,6 +206,12 @@ export function scoreProdotto(p, { categoriaIntervento, vision, intervento, prof
     score += bonusConcimePerProfilo(p, profilo);
   }
 
+  score += bonusLivelloImpegno(p, profilo);
+
+  if (categoriaIntervento === "rinnovo") {
+    score += scoreMatchCromaticoSemente(p, vision?.colore_dominante);
+  }
+
   return score;
 }
 
@@ -256,7 +268,11 @@ export function rankProdotti(prodotti, opts) {
   if (opts.categoriaIntervento === "diserbo") {
     grezzo = restringiPoolDiserbo(grezzo, opts.intervento);
   }
-  const pool = filtraProdottiConsumer(filtraPoolMarca(grezzo));
+  if (opts.categoriaIntervento === "rinnovo") {
+    grezzo = filtraPoolSementiPerColore(grezzo, opts.vision);
+  }
+  let pool = filtraProdottiConsumer(filtraPoolMarca(grezzo));
+  pool = filtraPoolPerLivelloImpegno(pool, opts.profilo);
   return pool
     .map((p) => ({ p, score: scoreProdotto(p, opts) }))
     .sort((a, b) => {
@@ -301,6 +317,11 @@ function motiviPunteggio(p, opts, score) {
     const target = livelloConcimiTarget(opts.profilo);
     const tier = tierConcime(p);
     if (tier === target) motivi.push(`concime ${tier} (coerente con obiettivo)`);
+  }
+  const imp = opts.profilo?.livello_impegno;
+  if (imp) motivi.push(`linea prodotto coerente con impegno ${imp}`);
+  if (opts.categoriaIntervento === "rinnovo" && opts.vision?.colore_dominante) {
+    motivi.push(`match cromatico (${opts.vision.colore_dominante})`);
   }
   if (!motivi.length) motivi.push(`punteggio totale ${score}`);
   return motivi;
@@ -365,7 +386,11 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
   if (!prodotto) {
     return {
       ...intervento,
-      descrizione: [intervento.descrizione, !mq ? AVVISO_MQ_MANCANTI : null].filter(Boolean).join(" ").slice(0, 500),
+      descrizione: appendNotaMatchCromatico(
+        [intervento.descrizione, !mq ? AVVISO_MQ_MANCANTI : null].filter(Boolean).join(" "),
+        vision,
+        intervento.categoria,
+      ).slice(0, 500),
     };
   }
 
@@ -375,11 +400,20 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
       ...intervento,
       prodotto_id: prodotto.id,
       prodotto_nome: prodotto.nome,
-      descrizione: [intervento.descrizione, ...blocchi, AVVISO_MQ_MANCANTI].filter(Boolean).join(" ").slice(0, 1200),
+      descrizione: appendNotaMatchCromatico(
+        [intervento.descrizione, ...blocchi, AVVISO_MQ_MANCANTI].filter(Boolean).join(" "),
+        vision,
+        intervento.categoria,
+      ).slice(0, 1200),
     };
   }
 
   const extra = `Dose principale (${prodotto.nome}): ${dose.testo}.`;
+  const descrizioneFinale = appendNotaMatchCromatico(
+    [intervento.descrizione, extra, ...blocchi].filter(Boolean).join(" "),
+    vision,
+    intervento.categoria,
+  );
   return {
     ...intervento,
     prodotto_id: prodotto.id,
@@ -389,7 +423,7 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
     dose_per_mq: dose.dose_per_mq,
     dose_display: dose.dose_display,
     avviso_fitofarmaco: false,
-    descrizione: [intervento.descrizione, extra, ...blocchi].filter(Boolean).join(" ").slice(0, 1200),
+    descrizione: descrizioneFinale.slice(0, 1200),
   };
 }
 
