@@ -69,54 +69,56 @@ export default function StatoClinicoWidget({
     : "—";
 
   return (
-    <section
-      className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
-      aria-live="polite"
-    >
-      <div className="stato-clinico__header">
-        <h2 className="stato-clinico__title">Stato clinico attuale</h2>
-        <span className={`stato-clinico__semaforo stato-clinico__semaforo--${stato.livello}`}>
-          <span className="stato-clinico__dot" aria-hidden />
-          {stato.label}
-        </span>
-      </div>
+    <>
+      <section
+        className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
+        aria-live="polite"
+      >
+        <div className="stato-clinico__header">
+          <h2 className="stato-clinico__title">Stato clinico attuale</h2>
+          <span className={`stato-clinico__semaforo stato-clinico__semaforo--${stato.livello}`}>
+            <span className="stato-clinico__dot" aria-hidden />
+            {stato.label}
+          </span>
+        </div>
 
-      <div className="stato-clinico__body">
-        <div className="stato-clinico__thumb">
-          {thumbUrl ? (
-            <img src={thumbUrl} alt="Ultima analisi foto prato" />
-          ) : (
-            <div className="stato-clinico__thumb-placeholder">
-              <span>Nessuna foto</span>
-              <Link to="/chat">Analizza</Link>
-            </div>
-          )}
+        <div className="stato-clinico__body">
+          <div className="stato-clinico__thumb">
+            {thumbUrl ? (
+              <img src={thumbUrl} alt="Ultima analisi foto prato" />
+            ) : (
+              <div className="stato-clinico__thumb-placeholder">
+                <span>Nessuna foto</span>
+                <Link to="/chat">Analizza</Link>
+              </div>
+            )}
+          </div>
+          <div className="stato-clinico__meta">
+            <p>
+              <strong>Zona:</strong> {zonaNome || "Prato principale"}
+            </p>
+            <p>
+              <strong>Ultima analisi:</strong> {dataLabel}
+            </p>
+            <p className="stato-clinico__motivo">{stato.motivo}</p>
+          </div>
         </div>
-        <div className="stato-clinico__meta">
-          <p>
-            <strong>Zona:</strong> {zonaNome || "Prato principale"}
-          </p>
-          <p>
-            <strong>Ultima analisi:</strong> {dataLabel}
-          </p>
-          <p className="stato-clinico__motivo">{stato.motivo}</p>
-        </div>
-      </div>
+      </section>
 
       {haSintesi ? (
-        <div className="stato-clinico__sintesi">
+        <div className="stato-clinico-gemini">
           <button
             type="button"
-            className={`stato-clinico__sintesi-toggle${sintesiAperta ? " stato-clinico__sintesi-toggle--open" : ""}`}
+            className={`stato-clinico-gemini__toggle${sintesiAperta ? " stato-clinico-gemini__toggle--open" : ""}`}
             onClick={() => setSintesiAperta((v) => !v)}
             aria-expanded={sintesiAperta}
             aria-controls="stato-clinico-sintesi-panel"
           >
-            <span className="stato-clinico__sintesi-title">Analisi Gemini</span>
-            <span className="stato-clinico__sintesi-chevron" aria-hidden />
+            <span className="stato-clinico-gemini__label">Analisi Gemini</span>
+            <span className="stato-clinico-gemini__chevron" aria-hidden />
           </button>
           {sintesiAperta ? (
-            <div id="stato-clinico-sintesi-panel" className="stato-clinico__sintesi-panel">
+            <div id="stato-clinico-sintesi-panel" className="stato-clinico-gemini__panel">
               <SintesiAnalisiBlocks
                 visionJson={ultimaAnalisi.vision_json}
                 reportMarkdown={ultimaAnalisi.report_markdown}
@@ -126,6 +128,6 @@ export default function StatoClinicoWidget({
           ) : null}
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
