@@ -8,27 +8,118 @@
   margin-bottom: 1.5rem;
 }
 
-.dash-header__kicker {
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
+.dash-header__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
 }
 
-.dash-header h1 {
-  margin: 0 0 0.35rem;
+.dash-header__brand {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+.dash-header__kicker {
+  margin: 0 0 0.45rem;
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #4a7c59;
+}
+
+.dash-header__kicker::before {
+  content: "▸ ";
+  color: #81c784;
+  font-size: 0.55rem;
+}
+
+.dash-header__title {
+  margin: 0 0 0.4rem;
   font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 500;
+  line-height: 1.15;
+}
+
+.dash-header__title--tech {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.55rem;
+  font-size: clamp(1.65rem, 4.5vw, 2.2rem);
+  letter-spacing: -0.02em;
+}
+
+.dash-header__title-main {
+  background: linear-gradient(118deg, #143d28 0%, #2d6b47 42%, #1a4d32 88%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.dash-header__title-accent {
+  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  font-size: 0.78em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #3d8f5c;
+  opacity: 0.92;
+}
+
+.dash-header__chip {
+  margin: 0;
+}
+
+.dash-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-top: 0.15rem;
+}
+
+.dash-header__action {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.dash-header__action:hover {
+  color: var(--text);
+  background: #f0f5ee;
+  border-color: #e0ebe0;
+}
+
+.dash-header__action--logout:hover {
+  color: #b71c1c;
+  background: #ffebee;
+  border-color: #ffcdd2;
 }
 
 .dash-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  gap: 0.5rem 1rem;
   align-items: center;
-  margin-top: 1rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e4ebe4);
 }
 
 .dash-nav__link {
@@ -118,7 +209,8 @@
     height: 100%;
   }
 
-  .dash-card--wide {
+  .dash-card--wide,
+  .dash-grid__span {
     grid-column: 1 / -1;
   }
 }

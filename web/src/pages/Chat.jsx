@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import AppNav from "../components/AppNav";
+import DashPageHeader from "../components/DashPageHeader";
 import { profileSummary } from "../data/onboardingSteps";
 import { analizzaPratoFoto } from "../lib/analizzaPrato";
 import { setInterventoCompletato } from "../lib/dashboard";
@@ -144,13 +144,15 @@ export default function Chat({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page chat chat--photo">
-      <header className="chat-header">
-        <div>
-          <h1>Il tuo prato</h1>
-          {summary ? <p className="profile-chip">{summary}</p> : null}
-        </div>
-        <AppNav active="chat" onLogout={logout} />
-      </header>
+      <DashPageHeader
+        active="chat"
+        kicker="Solum · vision AI"
+        title="Analisi"
+        titleAccent="foto"
+        techTitle
+        summary={summary}
+        onLogout={logout}
+      />
 
       <section className="weather-setup">
         <form className="weather-setup__form" onSubmit={saveCity}>

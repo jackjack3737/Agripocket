@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import AppNav from "../components/AppNav";
+import DashPageHeader from "../components/DashPageHeader";
 import ProfileResetButton from "../components/ProfileResetButton";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
 import StatoClinicoWidget from "../components/StatoClinicoWidget";
+import StatoClinicoGeminiBar from "../components/StatoClinicoGeminiBar";
 import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
@@ -121,14 +122,15 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <header className="dash-header">
-        <div>
-          <p className="dash-header__kicker">Centrale prato</p>
-          <h1>La tua dashboard</h1>
-          {summary ? <p className="profile-chip">{summary}</p> : null}
-        </div>
-        <AppNav active="dashboard" onLogout={logout} />
-      </header>
+      <DashPageHeader
+        active="dashboard"
+        kicker="Solum · telemetry"
+        title="Centro"
+        titleAccent="controllo"
+        techTitle
+        summary={summary}
+        onLogout={logout}
+      />
 
       {banner ? (
         <p className="dash-banner">
@@ -229,6 +231,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             </p>
           ) : null}
         </section>
+
+        <StatoClinicoGeminiBar ultimaAnalisi={ultimaAnalisi} />
 
         {visionUltima?.richiede_analisi_suolo ? (
           <AnalisiSuoloAlert

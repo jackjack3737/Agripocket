@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import AppNav from "../components/AppNav";
+import DashPageHeader from "../components/DashPageHeader";
 import {
   CalendarioFiltri,
   InterventoSection,
@@ -210,14 +210,15 @@ export default function CalendarioLavori({ profile, session }) {
 
   return (
     <div className="page dashboard dashboard--calendario">
-      <header className="dash-header">
-        <div>
-          <p className="dash-header__kicker">Centrale prato</p>
-          <h1>Calendario lavori</h1>
-          {summary ? <p className="profile-chip">{summary}</p> : null}
-        </div>
-        <AppNav active="calendario" onLogout={logout} />
-      </header>
+      <DashPageHeader
+        active="calendario"
+        kicker="Solum · planning"
+        title="Calendario"
+        titleAccent="lavori"
+        techTitle
+        summary={summary}
+        onLogout={logout}
+      />
 
       {banner ? (
         <p className="dash-banner">

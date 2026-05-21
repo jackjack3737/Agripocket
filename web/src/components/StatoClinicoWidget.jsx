@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { calcolaStatoClinico } from "../lib/statoClinico";
 import { resolveSignedFotoFromAnalisi } from "../lib/fotoPrato";
-import { sintesiDaAnalisi } from "../lib/sintesiAnalisi";
-import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
-
 function parseVision(raw) {
   if (!raw) return null;
   if (typeof raw === "object") return raw;
@@ -22,8 +19,6 @@ export default function StatoClinicoWidget({
   userId,
 }) {
   const [thumbUrl, setThumbUrl] = useState(null);
-  const [sintesiAperta, setSintesiAperta] = useState(false);
-
   const vision = useMemo(
     () => parseVision(ultimaAnalisi?.vision_json),
     [ultimaAnalisi?.vision_json],
@@ -33,10 +28,6 @@ export default function StatoClinicoWidget({
     () => calcolaStatoClinico({ vision, weather, agronomic: weather?.agronomic }),
     [vision, weather],
   );
-
-  useEffect(() => {
-    setSintesiAperta(false);
-  }, [ultimaAnalisi?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,14 +43,6 @@ export default function StatoClinicoWidget({
     };
   }, [ultimaAnalisi?.id, ultimaAnalisi?.foto_path, ultimaAnalisi?.foto_url, userId]);
 
-  const haSintesi = useMemo(() => {
-    if (!ultimaAnalisi) return false;
-    return !sintesiDaAnalisi({
-      vision_json: ultimaAnalisi.vision_json,
-      report_markdown: ultimaAnalisi.report_markdown,
-    }).vuota;
-  }, [ultimaAnalisi?.vision_json, ultimaAnalisi?.report_markdown]);
-
   const dataLabel = ultimaAnalisi?.created_at
     ? new Date(ultimaAnalisi.created_at).toLocaleDateString("it-IT", {
         day: "numeric",
@@ -69,65 +52,39 @@ export default function StatoClinicoWidget({
     : "—";
 
   return (
-    <>
-      <section
-        className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
-        aria-live="polite"
-      >
-        <div className="stato-clinico__header">
-          <h2 className="stato-clinico__title">Stato clinico attuale</h2>
-          <span className={`stato-clinico__semaforo stato-clinico__semaforo--${stato.livello}`}>
-            <span className="stato-clinico__dot" aria-hidden />
-            {stato.label}
-          </span>
-        </div>
+    <section
+      className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
+      aria-live="polite"
+    >
+      <div className="stato-clinico__header">
+        <h2 className="stato-clinico__title">Stato clinico attuale</h2>
+        <span className={`stato-clinico__semaforo stato-clinico__semaforo--${stato.livello}`}>
+          <span className="stato-clinico__dot" aria-hidden />
+          {stato.label}
+        </span>
+      </div>
 
-        <div className="stato-clinico__body">
-          <div className="stato-clinico__thumb">
-            {thumbUrl ? (
-              <img src={thumbUrl} alt="Ultima analisi foto prato" />
-            ) : (
-              <div className="stato-clinico__thumb-placeholder">
-                <span>Nessuna foto</span>
-                <Link to="/chat">Analizza</Link>
-              </div>
-            )}
-          </div>
-          <div className="stato-clinico__meta">
-            <p>
-              <strong>Zona:</strong> {zonaNome || "Prato principale"}
-            </p>
-            <p>
-              <strong>Ultima analisi:</strong> {dataLabel}
-            </p>
-            <p className="stato-clinico__motivo">{stato.motivo}</p>
-          </div>
-        </div>
-      </section>
-
-      {haSintesi ? (
-        <div className="stato-clinico-gemini">
-          <button
-            type="button"
-            className={`stato-clinico-gemini__toggle${sintesiAperta ? " stato-clinico-gemini__toggle--open" : ""}`}
-            onClick={() => setSintesiAperta((v) => !v)}
-            aria-expanded={sintesiAperta}
-            aria-controls="stato-clinico-sintesi-panel"
-          >
-            <span className="stato-clinico-gemini__label">Analisi Gemini</span>
-            <span className="stato-clinico-gemini__chevron" aria-hidden />
-          </button>
-          {sintesiAperta ? (
-            <div id="stato-clinico-sintesi-panel" className="stato-clinico-gemini__panel">
-              <SintesiAnalisiBlocks
-                visionJson={ultimaAnalisi.vision_json}
-                reportMarkdown={ultimaAnalisi.report_markdown}
-                compact
-              />
+      <div className="stato-clinico__body">
+        <div className="stato-clinico__thumb">
+          {thumbUrl ? (
+            <img src={thumbUrl} alt="Ultima analisi foto prato" />
+          ) : (
+            <div className="stato-clinico__thumb-placeholder">
+              <span>Nessuna foto</span>
+              <Link to="/chat">Analizza</Link>
             </div>
-          ) : null}
+          )}
         </div>
-      ) : null}
-    </>
+        <div className="stato-clinico__meta">
+          <p>
+            <strong>Zona:</strong> {zonaNome || "Prato principale"}
+          </p>
+          <p>
+            <strong>Ultima analisi:</strong> {dataLabel}
+          </p>
+          <p className="stato-clinico__motivo">{stato.motivo}</p>
+        </div>
+      </div>
+    </section>
   );
 }
