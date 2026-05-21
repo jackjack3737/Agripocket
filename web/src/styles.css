@@ -43,9 +43,11 @@ body {
   position: fixed;
   inset: 0;
   z-index: 0;
+  background-color: #1a3d2e;
   background-size: cover;
   background-position: center;
-  opacity: 0.55;
+  opacity: 0.62;
+  transition: background-image 0.45s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {

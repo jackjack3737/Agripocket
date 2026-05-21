@@ -8,6 +8,7 @@ import {
   ADVANCED_FIELDS,
   EXTRA_STEP,
   ONBOARDING_STEPS,
+  DEFAULT_ONBOARDING_BG,
 } from "../data/onboardingSteps";
 import { formatMqInput, parseMqInput } from "../lib/parseMq";
 import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
@@ -191,7 +192,8 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
   const displayStep = isExtra ? totalSteps : step + 1;
   const selectedOption =
     stepData && !isMulti && value ? stepData.options.find((o) => o.value === value) : null;
-  const bgImage = selectedOption?.image ?? null;
+  const stepBg = isExtra ? EXTRA_STEP.backgroundImage : stepData?.backgroundImage;
+  const bgImage = selectedOption?.image ?? stepBg ?? DEFAULT_ONBOARDING_BG;
 
   const extraReady =
     isExtra &&
@@ -210,17 +212,15 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
 
   return (
     <div className="onboarding-shell">
-      {bgImage ? (
-        <div
-          key={bgImage}
-          className="onboarding-bg"
-          style={{ backgroundImage: `url(${bgImage})` }}
-          aria-hidden
-        />
-      ) : null}
-      {bgImage ? <div className="onboarding-bg-overlay" aria-hidden /> : null}
+      <div
+        key={bgImage}
+        className="onboarding-bg"
+        style={{ backgroundImage: `url(${bgImage})` }}
+        aria-hidden
+      />
+      <div className="onboarding-bg-overlay" aria-hidden />
 
-      <div className={`page onboarding${bgImage ? " onboarding--has-bg" : ""}`}>
+      <div className="page onboarding onboarding--has-bg">
         <div className="onboarding-content">
           {canLeaveProfile ? (
             <div className="onboarding-exit-bar">
