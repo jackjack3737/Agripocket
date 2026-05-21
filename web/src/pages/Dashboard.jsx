@@ -31,6 +31,7 @@ import {
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { fetchMeteoForCity } from "../lib/weatherClient";
+import { loadZonaDefault } from "../lib/zonePrato";
 import { savePratoProfilo, supabase } from "../lib/supabase";
 import {
   AVVISO_FITOFARMACO,
@@ -438,6 +439,15 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     handleGeneraPiano();
   }, [loading, userId, profile?.localita, hasPiano, generatingPiano]);
 
+  const [zonaDefault, setZonaDefault] = useState(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadZonaDefault(userId)
+      .then(setZonaDefault)
+      .catch(() => setZonaDefault(null));
+  }, [userId]);
+
   useEffect(() => {
     if (!profile?.localita) {
       setWeather(null);
@@ -446,7 +456,12 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     }
     setWeatherLoading(true);
     setWeatherError("");
-    fetchMeteoForCity(profile.localita)
+    const gps = zonaDefault?.coordinate_gps;
+    fetchMeteoForCity(profile.localita, {
+      zonaId: zonaDefault?.id,
+      lat: gps?.lat,
+      lon: gps?.lon,
+    })
       .then((bundle) => {
         setWeather(bundle);
         setWeatherError("");
@@ -456,7 +471,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         setWeatherError(e.message || "Meteo non disponibile");
       })
       .finally(() => setWeatherLoading(false));
-  }, [profile?.localita]);
+  }, [profile?.localita, zonaDefault?.id, zonaDefault?.coordinate_gps?.lat, zonaDefault?.coordinate_gps?.lon]);
 
   async function handleGeneraPiano() {
     setGeneratingPiano(true);
@@ -580,7 +595,9 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           {weatherError && !weatherLoading ? (
             <p className="form-msg form-msg--error">{weatherError}</p>
           ) : null}
-          {weather ? <WeatherCard bundle={weather} compact /> : null}
+          {weather ? (
+            <WeatherCard bundle={weather} compact zonaNome={zonaDefault?.nome_zona} />
+          ) : null}
         </section>
 
         <section className="dash-card dash-card--radar">

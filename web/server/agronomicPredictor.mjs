@@ -2,7 +2,7 @@
  * Motore predittivo agronomico: rischio fungino (finestra umido-caldo) e ET0 semplificata.
  *
  * Integrazione meteo:
- * - `fetchWeatherBundle` (weatherCore.mjs) fornisce `current` (OpenWeather o Open-Meteo)
+ * - `fetchWeatherBundle` (weatherCore.mjs) fornisce `current` e `agronomic` (Open-Meteo)
  *   e `history.rows` (ultimi 14 gg da Open-Meteo archive: tMin, tMax, pioggia).
  * - OpenWeather 2.5 /weather non espone radiazione solare: stimiamo Ra (MJ/m²/d) con
  *   latitudine + giorno dell'anno (Hargreaves) oppure proxy da weather_code Open-Meteo.

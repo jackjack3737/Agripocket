@@ -1,15 +1,19 @@
-export default function WeatherCard({ bundle, compact = false }) {
+export default function WeatherCard({ bundle, compact = false, zonaNome }) {
   if (!bundle?.current) return null;
 
   const temp = Math.round(bundle.current.main.temp);
   const desc = bundle.current.weather?.[0]?.description ?? "";
-  const { advice, history, location } = bundle;
+  const { advice, history, location, agronomic } = bundle;
+  const ag = agronomic;
 
   return (
     <section className={`weather-card${compact ? " weather-card--compact" : ""}`}>
       <div className="weather-card__main">
         <div>
-          <p className="weather-card__label">Meteo · {location}</p>
+          <p className="weather-card__label">
+            Meteo · {location}
+            {zonaNome ? ` · ${zonaNome}` : ""}
+          </p>
           <p className="weather-card__temp">{temp}°C</p>
           <p className="weather-card__desc">{desc}</p>
         </div>
@@ -18,6 +22,16 @@ export default function WeatherCard({ bundle, compact = false }) {
           <span>{advice.advice}</span>
         </div>
       </div>
+      {ag ? (
+        <p className="weather-card__agro">
+          {ag.et0_mm_oggi != null ? `ET0 ${ag.et0_mm_oggi} mm/g` : null}
+          {ag.gdd?.oggi != null ? ` · GDD oggi ${ag.gdd.oggi}` : null}
+          {ag.gdd?.cumul_30g != null ? ` · GDD 30 gg ${ag.gdd.cumul_30g}` : null}
+          {ag.soil_temperature_10cm_c != null
+            ? ` · Suolo 10 cm ${ag.soil_temperature_10cm_c}°C`
+            : null}
+        </p>
+      ) : null}
       {history ? (
         <p className="weather-card__history">
           Ultimi {history.days} giorni: {history.minAbs.toFixed(0)}–{history.maxAbs.toFixed(0)}°C

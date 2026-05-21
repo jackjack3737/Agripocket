@@ -56,17 +56,24 @@ export function analizzaPratoPlugin() {
 
         const url = new URL(req.url, "http://localhost");
         const city = url.searchParams.get("city");
+        const zonaId = url.searchParams.get("zonaId");
+        const lat = url.searchParams.get("lat");
+        const lon = url.searchParams.get("lon");
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Content-Type", "application/json");
 
-        if (req.method !== "GET" || !city) {
+        if (req.method !== "GET" || (!city && (!lat || !lon))) {
           res.statusCode = 400;
-          res.end(JSON.stringify({ error: "Parametro city richiesto" }));
+          res.end(JSON.stringify({ error: "Parametro city oppure lat/lon richiesti" }));
           return;
         }
 
         try {
-          const bundle = await fetchWeatherBundle(city, env.OPENWEATHER_API_KEY);
+          const bundle = await fetchWeatherBundle(city || "Zona", null, {
+            zonaId: zonaId || undefined,
+            lat: lat != null ? Number(lat) : undefined,
+            lon: lon != null ? Number(lon) : undefined,
+          });
           res.statusCode = 200;
           res.end(JSON.stringify(bundle));
         } catch (e) {

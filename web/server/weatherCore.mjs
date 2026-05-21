@@ -1,4 +1,10 @@
-/** Meteo agronomico — Open-Meteo (gratuito) + OpenWeather opzionale se c'è API key */
+/** Meteo agronomico — Open-Meteo (gratuito, senza API key) */
+
+import {
+  fetchOpenMeteoAgronomic,
+  formatAgronomicForPrompt,
+} from "./agronomicMeteo.mjs";
+import { persistMeteoZona } from "./zoneMeteo.mjs";
 
 const IT_MONTHS = [
   "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
@@ -75,11 +81,12 @@ async function geocodeItalianCap(cap) {
   const hit = data?.[0];
   if (!hit) throw new Error(`CAP non trovato in Italia: ${zip}`);
   const addr = hit.address ?? {};
-  const name = addr.city || addr.town || addr.municipality || addr.village || hit.name || zip;
+  const comune = addr.city || addr.town || addr.municipality || addr.village || hit.name || zip;
   return {
     lat: Number(hit.lat),
     lon: Number(hit.lon),
-    name,
+    name: comune,
+    comune,
     country: "IT",
     admin1: addr.state || addr.region,
   };
@@ -101,6 +108,7 @@ async function geocodeOpenMeteo(city) {
     lat: hit.latitude,
     lon: hit.longitude,
     name: hit.name,
+    comune: hit.name,
     country: hit.country_code ?? "IT",
     admin1: hit.admin1,
   };
@@ -130,33 +138,27 @@ async function fetchCurrentOpenMeteo(lat, lon, placeName) {
   };
 }
 
-async function geocodeOpenWeather(city, apiKey) {
-  const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(city.trim())}&limit=1&appid=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Geocoding meteo: ${res.status}`);
-  const data = await res.json();
-  if (!data?.length) throw new Error(`Località non trovata: ${city}`);
-  return { lat: data[0].lat, lon: data[0].lon, name: data[0].name, country: data[0].country };
-}
-
-async function fetchCurrentOpenWeatherAt(lat, lon, apiKey) {
-  const url =
-    `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}` +
-    `&appid=${apiKey}&units=metric&lang=it`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.cod !== 200) throw new Error(data.message || "Meteo non disponibile per questa località");
-  return data;
-}
-
-async function fetchCurrentOpenWeatherZip(cap, apiKey) {
-  const url =
-    `https://api.openweathermap.org/data/2.5/weather?zip=${encodeURIComponent(cap)},IT` +
-    `&appid=${apiKey}&units=metric&lang=it`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.cod !== 200) throw new Error(data.message || "Meteo non disponibile per questo CAP");
-  return data;
+function historyFromAgronomic(agronomic) {
+  const rows = agronomic?.gdd?.serie ?? [];
+  if (!rows.length) return null;
+  const temps = rows.flatMap((r) => [r.tMax, r.tMin].filter((t) => t != null));
+  return {
+    days: rows.length,
+    rows: rows.map((r) => ({
+      date: r.date,
+      tMax: r.tMax,
+      tMin: r.tMin,
+      rainMm: r.rain_mm ?? 0,
+      et0_mm: r.et0_mm,
+    })),
+    avgMax: rows.reduce((s, r) => s + (r.tMax ?? 0), 0) / rows.length,
+    avgMin: rows.reduce((s, r) => s + (r.tMin ?? 0), 0) / rows.length,
+    maxAbs: Math.max(...temps),
+    minAbs: Math.min(...temps),
+    frostDays: rows.filter((r) => r.tMin != null && r.tMin <= 2).length,
+    hotDays: rows.filter((r) => r.tMax != null && r.tMax >= 30).length,
+    rainyDays: rows.filter((r) => (r.rain_mm ?? 0) >= 5).length,
+  };
 }
 
 async function fetchRecentTemperatures(lat, lon, days = 14) {
@@ -217,71 +219,62 @@ export function formatWeatherForPrompt(bundle) {
     );
   }
   lines.push(`Mese corrente: ${IT_MONTHS[new Date().getMonth()]}.`);
+  if (bundle.agronomic) {
+    lines.push(formatAgronomicForPrompt(bundle.agronomic));
+  }
   return lines.join("\n");
 }
 
-/**
- * @param {string} city - città o CAP
- * @param {string} [apiKey] - OpenWeather opzionale
- */
-async function resolveGeo(city, apiKey) {
+/** Geocoding solo Open-Meteo + Nominatim (CAP IT). */
+async function resolveGeo(city) {
   const q = city.trim();
-  if (isItalianCap(q)) {
-    try {
-      return await geocodeItalianCap(q);
-    } catch (capErr) {
-      if (apiKey) {
-        try {
-          return await geocodeOpenWeather(`${q},IT`, apiKey);
-        } catch {
-          throw capErr;
-        }
-      }
-      throw capErr;
-    }
-  }
-  if (apiKey) {
-    try {
-      return await geocodeOpenWeather(q, apiKey);
-    } catch {
-      return geocodeOpenMeteo(q);
-    }
-  }
+  if (isItalianCap(q)) return geocodeItalianCap(q);
   return geocodeOpenMeteo(q);
 }
 
-export async function fetchWeatherBundle(city, apiKey) {
-  if (!city?.trim()) throw new Error("Inserisci città o CAP");
-
-  const q = city.trim();
-  const key = apiKey?.trim();
-  const geo = await resolveGeo(q, key);
-  let current;
-
-  if (key) {
-    try {
-      current = isItalianCap(q)
-        ? await fetchCurrentOpenWeatherZip(q, key)
-        : await fetchCurrentOpenWeatherAt(geo.lat, geo.lon, key);
-    } catch {
-      current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
-    }
+/**
+ * Bundle meteo completo (Open-Meteo + ET0/GDD/T suolo).
+ * @param {string} city - città o CAP
+ * @param {string} [_legacyApiKey] - ignorato (OpenWeather dismesso)
+ * @param {{ zonaId?: string, lat?: number, lon?: number }} [opts]
+ */
+export async function fetchWeatherBundle(city, _legacyApiKey, opts = {}) {
+  let geo;
+  if (opts.lat != null && opts.lon != null) {
+    geo = {
+      lat: Number(opts.lat),
+      lon: Number(opts.lon),
+      name: city?.trim() || "Zona",
+      comune: city?.trim() || null,
+      country: "IT",
+    };
   } else {
-    current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
+    if (!city?.trim()) throw new Error("Inserisci città o CAP");
+    geo = await resolveGeo(city.trim());
   }
 
-  const history = await fetchRecentTemperatures(geo.lat, geo.lon, 14);
+  const agronomic = await fetchOpenMeteoAgronomic(geo.lat, geo.lon);
+  const current = await fetchCurrentOpenMeteo(geo.lat, geo.lon, geo.name);
+  const history = historyFromAgronomic(agronomic) ?? (await fetchRecentTemperatures(geo.lat, geo.lon, 14));
   const advice = getAgronomicAdvice(current);
   const location = geo.admin1
     ? `${current.name}, ${geo.admin1}`
     : `${current.name}${geo.country ? `, ${geo.country}` : ""}`;
 
-  return {
+  const bundle = {
     location,
     geo,
     current,
     history,
+    agronomic,
     advice,
-    summaryText: formatWeatherForPrompt({ current, history, advice, location }),
+    provider: "open-meteo",
   };
+  bundle.summaryText = formatWeatherForPrompt({ ...bundle, location });
+
+  if (opts.zonaId) {
+    bundle.zonaPersisted = await persistMeteoZona(opts.zonaId, agronomic, geo);
+  }
+
+  return bundle;
 }
