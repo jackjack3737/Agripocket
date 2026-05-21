@@ -1346,13 +1346,65 @@
   border-top: 1px solid var(--border, #e0e6e0);
 }
 
+.stato-clinico__sintesi-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  margin: 0;
+  border: 1px solid #e0ebe0;
+  border-radius: 8px;
+  background: #f6faf4;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.stato-clinico__sintesi-toggle:hover {
+  background: #eef5eb;
+  border-color: #c8e6c9;
+}
+
+.stato-clinico__sintesi-toggle--open {
+  border-radius: 8px 8px 0 0;
+  border-bottom-color: transparent;
+}
+
 .stato-clinico__sintesi-title {
-  margin: 0 0 0.75rem;
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--accent, #1a3d2e);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.stato-clinico__sintesi-chevron {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.stato-clinico__sintesi-toggle--open .stato-clinico__sintesi-chevron {
+  transform: rotate(-135deg);
+  margin-top: 0.2rem;
+}
+
+.stato-clinico__sintesi-panel {
+  padding: 0.85rem 0.75rem 0.25rem;
+  border: 1px solid #e0ebe0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: #fafcf9;
 }
 
 .sintesi-analisi {

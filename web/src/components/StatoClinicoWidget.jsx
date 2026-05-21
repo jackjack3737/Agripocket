@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { calcolaStatoClinico } from "../lib/statoClinico";
 import { resolveSignedFotoFromAnalisi } from "../lib/fotoPrato";
+import { sintesiDaAnalisi } from "../lib/sintesiAnalisi";
 import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
 
 function parseVision(raw) {
@@ -21,6 +22,7 @@ export default function StatoClinicoWidget({
   userId,
 }) {
   const [thumbUrl, setThumbUrl] = useState(null);
+  const [sintesiAperta, setSintesiAperta] = useState(false);
 
   const vision = useMemo(
     () => parseVision(ultimaAnalisi?.vision_json),
@@ -31,6 +33,10 @@ export default function StatoClinicoWidget({
     () => calcolaStatoClinico({ vision, weather, agronomic: weather?.agronomic }),
     [vision, weather],
   );
+
+  useEffect(() => {
+    setSintesiAperta(false);
+  }, [ultimaAnalisi?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +51,14 @@ export default function StatoClinicoWidget({
       cancelled = true;
     };
   }, [ultimaAnalisi?.id, ultimaAnalisi?.foto_path, ultimaAnalisi?.foto_url, userId]);
+
+  const haSintesi = useMemo(() => {
+    if (!ultimaAnalisi) return false;
+    return !sintesiDaAnalisi({
+      vision_json: ultimaAnalisi.vision_json,
+      report_markdown: ultimaAnalisi.report_markdown,
+    }).vuota;
+  }, [ultimaAnalisi?.vision_json, ultimaAnalisi?.report_markdown]);
 
   const dataLabel = ultimaAnalisi?.created_at
     ? new Date(ultimaAnalisi.created_at).toLocaleDateString("it-IT", {
@@ -89,14 +103,27 @@ export default function StatoClinicoWidget({
         </div>
       </div>
 
-      {ultimaAnalisi ? (
+      {haSintesi ? (
         <div className="stato-clinico__sintesi">
-          <h3 className="stato-clinico__sintesi-title">Analisi Gemini</h3>
-          <SintesiAnalisiBlocks
-            visionJson={ultimaAnalisi.vision_json}
-            reportMarkdown={ultimaAnalisi.report_markdown}
-            compact
-          />
+          <button
+            type="button"
+            className={`stato-clinico__sintesi-toggle${sintesiAperta ? " stato-clinico__sintesi-toggle--open" : ""}`}
+            onClick={() => setSintesiAperta((v) => !v)}
+            aria-expanded={sintesiAperta}
+            aria-controls="stato-clinico-sintesi-panel"
+          >
+            <span className="stato-clinico__sintesi-title">Analisi Gemini</span>
+            <span className="stato-clinico__sintesi-chevron" aria-hidden />
+          </button>
+          {sintesiAperta ? (
+            <div id="stato-clinico-sintesi-panel" className="stato-clinico__sintesi-panel">
+              <SintesiAnalisiBlocks
+                visionJson={ultimaAnalisi.vision_json}
+                reportMarkdown={ultimaAnalisi.report_markdown}
+                compact
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>
