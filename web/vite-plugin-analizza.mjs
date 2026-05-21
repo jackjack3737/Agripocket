@@ -41,6 +41,7 @@ async function runAnalizzaJob(jobId, body, authHeader, env) {
       modalita: body?.modalita || "prato",
       zonaId: body?.zonaId,
       zonaNome: body?.zonaNome,
+      notaUtente: body?.notaUtente,
     });
     await updateJob(admin, jobId, { status: "completed", result, error_message: null });
   } catch (e) {
@@ -208,6 +209,7 @@ export function analizzaPratoPlugin() {
                 modalita: body?.modalita || "prato",
                 zonaId: body?.zonaId,
                 zonaNome: body?.zonaNome,
+                notaUtente: body?.notaUtente,
               });
               res.statusCode = 200;
               res.end(JSON.stringify({ ...result, async: false }));

@@ -1447,22 +1447,187 @@
   margin-bottom: 0.25rem;
 }
 
-.consulente-zona__camera {
-  width: 100%;
-  max-width: 20rem;
+/* Chiedi all'agronomo — barra ricerca */
+.agronomo-ask__bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin: 1rem 0 0.75rem;
 }
 
-.consulente-zona__preview {
-  width: 100%;
-  max-width: 14rem;
+.agronomo-ask__field-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0.35rem 0.75rem 0.35rem 0.5rem;
+  background: #fff;
+  border: 1px solid var(--border, #dde3dd);
+  border-radius: 28px;
+  box-shadow: 0 1px 3px rgba(20, 40, 25, 0.06);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.agronomo-ask__field-wrap:focus-within {
+  border-color: #7cb88a;
+  box-shadow: 0 0 0 3px rgba(26, 61, 46, 0.1);
+}
+
+.agronomo-ask__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  outline: none;
+}
+
+.agronomo-ask__input::placeholder {
+  color: var(--muted);
+}
+
+.agronomo-ask__thumb-chip {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 8px;
-  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.agronomo-ask__thumb-chip img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
-.consulente-zona__loading {
-  text-align: center;
-  padding: 1rem 0;
+.agronomo-ask__thumb-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: 0 0 0 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agronomo-ask__icon-btn {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--border, #dde3dd);
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
+}
+
+.agronomo-ask__icon-btn:hover:not(:disabled) {
+  background: #f4f8f2;
+}
+
+.agronomo-ask__icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.agronomo-ask__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agronomo-ask__icon-btn--send {
+  background: var(--accent, #1a3d2e);
+  border-color: var(--accent, #1a3d2e);
+}
+
+.agronomo-ask__icon-btn--send:hover:not(:disabled) {
+  background: #245c42;
+}
+
+.agronomo-ask__icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  background-color: currentColor;
+  color: var(--accent, #1a3d2e);
+}
+
+.agronomo-ask__icon-btn--send .agronomo-ask__icon {
+  color: #fff;
+}
+
+.agronomo-ask__icon--camera {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M4 8h3l2-3h6l2 3h3v12H4V8z'/%3E%3Ccircle cx='12' cy='13' r='3.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M4 8h3l2-3h6l2 3h3v12H4V8z'/%3E%3Ccircle cx='12' cy='13' r='3.5'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  background-color: var(--accent, #1a3d2e);
+}
+
+.agronomo-ask__icon--send {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2v7z'/%3E%3C/svg%3E")
+    center / 70% no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M2 21l21-9L2 3v7l15 2-15 2v7z'/%3E%3C/svg%3E")
+    center / 70% no-repeat;
+  background-color: #fff;
+}
+
+.agronomo-ask__loading {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.agronomo-ask__risposta {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f6faf4;
+  border-radius: 12px;
+  border: 1px solid #e0ebe0;
+}
+
+.agronomo-ask__risposta-label {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.agronomo-ask__preview {
+  width: 100%;
+  max-width: 12rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  object-fit: cover;
+}
+
+.agronomo-ask__testo {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  font-size: 0.92rem;
+}
+
+.agronomo-ask__reset {
+  margin-top: 0.75rem;
 }
 
 /* Analisi suolo (FASE 4) */

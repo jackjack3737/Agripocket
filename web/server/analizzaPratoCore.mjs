@@ -160,10 +160,11 @@ async function geminiGenerate(apiKey, parts, opts = {}) {
   return out;
 }
 
-const VISION_PROMPT_MACCHIA = (profilo, weatherBlock, zonaNome) => `Sei agronomo specializzato in diagnosi di MACCHIE e zone dove il tappeto erboso non cresce o è danneggiato.
+const VISION_PROMPT_MACCHIA = (profilo, weatherBlock, zonaNome, notaUtente) => `Sei agronomo specializzato in diagnosi di MACCHIE e zone dove il tappeto erboso non cresce o è danneggiato.
 
 L'utente ha fotografato una ZONA PROBLEMATICA del prato (non il prato intero).
 Zona: ${zonaNome || "area problematica"}
+${notaUtente?.trim() ? `\nDomanda o nota dell'utente: «${notaUtente.trim()}»\nRispondi anche a questa domanda usando la foto.\n` : ""}
 
 Profilo del sito:
 ${formatProfileForPrompt(profilo)}
@@ -202,6 +203,7 @@ danno_localizzato: sempre true per questa modalità.`;
  *   modalita?: "prato"|"macchia_zona",
  *   zonaId?: string,
  *   zonaNome?: string,
+ *   notaUtente?: string,
  * }} opts
  */
 export async function analizzaPrato({
@@ -212,6 +214,7 @@ export async function analizzaPrato({
   modalita = "prato",
   zonaId: zonaIdInput,
   zonaNome: zonaNomeInput,
+  notaUtente: notaUtenteInput,
 }) {
   const geminiKey = env.GEMINI_API_KEY?.trim();
   const supabaseUrl = env.SUPABASE_URL?.trim();
@@ -342,8 +345,10 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
 - Piccole imperfezioni locali: 70-84; problemi evidenti ma gestibili: 50-69; danni gravi: sotto 50.
 - stato_generale deve essere coerente con la media dei punteggi_assi.`;
 
+  const notaUtente = isMacchia ? String(notaUtenteInput || "").trim() : "";
+
   const visionPrompt = isMacchia
-    ? VISION_PROMPT_MACCHIA(profilo, weatherBlock, zonaNome)
+    ? VISION_PROMPT_MACCHIA(profilo, weatherBlock, zonaNome, notaUtente)
     : visionPromptPrato;
 
   const visionRaw = await geminiGenerate(
@@ -421,6 +426,7 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
     .join("\n\n---\n\n");
 
   const reportPromptMacchia = `Sei agronomo. L'utente ha fotografato una MACCHIA sul prato (zona: ${zonaNome || "problematica"}).
+${notaUtente ? `\nDomanda dell'utente: «${notaUtente}»\n` : ""}
 
 Profilo: ${formatProfileForPrompt(profilo)}
 ${weatherBlock || ""}

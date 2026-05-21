@@ -21,6 +21,7 @@ async function runAnalizzaJob(jobId, body, authHeader, env) {
       modalita: body?.modalita || "prato",
       zonaId: body?.zonaId,
       zonaNome: body?.zonaNome,
+      notaUtente: body?.notaUtente,
     });
     await updateJob(admin, jobId, {
       status: "completed",
@@ -89,6 +90,7 @@ export default async function handler(req, res) {
         modalita: body?.modalita || "prato",
         zonaId: body?.zonaId,
         zonaNome: body?.zonaNome,
+        notaUtente: body?.notaUtente,
       });
       res.status(200).json({ ...result, async: false });
       return;

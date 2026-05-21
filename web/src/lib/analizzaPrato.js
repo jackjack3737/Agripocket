@@ -64,12 +64,36 @@ export async function analizzaPratoFoto({ base64, mimeType = "image/jpeg", userI
 }
 
 /** Foto macchia su zona → analisi mirata (consulente zona). */
+export async function chiediAgronomoTesto({ domanda, zonaId }) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Accedi per chiedere all'agronomo");
+
+  const res = await fetch("/api/chat-zona", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ domanda: domanda.trim(), zonaId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Risposta non disponibile");
+  return {
+    risposta: data.risposta ?? "",
+    fonte: data.fonte ?? null,
+    chunksUsed: data.chunksUsed ?? 0,
+  };
+}
+
 export async function analizzaMacchiaZona({
   base64,
   mimeType = "image/jpeg",
   userId,
   zonaId,
   zonaNome,
+  notaUtente,
 }) {
   const {
     data: { session },
@@ -80,6 +104,7 @@ export async function analizzaMacchiaZona({
     modalita: "macchia_zona",
     zonaId: zonaId || undefined,
     zonaNome: zonaNome || undefined,
+    notaUtente: notaUtente?.trim() || undefined,
   });
 
   if (data.analisiId && userId) {
