@@ -5,7 +5,12 @@ import { resetPratoProfiloCompleto } from "../lib/resetProfilo";
 /**
  * Reset profilo con doppia conferma.
  */
-export default function ProfileResetButton({ onResetComplete, embedded = false, stayOnPage = false }) {
+export default function ProfileResetButton({
+  onResetComplete,
+  embedded = false,
+  minimal = false,
+  stayOnPage = false,
+}) {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -34,7 +39,11 @@ export default function ProfileResetButton({ onResetComplete, embedded = false, 
 
   return (
     <>
-      {embedded ? (
+      {minimal ? (
+        <button type="button" className="btn btn-ghost btn-sm dash-footer-reset__btn" onClick={() => setStep(1)}>
+          Reset profilo
+        </button>
+      ) : embedded ? (
         <div className="profile-reset-inline">
           <p className="profile-reset-inline__label">Zona pericolosa</p>
           <p className="profile-reset-inline__desc">

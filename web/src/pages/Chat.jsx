@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AppNav from "../components/AppNav";
 import { profileSummary } from "../data/onboardingSteps";
 import { analizzaPratoFoto } from "../lib/analizzaPrato";
 import { setInterventoCompletato } from "../lib/dashboard";
@@ -148,17 +149,7 @@ export default function Chat({ profile, session, onProfileUpdate }) {
           <h1>Il tuo prato</h1>
           {summary ? <p className="profile-chip">{summary}</p> : null}
         </div>
-        <div className="chat-header-actions">
-          <Link className="btn btn-ghost btn-sm" to="/dashboard">
-            Dashboard
-          </Link>
-          <Link className="btn btn-ghost btn-sm" to="/onboarding">
-            Profilo
-          </Link>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={logout}>
-            Esci
-          </button>
-        </div>
+        <AppNav active="chat" onLogout={logout} />
       </header>
 
       <section className="weather-setup">
@@ -262,7 +253,7 @@ export default function Chat({ profile, session, onProfileUpdate }) {
               type="button"
               className="btn btn-primary"
               onClick={() =>
-                navigate("/dashboard", {
+                navigate("/calendario", {
                   state: {
                     fromAnalysis: true,
                     pianoAggiornato: meta?.pianoAggiornato,
@@ -271,7 +262,7 @@ export default function Chat({ profile, session, onProfileUpdate }) {
                 })
               }
             >
-              Vai alla dashboard
+              Vai al calendario
             </button>
             <button type="button" className="btn btn-ghost photo-new" onClick={openCamera}>
               Nuova foto

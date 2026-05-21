@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
+import CalendarioLavori from "./pages/CalendarioLavori";
 import Home from "./pages/Home";
 
 export default function App() {
@@ -104,6 +105,18 @@ export default function App() {
             <Navigate to="/onboarding" replace />
           ) : (
             <Chat profile={profile} session={session} onProfileUpdate={setProfile} />
+          )
+        }
+      />
+      <Route
+        path="/calendario"
+        element={
+          !session ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            <CalendarioLavori profile={profile} session={session} />
           )
         }
       />

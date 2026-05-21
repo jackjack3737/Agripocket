@@ -61,12 +61,30 @@
   font-size: 0.88rem;
 }
 
+.dash-banner__link {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .dash-banner__close {
   border: none;
   background: none;
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.dash-footer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border, #e0e0e0);
+  display: flex;
+  justify-content: center;
+}
+
+.dash-footer-reset__btn {
   color: var(--muted);
 }
 
