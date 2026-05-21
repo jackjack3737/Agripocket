@@ -144,6 +144,104 @@
   border-color: #ffcdd2;
 }
 
+.dash-header--hero .dash-header__top--actions-only {
+  justify-content: flex-end;
+  margin-bottom: 0;
+}
+
+.dash-header--hero .dash-header__top--actions-only .dash-header__actions {
+  padding-top: 0;
+}
+
+.dash-header--hero .dash-nav {
+  margin-top: 0.5rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.dash-header__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.85rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border, #e8ece8);
+}
+
+.dash-header__hero-brand {
+  margin: 0;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  color: #1d1d1f;
+  flex-shrink: 0;
+}
+
+.dash-header__hero-tagline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    system-ui,
+    sans-serif;
+  font-size: 0.92rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: #6e6e73;
+}
+
+.dash-header__hero-fixed {
+  white-space: nowrap;
+}
+
+.dash-header__hero-word {
+  display: inline-block;
+  min-width: 5.5rem;
+  font-weight: 500;
+  font-style: italic;
+  color: #2e6b47;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.dash-header__hero-word--in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dash-header__hero-chip {
+  margin: 0 0 0 auto;
+  align-self: center;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 520px) {
+  .dash-header__hero-chip {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
 .dash-nav {
   display: flex;
   flex-wrap: wrap;
@@ -151,6 +249,12 @@
   align-items: center;
   margin-top: 0.85rem;
   padding-top: 0.85rem;
+  border-top: 1px solid var(--border, #e4ebe4);
+}
+
+.dash-header--hero .dash-header__top--actions-only + .dash-nav {
+  margin-top: 0.35rem;
+  padding-top: 0.65rem;
   border-top: 1px solid var(--border, #e4ebe4);
 }
 

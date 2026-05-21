@@ -122,14 +122,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <DashPageHeader
-        active="dashboard"
-        kicker="Il tuo prato, in tempo reale"
-        title="Solum"
-        appleTitle
-        summary={summary}
-        onLogout={logout}
-      />
+      <DashPageHeader active="dashboard" heroBrand summary={summary} onLogout={logout} />
 
       {banner ? (
         <p className="dash-banner">
