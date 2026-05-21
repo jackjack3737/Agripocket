@@ -49,6 +49,18 @@ export async function persistMeteoZona(zonaId, agronomic, geo = {}) {
   return data;
 }
 
+/** id_zona default per analisi/interventi. */
+export async function loadZonaIdForUser(admin, userId) {
+  if (!admin || !userId) return null;
+  const { data } = await admin
+    .from("zone_prato")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_default", true)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 /** Carica zona default utente (per meteo senza zonaId esplicito). */
 export async function loadZonaDefault(userId) {
   const admin = adminClient();

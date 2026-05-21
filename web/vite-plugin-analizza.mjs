@@ -4,6 +4,7 @@ import { analizzaPrato } from "./server/analizzaPratoCore.mjs";
 import { generaPianoStagionale } from "./server/pianoStagionale.mjs";
 import { resetProfiloUtente } from "./server/resetProfilo.mjs";
 import { fetchWeatherBundle } from "./server/weatherCore.mjs";
+import { rispondiChatZona } from "./server/chatZonaRAG.mjs";
 import { createJob, updateJob, adminClient, getJobForUser } from "./server/jobs.mjs";
 import { checkRateLimit } from "./server/rateLimit.mjs";
 
@@ -270,6 +271,64 @@ export function analizzaPratoPlugin() {
       });
 
       server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/chat-zona")) return next();
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+        res.setHeader("Content-Type", "application/json");
+
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        const auth = req.headers.authorization || "";
+        if (!auth) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: "Non autenticato" }));
+          return;
+        }
+
+        try {
+          const user = await authUser(req, env);
+          if (!user) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: "Sessione non valida" }));
+            return;
+          }
+
+          const chunks = [];
+          for await (const chunk of req) chunks.push(chunk);
+          const body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+
+          const admin = adminClient(env);
+          const { data: profilo } = await admin
+            .from("prato_profilo")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          const result = await rispondiChatZona(admin, user.id, body?.domanda, {
+            zonaId: body?.zonaId || body?.zona_id,
+            profilo,
+            env,
+          });
+          res.statusCode = 200;
+          res.end(JSON.stringify(result));
+        } catch (e) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message || String(e) }));
+        }
+      });
+
+      server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith("/api/genera-piano")) return next();
 
         if (req.method === "OPTIONS") {
@@ -345,7 +404,7 @@ export function analizzaPratoPlugin() {
 
       if (env.GEMINI_API_KEY) {
         console.log(
-          "[agripocket] API: /api/analizza-prato · /api/genera-piano · /api/reset-profilo · /api/job-status · meteo: /api/meteo?city=...",
+          "[agripocket] API: analizza-prato · genera-piano · chat-zona · reset-profilo · job-status · meteo",
         );
       } else {
         console.warn("[agripocket] Manca crawler/.env — foto prato non funzionerà");

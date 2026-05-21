@@ -59,10 +59,11 @@ export function normalizeCategoria(c) {
   return "altro";
 }
 
-function rowIntervento(userId, analisiId, i, fonte) {
+function rowIntervento(userId, analisiId, i, fonte, zonaId = null) {
   const row = {
     user_id: userId,
     analisi_id: analisiId,
+    ...(zonaId ? { zona_id: zonaId } : {}),
     titolo: i.titolo,
     descrizione: i.descrizione || null,
     priorita: i.priorita,
@@ -185,17 +186,20 @@ Regole:
 export async function persistAnalisiAndInterventi(
   admin,
   userId,
-  { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType },
+  { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType, zonaId },
   { geminiGenerate, geminiKey } = {},
 ) {
+  const insertRow = {
+    user_id: userId,
+    report_markdown: report,
+    vision_json: vision,
+    chunks_used: chunksUsed ?? 0,
+  };
+  if (zonaId) insertRow.zona_id = zonaId;
+
   const { data: analisi, error: analisiErr } = await admin
     .from("prato_analisi")
-    .insert({
-      user_id: userId,
-      report_markdown: report,
-      vision_json: vision,
-      chunks_used: chunksUsed ?? 0,
-    })
+    .insert(insertRow)
     .select("id")
     .single();
 
@@ -230,7 +234,7 @@ export async function persistAnalisiAndInterventi(
 
   let saved = [];
   if (arricchiti.length) {
-    const rows = arricchiti.map((i) => rowIntervento(userId, analisiId, i, "ia_foto"));
+    const rows = arricchiti.map((i) => rowIntervento(userId, analisiId, i, "ia_foto", zonaId));
     saved = await insertInterventi(admin, rows);
   }
 

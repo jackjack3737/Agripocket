@@ -2,6 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import { extractInterventiFromReport, persistAnalisiAndInterventi } from "./interventiFromReport.mjs";
 import { formatProfileForPrompt } from "./profileContext.mjs";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
+import { registraFocolaiDaVision } from "./focolaiRegionali.mjs";
+import { testoAlertAnalisiSuolo } from "./laboratoriSuolo.mjs";
+import { loadZonaIdForUser } from "./zoneMeteo.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -236,8 +239,16 @@ Rispondi SOLO JSON valido (italiano), forma:
     "difesa": 85,
     "manutenzione": 85
   },
-  "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili"
+  "query_ricerca_kb": "80-200 caratteri con specie latine, parassiti (larve sotto prato, popillia) e problemi visibili",
+  "patologia_confermata": { "nome": "", "confidenza": "alta|media|bassa" },
+  "richiede_analisi_suolo": false,
+  "motivo_analisi_suolo": ""
 }
+
+ANALISI SUOLO (obbligatorio se pH/carenze gravi):
+- Se vedi clorosi diffusa, ingiallimento da carenza, sospetto pH estremo, bruciature da calcare o tessuto necrotico da squilibrio nutrizionale GRAVE: imposta richiede_analisi_suolo: true e motivo_analisi_suolo con sintomi osservati.
+- In quel caso NON dare dosi di concime o correttivi specifici nel report: indica solo che serve campione in laboratorio.
+- patologia_confermata: solo se identifichi una patologia con alta sicurezza visiva (confidenza alta); altrimenti nome vuoto e confidenza bassa.
 Max 3 specie_probabili, ordinate per confidenza. Se non distinguibile, una voce con confidenza bassa e motivo.
 
 VALUTAZIONE stato_generale (importante per il punteggio utente):
@@ -279,6 +290,29 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
   vision = normalizePunteggiAssi(vision);
   vision = normalizeVisionGeometria(vision);
   vision = normalizeColoreDominante(vision);
+
+  if (vision.richiede_analisi_suolo == null) {
+    const ph = String(profilo?.ph_terreno || "").toLowerCase();
+    const squilibrio =
+      ph === "acido" ||
+      ph === "alcalino" ||
+      (vision.problemi_rilevati || []).some((p) =>
+        /ph|carenz|clorosi|necros|calcare|azoto|ferro|manganese/i.test(
+          `${p?.problema} ${p?.dettaglio}`,
+        ),
+      );
+    vision.richiede_analisi_suolo = !!squilibrio;
+    if (squilibrio && !vision.motivo_analisi_suolo) {
+      vision.motivo_analisi_suolo =
+        "Sintomi compatibili con squilibrio del suolo o pH non ottimale: serve analisi di laboratorio.";
+    }
+  }
+
+  try {
+    await registraFocolaiDaVision(admin, profilo, vision);
+  } catch (e) {
+    console.warn("[analizza] focolai:", e.message);
+  }
 
   const speciesFromVision = (vision.specie_probabili || [])
     .map((s) => (typeof s === "string" ? s : s?.nome))
@@ -328,7 +362,19 @@ Report Markdown in italiano con ## :
 Cosa vedo nella foto, Specie e miscuglio (da visione), Meteo e temperature recenti, Diagnosi e problemi, Parassiti e larve (sotto il tappeto: popillia/maggiolino, otiorrinco, altri), Taglio e altezza, Feltro/thatch, Foglie e detriti, Irrigazione e stress, Malattie, Piano d'azione, Cosa evitare, Nota agronomica.
 Fitofarmaci (fungicidi/insetticidi): SOLO se la foto mostra malattie, parassiti o danni evidenti — non preventivi generici.
 Se serve un trattamento, preferisci prodotti BOTTOS in catalogo: Fly (larve/popillia), Trichoderma (problemi fungini), senza dose automatica.
-Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se utile. Collega diagnosi + meteo.`;
+Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se utile. Collega diagnosi + meteo.
+${
+  vision.richiede_analisi_suolo
+    ? `
+OBBLIGO ANALISI SUOLO (richiede_analisi_suolo=true):
+- Aggiungi sezione ## Analisi del suolo consigliata
+- NON proporre dosi NPK o correttivi pH senza dati di laboratorio
+- Motivo: ${vision.motivo_analisi_suolo || "squilibrio nutrizionale sospetto"}
+- Laboratori suggeriti per ${profilo?.localita || "zona"}:
+${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
+- Istruzioni prelievo: elenca i passi per le carote di terra (campione composito 10-15 cm)`
+    : ""
+}`;
 
   const report = await geminiGenerate(geminiKey, [{ text: reportPrompt }], {
     maxTokens: 8192,
@@ -339,6 +385,8 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
   let analisiId = null;
   let dashboardReady = false;
   let saved = null;
+
+  const zonaId = await loadZonaIdForUser(admin, userData.user.id);
 
   try {
     interventi = await extractInterventiFromReport(report, vision, geminiGenerate, geminiKey);
@@ -353,6 +401,7 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
         profilo,
         imageBase64: img,
         mimeType,
+        zonaId,
       },
       { geminiGenerate, geminiKey },
     );
@@ -372,5 +421,8 @@ Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se u
     analisiId,
     dashboardReady,
     pianoAggiornato: saved?.pianoAggiornato ?? null,
+    richiede_analisi_suolo: !!vision?.richiede_analisi_suolo,
+    motivo_analisi_suolo: vision?.motivo_analisi_suolo || null,
+    zonaId,
   };
 }

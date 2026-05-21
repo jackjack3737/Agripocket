@@ -14,6 +14,7 @@ import {
   REGOLE_FITOFARMACI_PROMPT,
   filtraInterventiFitofarmacoCurativo,
 } from "./regoleFitofarmaci.mjs";
+import { buildFocolaiPromptBlock } from "./focolaiRegionali.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -166,6 +167,13 @@ export async function buildPianoInterventi(profilo, env, admin, { vision = null 
   const mese = new Date().toLocaleString("it-IT", { month: "long", year: "numeric" });
   const cfgLivello = configLivelloImpegno(profilo);
 
+  let focolaiBlock = "";
+  try {
+    focolaiBlock = await buildFocolaiPromptBlock(admin, profilo);
+  } catch {
+    focolaiBlock = "";
+  }
+
   const prompt = `Sei il miglior agronomo di tappeto erboso in Italia. Crea un CALENDARIO LAVORI strategico, giorno per giorno (date precise), per i prossimi 12 mesi.
 
 Oggi: ${oggi} (${mese})
@@ -181,6 +189,8 @@ ${weatherBlock}
 ${preEmergenzaBlock ? `${preEmergenzaBlock}\n` : ""}
 
 ${hintParassitiRegionali(profilo?.localita)}
+
+${focolaiBlock}
 
 Knowledge base (prodotti e pratiche — usa nomi e dosaggi quando presenti):
 ${kb || "(usa best practice italiane per prato da giardino)"}

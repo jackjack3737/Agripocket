@@ -50,6 +50,14 @@ export async function uploadFotoAnalisiClient(userId, analisiId, base64, mimeTyp
   return resolveSignedFotoUrl(path);
 }
 
+/** URL firmato per riga analisi (path o legacy url). */
+export async function resolveSignedFotoFromAnalisi(analisi) {
+  if (!analisi) return null;
+  const path = analisi.foto_path || null;
+  if (path) return resolveSignedFotoUrl(path);
+  return analisi.foto_url || null;
+}
+
 export async function loadUltimaFoto(userId) {
   const { data, error } = await supabase
     .from("prato_analisi")

@@ -6,6 +6,9 @@ import ProfileResetButton from "../components/ProfileResetButton";
 import PratoZoneEditor from "../components/PratoZoneEditor";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
+import StatoClinicoWidget from "../components/StatoClinicoWidget";
+import ChatZonaPanel from "../components/ChatZonaPanel";
+import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
 import { profileSummary } from "../data/onboardingSteps";
 import {
@@ -441,6 +444,17 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   const [zonaDefault, setZonaDefault] = useState(null);
 
+  const visionUltima = useMemo(() => {
+    const raw = ultimaAnalisi?.vision_json;
+    if (!raw) return null;
+    if (typeof raw === "object") return raw;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }, [ultimaAnalisi?.vision_json]);
+
   useEffect(() => {
     if (!userId) return;
     loadZonaDefault(userId)
@@ -580,6 +594,26 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
       ) : null}
 
       <div className="dash-grid">
+        <StatoClinicoWidget
+          ultimaAnalisi={ultimaAnalisi}
+          zonaNome={zonaDefault?.nome_zona}
+          weather={weather}
+          userId={userId}
+        />
+
+        {visionUltima?.richiede_analisi_suolo ? (
+          <AnalisiSuoloAlert
+            localita={profile?.localita}
+            motivo={visionUltima.motivo_analisi_suolo}
+          />
+        ) : null}
+
+        <ChatZonaPanel
+          profile={profile}
+          zonaId={zonaDefault?.id}
+          zonaNome={zonaDefault?.nome_zona}
+        />
+
         <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />
 
         <section className="dash-card dash-card--weather">

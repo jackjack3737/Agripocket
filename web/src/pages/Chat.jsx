@@ -7,6 +7,7 @@ import { fileToCompressedBase64 } from "../lib/photoCompress";
 import { supabase, updatePratoLocalita } from "../lib/supabase";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import WeatherCard from "../components/WeatherCard";
+import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 
 function ReportBody({ markdown }) {
   const blocks = markdown.split(/\n(?=## )/);
@@ -120,6 +121,8 @@ export default function Chat({ profile, session, onProfileUpdate }) {
         weatherUsed: result.weatherUsed,
         pianoAggiornato: result.pianoAggiornato,
         interventiCount: result.interventi?.length ?? 0,
+        richiede_analisi_suolo: result.richiede_analisi_suolo,
+        motivo_analisi_suolo: result.motivo_analisi_suolo,
       });
     } catch (err) {
       setError(err.message || "Analisi non riuscita");
@@ -248,6 +251,12 @@ export default function Chat({ profile, session, onProfileUpdate }) {
             {meta?.chunksUsed ? `, ${meta.chunksUsed} fonti KB` : ""}
           </p>
           <ReportBody markdown={report} />
+          {meta?.richiede_analisi_suolo ? (
+            <AnalisiSuoloAlert
+              localita={profile?.localita}
+              motivo={meta?.motivo_analisi_suolo}
+            />
+          ) : null}
           <div className="photo-result__actions">
             <button
               type="button"

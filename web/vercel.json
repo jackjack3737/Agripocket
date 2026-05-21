@@ -15,6 +15,9 @@
     },
     "api/reset-profilo.js": {
       "maxDuration": 30
+    },
+    "api/chat-zona.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

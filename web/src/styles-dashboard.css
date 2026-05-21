@@ -1244,3 +1244,179 @@
   color: #c62828;
   margin-right: 0.5rem;
 }
+
+/* Stato clinico (FASE 5) */
+.stato-clinico {
+  border: 1px solid var(--border, #e0e6e0);
+  background: linear-gradient(135deg, #fafcf9 0%, #f4f8f2 100%);
+}
+
+.stato-clinico__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.stato-clinico__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.stato-clinico__semaforo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.stato-clinico__dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stato-clinico__semaforo--verde {
+  color: #2e7d32;
+}
+.stato-clinico__semaforo--giallo {
+  color: #f9a825;
+}
+.stato-clinico__semaforo--rosso {
+  color: #c62828;
+}
+.stato-clinico__semaforo--grigio {
+  color: #78909c;
+}
+
+.stato-clinico__body {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 480px) {
+  .stato-clinico__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stato-clinico__thumb img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.stato-clinico__thumb-placeholder {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: #e8efe6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.stato-clinico__meta p {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+}
+
+.stato-clinico__motivo {
+  color: var(--muted);
+  margin-top: 0.5rem !important;
+}
+
+/* Analisi suolo (FASE 4) */
+.analisi-suolo-alert {
+  border-left: 4px solid #ff8f00;
+  background: #fff8e8;
+}
+
+.analisi-suolo-alert__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.analisi-suolo-alert__lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.analisi-suolo-alert__subtitle {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.analisi-suolo-alert__labs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analisi-suolo-alert__labs li {
+  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.analisi-suolo-alert__labs strong {
+  display: block;
+}
+
+.analisi-suolo-alert__steps {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+}
+
+.analisi-suolo-alert__steps li {
+  margin-bottom: 0.35rem;
+}
+
+/* Chat zona RAG (FASE 6) */
+.chat-zona__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.chat-zona__input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, #dde3dd);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.chat-zona__risposta {
+  padding: 0.85rem 1rem;
+  background: #f6faf4;
+  border-radius: 8px;
+  border: 1px solid #e0ebe0;
+}
+
+.chat-zona__risposta-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
