@@ -160,10 +160,59 @@ async function geminiGenerate(apiKey, parts, opts = {}) {
   return out;
 }
 
+const VISION_PROMPT_MACCHIA = (profilo, weatherBlock, zonaNome) => `Sei agronomo specializzato in diagnosi di MACCHIE e zone dove il tappeto erboso non cresce o è danneggiato.
+
+L'utente ha fotografato una ZONA PROBLEMATICA del prato (non il prato intero).
+Zona: ${zonaNome || "area problematica"}
+
+Profilo del sito:
+${formatProfileForPrompt(profilo)}
+
+${weatherBlock || "Meteo: località non indicata nel profilo."}
+
+Concentrati SOLO su ciò che vedi nella macchia/area inquadrata: forma del danno, colore, densità, bordi, confronto con erba sana attorno.
+
+Rispondi SOLO JSON valido (italiano), forma:
+{
+  "sintesi_visiva": "2-4 frasi su cosa si vede nella macchia",
+  "specie_probabili": [{ "nome": "latino", "confidenza": "alta|media|bassa", "motivo": "" }],
+  "stato_generale": "ottimo|buono|discreto|critico",
+  "problemi_rilevati": [{ "problema": "", "gravita": "bassa|media|alta", "dettaglio": "" }],
+  "pattern_geometrico": "circolare|irregolare|diffuso|lineare|nessuno",
+  "danno_localizzato": true,
+  "diagnosi_avanzata": "Perché qui l'erba non cresce o è malata: ipotesi principali collegate a pattern, irrigazione, ombra, traffico, funghi, parassiti sottoprato",
+  "malattie_sospette": [{ "nome": "", "gravita": "bassa|media|alta", "note": "" }],
+  "parassiti_sottoprato": [{ "tipo": "popillia|otiorrinco|altro", "segni": "", "gravita": "bassa|media|alta", "note": "" }],
+  "stress_idrici": { "segni": true|false, "note": "" },
+  "feltro_thatch": { "presente": true|false, "note": "" },
+  "query_ricerca_kb": "80-200 caratteri con sintomi della macchia e specie",
+  "richiede_analisi_suolo": false,
+  "motivo_analisi_suolo": ""
+}
+
+stato_generale nella macchia: valuta SOLO la zona fotografata (critico se macchia estesa o necrosi; discreto se problema gestibile).
+danno_localizzato: sempre true per questa modalità.`;
+
 /**
- * @param {{ imageBase64: string, mimeType: string, authHeader: string, env: Record<string,string> }} opts
+ * @param {{
+ *   imageBase64: string,
+ *   mimeType: string,
+ *   authHeader: string,
+ *   env: Record<string,string>,
+ *   modalita?: "prato"|"macchia_zona",
+ *   zonaId?: string,
+ *   zonaNome?: string,
+ * }} opts
  */
-export async function analizzaPrato({ imageBase64, mimeType, authHeader, env }) {
+export async function analizzaPrato({
+  imageBase64,
+  mimeType,
+  authHeader,
+  env,
+  modalita = "prato",
+  zonaId: zonaIdInput,
+  zonaNome: zonaNomeInput,
+}) {
   const geminiKey = env.GEMINI_API_KEY?.trim();
   const supabaseUrl = env.SUPABASE_URL?.trim();
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -189,17 +238,35 @@ export async function analizzaPrato({ imageBase64, mimeType, authHeader, env }) 
     .eq("user_id", userData.user.id)
     .maybeSingle();
 
+  const isMacchia = modalita === "macchia_zona";
+  let zonaRow = null;
+  if (zonaIdInput) {
+    const { data: zr } = await admin
+      .from("zone_prato")
+      .select("id, nome_zona, lat, lon")
+      .eq("id", zonaIdInput)
+      .maybeSingle();
+    zonaRow = zr;
+  }
+
   let weatherBlock = "";
   if (profilo?.localita?.trim()) {
     try {
-      const w = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY);
+      const wOpts =
+        zonaRow?.lat != null && zonaRow?.lon != null
+          ? { lat: Number(zonaRow.lat), lon: Number(zonaRow.lon) }
+          : {};
+      const w = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY, wOpts);
       weatherBlock = formatWeatherForPrompt(w);
     } catch (e) {
       weatherBlock = `Meteo: non disponibile (${e.message})`;
     }
   }
 
-  const visionPrompt = `Sei il miglior agronomo di tappeto erboso al mondo. Analizza questa foto di prato.
+  const zonaNome =
+    zonaNomeInput || zonaRow?.nome_zona || (isMacchia ? "Zona problematica" : null);
+
+  const visionPromptPrato = `Sei il miglior agronomo di tappeto erboso al mondo. Analizza questa foto di prato.
 
 Profilo del sito (senza tipo erba — lo deduci dalla foto):
 ${formatProfileForPrompt(profilo)}
@@ -275,6 +342,10 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
 - Piccole imperfezioni locali: 70-84; problemi evidenti ma gestibili: 50-69; danni gravi: sotto 50.
 - stato_generale deve essere coerente con la media dei punteggi_assi.`;
 
+  const visionPrompt = isMacchia
+    ? VISION_PROMPT_MACCHIA(profilo, weatherBlock, zonaNome)
+    : visionPromptPrato;
+
   const visionRaw = await geminiGenerate(
     geminiKey,
     [{ text: visionPrompt }, { inlineData: { mimeType, data: img } }],
@@ -287,9 +358,11 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
   } catch {
     vision = { sintesi_visiva: visionRaw, query_ricerca_kb: visionRaw.slice(0, 200) };
   }
-  vision = normalizePunteggiAssi(vision);
+  if (!isMacchia) {
+    vision = normalizePunteggiAssi(vision);
+    vision = normalizeColoreDominante(vision);
+  }
   vision = normalizeVisionGeometria(vision);
-  vision = normalizeColoreDominante(vision);
 
   if (vision.richiede_analisi_suolo == null) {
     const ph = String(profilo?.ph_terreno || "").toLowerCase();
@@ -318,7 +391,7 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
     .map((s) => (typeof s === "string" ? s : s?.nome))
     .filter(Boolean);
 
-  if (speciesFromVision.length) {
+  if (!isMacchia && speciesFromVision.length) {
     const note = `Specie (analisi foto): ${speciesFromVision.slice(0, 3).join(", ")}`;
     await admin
       .from("prato_profilo")
@@ -347,7 +420,30 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
     })
     .join("\n\n---\n\n");
 
-  const reportPrompt = `Sei il miglior agronomo di tappeto erboso al mondo.
+  const reportPromptMacchia = `Sei agronomo. L'utente ha fotografato una MACCHIA sul prato (zona: ${zonaNome || "problematica"}).
+
+Profilo: ${formatProfileForPrompt(profilo)}
+${weatherBlock || ""}
+
+Analisi visione della macchia:
+${JSON.stringify(vision, null, 2)}
+
+Knowledge base:
+${kbContext || "(nessun chunk)"}
+
+Report Markdown BREVE in italiano, solo queste sezioni ## :
+Cosa vede nella macchia, Perché qui non cresce (diagnosi), Cosa fare ora (3-5 azioni concrete), Cosa evitare, Nota agronomica (1 paragrafo).
+Niente piano stagionale completo. Fitofarmaci solo se evidenti nella macchia.
+${
+  vision.richiede_analisi_suolo
+    ? `
+## Analisi del suolo consigliata
+Motivo: ${vision.motivo_analisi_suolo || "squilibrio sospetto"}
+${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}`
+    : ""
+}`;
+
+  const reportPromptPrato = `Sei il miglior agronomo di tappeto erboso al mondo.
 
 Profilo: ${formatProfileForPrompt(profilo)}
 
@@ -376,8 +472,10 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
     : ""
 }`;
 
+  const reportPrompt = isMacchia ? reportPromptMacchia : reportPromptPrato;
+
   const report = await geminiGenerate(geminiKey, [{ text: reportPrompt }], {
-    maxTokens: 8192,
+    maxTokens: isMacchia ? 4096 : 8192,
     temperature: 0.4,
   });
 
@@ -386,7 +484,7 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
   let dashboardReady = false;
   let saved = null;
 
-  const zonaId = await loadZonaIdForUser(admin, userData.user.id);
+  const zonaId = zonaIdInput || (await loadZonaIdForUser(admin, userData.user.id));
 
   try {
     interventi = await extractInterventiFromReport(report, vision, geminiGenerate, geminiKey);
@@ -403,7 +501,12 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
         mimeType,
         zonaId,
       },
-      { geminiGenerate, geminiKey },
+      {
+        geminiGenerate,
+        geminiKey,
+        fonteInterventi: isMacchia ? "ia_macchia" : "ia_foto",
+        integraPiano: !isMacchia,
+      },
     );
     analisiId = saved.analisiId;
     interventi = saved.interventi;
@@ -424,5 +527,6 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
     richiede_analisi_suolo: !!vision?.richiede_analisi_suolo,
     motivo_analisi_suolo: vision?.motivo_analisi_suolo || null,
     zonaId,
+    modalita,
   };
 }

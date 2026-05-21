@@ -38,6 +38,9 @@ async function runAnalizzaJob(jobId, body, authHeader, env) {
       mimeType: body.mimeType || "image/jpeg",
       authHeader,
       env,
+      modalita: body?.modalita || "prato",
+      zonaId: body?.zonaId,
+      zonaNome: body?.zonaNome,
     });
     await updateJob(admin, jobId, { status: "completed", result, error_message: null });
   } catch (e) {
@@ -202,6 +205,9 @@ export function analizzaPratoPlugin() {
                 mimeType: body.mimeType || "image/jpeg",
                 authHeader: auth,
                 env,
+                modalita: body?.modalita || "prato",
+                zonaId: body?.zonaId,
+                zonaNome: body?.zonaNome,
               });
               res.statusCode = 200;
               res.end(JSON.stringify({ ...result, async: false }));

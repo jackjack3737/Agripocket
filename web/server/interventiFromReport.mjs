@@ -187,7 +187,7 @@ export async function persistAnalisiAndInterventi(
   admin,
   userId,
   { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType, zonaId },
-  { geminiGenerate, geminiKey } = {},
+  { geminiGenerate, geminiKey, fonteInterventi = "ia_foto", integraPiano = true } = {},
 ) {
   const insertRow = {
     user_id: userId,
@@ -224,7 +224,7 @@ export async function persistAnalisiAndInterventi(
     .from("prato_interventi")
     .delete()
     .eq("user_id", userId)
-    .eq("fonte", "ia_foto")
+    .eq("fonte", fonteInterventi)
     .eq("stato", "pianificato");
 
   const prodotti = await loadProdotti(admin);
@@ -234,12 +234,14 @@ export async function persistAnalisiAndInterventi(
 
   let saved = [];
   if (arricchiti.length) {
-    const rows = arricchiti.map((i) => rowIntervento(userId, analisiId, i, "ia_foto", zonaId));
+    const rows = arricchiti.map((i) =>
+      rowIntervento(userId, analisiId, i, fonteInterventi, zonaId),
+    );
     saved = await insertInterventi(admin, rows);
   }
 
   let pianoAggiornato = null;
-  if (geminiGenerate && geminiKey) {
+  if (integraPiano && geminiGenerate && geminiKey) {
     try {
       pianoAggiornato = await integraFotoNelPiano({
         admin,
@@ -277,7 +279,11 @@ async function rollbackAnalisiParziale(admin, userId, analisiId) {
   if (!analisiId) return;
   try {
     await admin.from("prato_interventi").delete().eq("analisi_id", analisiId);
-    await admin.from("prato_interventi").delete().eq("user_id", userId).eq("fonte", "ia_foto");
+    await admin
+      .from("prato_interventi")
+      .delete()
+      .eq("user_id", userId)
+      .eq("fonte", fonteInterventi);
     await admin.from("prato_analisi").delete().eq("id", analisiId);
   } catch (err) {
     console.warn("[persistAnalisi] rollback:", err.message);

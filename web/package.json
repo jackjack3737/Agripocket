@@ -6,11 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ingest:books": "node scripts/ingest_books.mjs",
+    "ingest:books:resume": "node scripts/ingest_books.mjs --no-skip-existing",
+    "cleanup:kb-libri": "node scripts/cleanup_kb_libri.mjs",
+    "dedupe:kb-libri": "node scripts/dedupe_kb_libri.mjs",
+    "kb:libri:prepare": "node scripts/dedupe_kb_libri.mjs && node scripts/cleanup_kb_libri.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "@vercel/functions": "^3.6.0",
+    "pdf-parse": "^1.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0"

@@ -18,6 +18,9 @@ async function runAnalizzaJob(jobId, body, authHeader, env) {
       mimeType: body.mimeType || "image/jpeg",
       authHeader,
       env,
+      modalita: body?.modalita || "prato",
+      zonaId: body?.zonaId,
+      zonaNome: body?.zonaNome,
     });
     await updateJob(admin, jobId, {
       status: "completed",
@@ -83,6 +86,9 @@ export default async function handler(req, res) {
         mimeType: body?.mimeType || "image/jpeg",
         authHeader: auth,
         env,
+        modalita: body?.modalita || "prato",
+        zonaId: body?.zonaId,
+        zonaNome: body?.zonaNome,
       });
       res.status(200).json({ ...result, async: false });
       return;

@@ -47,7 +47,9 @@ export async function loadInterventi(userId) {
 export async function loadUltimaAnalisi(userId) {
   const { data, error } = await supabase
     .from("prato_analisi")
-    .select("id, created_at, chunks_used, vision_json, foto_url, foto_path, zona_id")
+    .select(
+      "id, created_at, chunks_used, vision_json, report_markdown, foto_url, foto_path, zona_id",
+    )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(1)

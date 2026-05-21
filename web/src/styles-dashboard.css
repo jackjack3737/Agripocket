@@ -1340,6 +1340,79 @@
   margin-top: 0.5rem !important;
 }
 
+.stato-clinico__sintesi {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e0e6e0);
+}
+
+.stato-clinico__sintesi-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sintesi-analisi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sintesi-analisi--compact .sintesi-blocco {
+  padding: 0.6rem 0.75rem;
+}
+
+.sintesi-blocco {
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e8efe6;
+}
+
+.sintesi-blocco--azione {
+  border-color: #c8e6c9;
+  background: #f1f8f0;
+}
+
+.sintesi-blocco__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sintesi-blocco__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text, #1a2e1a);
+}
+
+.sintesi-blocco__list li {
+  margin-bottom: 0.25rem;
+}
+
+.consulente-zona__camera {
+  width: 100%;
+  max-width: 20rem;
+}
+
+.consulente-zona__preview {
+  width: 100%;
+  max-width: 14rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  object-fit: cover;
+}
+
+.consulente-zona__loading {
+  text-align: center;
+  padding: 1rem 0;
+}
+
 /* Analisi suolo (FASE 4) */
 .analisi-suolo-alert {
   border-left: 4px solid #ff8f00;

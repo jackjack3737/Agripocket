@@ -7,7 +7,7 @@ import PratoZoneEditor from "../components/PratoZoneEditor";
 import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
 import StatoClinicoWidget from "../components/StatoClinicoWidget";
-import ChatZonaPanel from "../components/ChatZonaPanel";
+import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
 import { profileSummary } from "../data/onboardingSteps";
@@ -608,10 +608,15 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           />
         ) : null}
 
-        <ChatZonaPanel
+        <ConsulenteZonaFoto
           profile={profile}
+          userId={userId}
           zonaId={zonaDefault?.id}
           zonaNome={zonaDefault?.nome_zona}
+          onAnalisiComplete={async () => {
+            const analisi = await loadUltimaAnalisi(userId).catch(() => null);
+            setUltimaAnalisi(analisi);
+          }}
         />
 
         <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />

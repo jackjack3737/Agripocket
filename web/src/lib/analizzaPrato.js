@@ -2,14 +2,14 @@ import { supabase, loadPratoProfilo } from "./supabase";
 import { pollJobUntilDone } from "./pollJob";
 import { uploadFotoAnalisiClient } from "./fotoPrato";
 
-async function callAnalizzaApi(base64, mimeType, token) {
+async function callAnalizzaApi(base64, mimeType, token, extra = {}) {
   const res = await fetch("/api/analizza-prato", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ imageBase64: base64, mimeType }),
+    body: JSON.stringify({ imageBase64: base64, mimeType, ...extra }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Analisi non riuscita");
@@ -60,5 +60,42 @@ export async function analizzaPratoFoto({ base64, mimeType = "image/jpeg", userI
     dashboardReady: data.dashboardReady ?? false,
     pianoAggiornato: data.pianoAggiornato ?? null,
     profile,
+  };
+}
+
+/** Foto macchia su zona → analisi mirata (consulente zona). */
+export async function analizzaMacchiaZona({
+  base64,
+  mimeType = "image/jpeg",
+  userId,
+  zonaId,
+  zonaNome,
+}) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Accedi per analizzare la macchia");
+
+  const data = await callAnalizzaApi(base64, mimeType, session.access_token, {
+    modalita: "macchia_zona",
+    zonaId: zonaId || undefined,
+    zonaNome: zonaNome || undefined,
+  });
+
+  if (data.analisiId && userId) {
+    try {
+      await uploadFotoAnalisiClient(userId, data.analisiId, base64, mimeType);
+    } catch {
+      /* bucket opzionale */
+    }
+  }
+
+  return {
+    report: data.report ?? "",
+    vision: data.vision ?? null,
+    analisiId: data.analisiId ?? null,
+    dashboardReady: data.dashboardReady ?? false,
+    richiede_analisi_suolo: data.richiede_analisi_suolo ?? false,
+    motivo_analisi_suolo: data.motivo_analisi_suolo ?? null,
   };
 }

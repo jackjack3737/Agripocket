@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { calcolaStatoClinico } from "../lib/statoClinico";
 import { resolveSignedFotoFromAnalisi } from "../lib/fotoPrato";
+import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
 
 function parseVision(raw) {
   if (!raw) return null;
@@ -87,6 +88,17 @@ export default function StatoClinicoWidget({
           <p className="stato-clinico__motivo">{stato.motivo}</p>
         </div>
       </div>
+
+      {ultimaAnalisi ? (
+        <div className="stato-clinico__sintesi">
+          <h3 className="stato-clinico__sintesi-title">Analisi Gemini</h3>
+          <SintesiAnalisiBlocks
+            visionJson={ultimaAnalisi.vision_json}
+            reportMarkdown={ultimaAnalisi.report_markdown}
+            compact
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

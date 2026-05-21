@@ -16,6 +16,8 @@ venv/
 Thumbs.db
 *.log
 .cursor/
+web/scripts/libri/*.pdf
+web/scripts/.ingest_books.lock
 crawler/sources_drive/
 Ground/
 preventivo/
