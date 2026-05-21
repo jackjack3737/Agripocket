@@ -18,6 +18,8 @@ Thumbs.db
 .cursor/
 web/scripts/libri/*.pdf
 web/scripts/.ingest_books.lock
+# Sorgenti PNG pesanti: in repo solo WebP (npm run optimize:onboarding in web/)
+web/public/onboarding/*.png
 crawler/sources_drive/
 Ground/
 preventivo/

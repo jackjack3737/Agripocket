@@ -1,6 +1,8 @@
 /** Onboarding — guida per utenti non esperti */
 
-const IMG = (name) => `/onboarding/${name}`;
+import { onboardingImg } from "../lib/onboardingImages.js";
+
+const IMG = (name) => onboardingImg(name);
 
 /** Sfondo generale se lo step non ne ha uno dedicato */
 export const DEFAULT_ONBOARDING_BG = IMG("bg-prato-generale.png");
@@ -270,7 +272,7 @@ export const ONBOARDING_STEPS = [
   {
     id: "frequenza_taglio",
     field: "frequenza_taglio",
-    backgroundImage: IMG("bg-taglio.png"),
+    backgroundImage: IMG("bg-taglio-manuale.png"),
     title: "Ogni quanto tagli?",
     intro: "La frequenza di taglio influenza stress, malattie e densità.",
     whatToDo: "Pensa alla stagione tipo (aprile–giugno).",
@@ -301,14 +303,14 @@ export const ONBOARDING_STEPS = [
         label: "Raramente",
         desc: "Meno spesso",
         help: "Erba che cresce molto tra un taglio e l'altro.",
-        image: IMG("bg-taglio.png"),
+        image: IMG("opt-taglio-raro.png"),
       },
       {
         value: "non_so",
         label: "Non lo so",
         desc: "Variabile",
         help: "",
-        image: IMG("bg-taglio.png"),
+        image: IMG("opt-taglio-raro.png"),
       },
     ],
   },
@@ -353,7 +355,7 @@ export const ONBOARDING_STEPS = [
   {
     id: "animali",
     field: "animali",
-    backgroundImage: IMG("bg-animali.png"),
+    backgroundImage: IMG("bg-prato-vuoto.png"),
     title: "Ci sono animali sul prato?",
     intro: "Cani e altri animali cambiano usura, urine e rischio parassiti.",
     whatToDo: "Scegli l'opzione principale.",
@@ -363,7 +365,7 @@ export const ONBOARDING_STEPS = [
         label: "No",
         desc: "Nessun animale abituale",
         help: "",
-        image: IMG("bg-animali.png"),
+        image: IMG("bg-prato-vuoto.png"),
       },
       {
         value: "cane",
@@ -377,14 +379,14 @@ export const ONBOARDING_STEPS = [
         label: "Altri",
         desc: "Gatti, conigli, pollame…",
         help: "",
-        image: IMG("bg-animali.png"),
+        image: IMG("bg-prato-vuoto.png"),
       },
       {
         value: "non_so",
         label: "Non lo so",
         desc: "—",
         help: "",
-        image: IMG("bg-animali.png"),
+        image: IMG("bg-prato-vuoto.png"),
       },
     ],
   },

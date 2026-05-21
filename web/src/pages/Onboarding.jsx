@@ -10,6 +10,7 @@ import {
   ONBOARDING_STEPS,
   DEFAULT_ONBOARDING_BG,
 } from "../data/onboardingSteps";
+import { preloadOnboardingImage } from "../lib/onboardingImages";
 import { formatMqInput, parseMqInput } from "../lib/parseMq";
 import { DISCLAIMER_LEGALE } from "../lib/sicurezzaClient";
 import { savePratoProfilo } from "../lib/supabase";
@@ -92,6 +93,15 @@ function findNextStep(from, answers, dir = 1) {
     i += dir;
   }
   return dir > 0 ? ONBOARDING_STEPS.length : -1;
+}
+
+function resolveStepBg(stepIndex, answers) {
+  if (stepIndex >= ONBOARDING_STEPS.length) return EXTRA_STEP.backgroundImage;
+  const sd = ONBOARDING_STEPS[stepIndex];
+  if (!sd) return DEFAULT_ONBOARDING_BG;
+  const v = sd.type !== "multi" && sd.field ? answers[sd.field] : null;
+  const opt = v && sd.options ? sd.options.find((o) => o.value === v) : null;
+  return opt?.image ?? sd.backgroundImage ?? DEFAULT_ONBOARDING_BG;
 }
 
 export default function Onboarding({ userId, initialProfile, onComplete }) {
@@ -194,6 +204,17 @@ export default function Onboarding({ userId, initialProfile, onComplete }) {
     stepData && !isMulti && value ? stepData.options.find((o) => o.value === value) : null;
   const stepBg = isExtra ? EXTRA_STEP.backgroundImage : stepData?.backgroundImage;
   const bgImage = selectedOption?.image ?? stepBg ?? DEFAULT_ONBOARDING_BG;
+
+  useEffect(() => {
+    preloadOnboardingImage(bgImage);
+    const nextIdx = findNextStep(step + 1, answers, 1);
+    if (nextIdx >= 0) preloadOnboardingImage(resolveStepBg(nextIdx, answers));
+    const next2 = findNextStep(nextIdx + 1, answers, 1);
+    if (next2 >= 0 && next2 !== nextIdx) preloadOnboardingImage(resolveStepBg(next2, answers));
+    for (const opt of stepData?.options ?? []) {
+      if (opt.image) preloadOnboardingImage(opt.image);
+    }
+  }, [step, bgImage, answers, stepData]);
 
   const extraReady =
     isExtra &&
