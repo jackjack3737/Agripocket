@@ -9,20 +9,31 @@ export default function DashPageHeader({
   summary,
   onLogout,
   techTitle = false,
+  appleTitle = false,
 }) {
+  const titleClass = [
+    "dash-header__title",
+    appleTitle && "dash-header__title--apple",
+    techTitle && !appleTitle && "dash-header__title--tech",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <header className="dash-header">
       <div className="dash-header__top">
         <div className="dash-header__brand">
-          {kicker ? <p className="dash-header__kicker">{kicker}</p> : null}
-          <h1 className={`dash-header__title${techTitle ? " dash-header__title--tech" : ""}`}>
-            {titleAccent ? (
+          {kicker ? (
+            <p className={`dash-header__kicker${appleTitle ? " dash-header__kicker--apple" : ""}`}>{kicker}</p>
+          ) : null}
+          <h1 className={titleClass}>
+            {appleTitle || !titleAccent ? (
+              title
+            ) : (
               <>
                 <span className="dash-header__title-main">{title}</span>
                 <span className="dash-header__title-accent">{titleAccent}</span>
               </>
-            ) : (
-              title
             )}
           </h1>
           {summary ? <p className="dash-header__chip profile-chip">{summary}</p> : null}

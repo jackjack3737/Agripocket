@@ -124,10 +124,9 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     <div className="page dashboard">
       <DashPageHeader
         active="dashboard"
-        kicker="Solum · telemetry"
-        title="Centro"
-        titleAccent="controllo"
-        techTitle
+        kicker="Il tuo prato, in tempo reale"
+        title="Solum"
+        appleTitle
         summary={summary}
         onLogout={logout}
       />
