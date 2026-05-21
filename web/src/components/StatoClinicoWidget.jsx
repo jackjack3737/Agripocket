@@ -70,7 +70,7 @@ export default function StatoClinicoWidget({
 
   return (
     <section
-      className={`dash-card dash-card--wide stato-clinico stato-clinico--${stato.livello}`}
+      className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
       aria-live="polite"
     >
       <div className="stato-clinico__header">

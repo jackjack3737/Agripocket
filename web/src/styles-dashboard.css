@@ -97,6 +97,25 @@
 @media (min-width: 640px) {
   .dash-grid {
     grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .dash-grid__col {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .dash-grid__col .stato-clinico {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .dash-card--radar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   .dash-card--wide {

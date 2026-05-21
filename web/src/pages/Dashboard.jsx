@@ -152,23 +152,32 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
       ) : null}
 
       <div className="dash-grid">
-        <section className="dash-card dash-card--weather">
-          <h2 className="dash-card__title">Meteo</h2>
-          {profile?.localita ? (
-            <p className="dash-card__sub">{profile.localita}</p>
-          ) : (
-            <p className="dash-card__sub">
-              <Link to="/onboarding">Imposta la località</Link> nel profilo.
-            </p>
-          )}
-          {weatherLoading ? <p className="dash-card__loading">Caricamento meteo…</p> : null}
-          {weatherError && !weatherLoading ? (
-            <p className="form-msg form-msg--error">{weatherError}</p>
-          ) : null}
-          {weather ? (
-            <WeatherCard bundle={weather} compact zonaNome={zonaDefault?.nome_zona} />
-          ) : null}
-        </section>
+        <div className="dash-grid__col">
+          <section className="dash-card dash-card--weather">
+            <h2 className="dash-card__title">Meteo</h2>
+            {profile?.localita ? (
+              <p className="dash-card__sub">{profile.localita}</p>
+            ) : (
+              <p className="dash-card__sub">
+                <Link to="/onboarding">Imposta la località</Link> nel profilo.
+              </p>
+            )}
+            {weatherLoading ? <p className="dash-card__loading">Caricamento meteo…</p> : null}
+            {weatherError && !weatherLoading ? (
+              <p className="form-msg form-msg--error">{weatherError}</p>
+            ) : null}
+            {weather ? (
+              <WeatherCard bundle={weather} compact zonaNome={zonaDefault?.nome_zona} />
+            ) : null}
+          </section>
+
+          <StatoClinicoWidget
+            ultimaAnalisi={ultimaAnalisi}
+            zonaNome={zonaDefault?.nome_zona}
+            weather={weather}
+            userId={userId}
+          />
+        </div>
 
         <section className="dash-card dash-card--radar">
           <h2 className="dash-card__title">Stato prato</h2>
@@ -220,13 +229,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             </p>
           ) : null}
         </section>
-
-        <StatoClinicoWidget
-          ultimaAnalisi={ultimaAnalisi}
-          zonaNome={zonaDefault?.nome_zona}
-          weather={weather}
-          userId={userId}
-        />
 
         {visionUltima?.richiede_analisi_suolo ? (
           <AnalisiSuoloAlert
