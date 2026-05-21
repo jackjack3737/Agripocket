@@ -67,6 +67,67 @@ function isItalianCap(value) {
   return /^\d{5}$/.test(String(value || "").trim());
 }
 
+/**
+ * Normalizza località da profilo/mappa (es. "Busto Arsizio, 21052" da Google Geocoder).
+ * Open-Meteo non accetta "città, CAP" come stringa unica.
+ */
+export function parseLocalitaQuery(raw) {
+  let q = String(raw || "").trim();
+  if (!q) return { kind: "empty" };
+
+  q = q.replace(/,?\s*(Italia|Italy|IT)\s*$/i, "").trim();
+
+  if (isItalianCap(q)) return { kind: "cap", cap: q };
+
+  const commaCap = q.match(/^(.+?),\s*(\d{5})\s*$/);
+  if (commaCap) {
+    return { kind: "city_cap", city: commaCap[1].trim(), cap: commaCap[2] };
+  }
+
+  const capInString = q.match(/\b(\d{5})\b/);
+  if (capInString) {
+    const city = q
+      .replace(capInString[0], "")
+      .replace(/,\s*,/g, ",")
+      .replace(/^,\s*|,\s*$/g, "")
+      .trim();
+    if (city) return { kind: "city_cap", city, cap: capInString[1] };
+    return { kind: "cap", cap: capInString[1] };
+  }
+
+  if (q.includes(",")) {
+    const parts = q
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      const last = parts[parts.length - 1];
+      if (/^\d{5}$/.test(last)) {
+        return { kind: "city_cap", city: parts.slice(0, -1).join(", "), cap: last };
+      }
+      // "Via Roma 1, Busto Arsizio" → comune = ultimo segmento
+      if (last.length >= 2 && /^[A-Za-zÀ-ÿ]/u.test(last) && !/^\d/.test(last)) {
+        return { kind: "city", city: last };
+      }
+    }
+    const first = parts[0]?.trim();
+    if (first?.length >= 2) return { kind: "city", city: first };
+  }
+
+  return { kind: "city", city: q };
+}
+
+function coordsValid(lat, lon) {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180
+  );
+}
+
 /** CAP italiano: Open-Meteo non li risolve (es. 40100 → Dax FR). */
 async function geocodeItalianCap(cap) {
   const zip = cap.trim();
@@ -92,18 +153,53 @@ async function geocodeItalianCap(cap) {
   };
 }
 
-async function geocodeOpenMeteo(city) {
+/** Fallback città via Nominatim (se Open-Meteo non trova il nome). */
+async function geocodeNominatimCity(city) {
   const q = city.trim();
   const url =
-    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}` +
-    `&count=8&language=it`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Geocoding meteo: ${res.status}`);
+    `https://nominatim.openstreetmap.org/search?` +
+    `q=${encodeURIComponent(q)}&countrycodes=it&format=jsonv2&addressdetails=1&limit=1`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "AgriPocket/1.0 (turfgrass app; contact: support@agripocket.local)" },
+  });
+  if (!res.ok) throw new Error(`Geocoding città: ${res.status}`);
   const data = await res.json();
-  const hit =
-    data.results?.find((r) => r.country_code === "IT") ||
-    data.results?.[0];
+  const hit = data?.[0];
   if (!hit) throw new Error(`Località non trovata: ${city}`);
+  const addr = hit.address ?? {};
+  const comune = addr.city || addr.town || addr.municipality || addr.village || hit.name || q;
+  return {
+    lat: Number(hit.lat),
+    lon: Number(hit.lon),
+    name: comune,
+    comune,
+    country: "IT",
+    admin1: addr.state || addr.region,
+  };
+}
+
+async function geocodeOpenMeteo(city, preferItaly = true) {
+  const q = city.trim();
+  if (!q) throw new Error("Località vuota");
+
+  const trySearch = async (name, country) => {
+    const url =
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}` +
+      `&count=10&language=it${country ? `&country=${country}` : ""}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.results?.length ? data.results : null;
+  };
+
+  let results = preferItaly ? await trySearch(q, "IT") : null;
+  if (!results?.length) results = await trySearch(q, null);
+  if (!results?.length) throw new Error(`Località non trovata: ${city}`);
+
+  const hit =
+    results.find((r) => r.country_code === "IT") ||
+    results.find((r) => r.feature_code === "PPL" || r.feature_code === "PPLA" || r.feature_code === "PPLA3") ||
+    results[0];
   return {
     lat: hit.latitude,
     lon: hit.longitude,
@@ -225,11 +321,33 @@ export function formatWeatherForPrompt(bundle) {
   return lines.join("\n");
 }
 
-/** Geocoding solo Open-Meteo + Nominatim (CAP IT). */
+/** Geocoding: CAP (Nominatim), città (Open-Meteo IT), formato "Città, CAP". */
 async function resolveGeo(city) {
-  const q = city.trim();
-  if (isItalianCap(q)) return geocodeItalianCap(q);
-  return geocodeOpenMeteo(q);
+  const parsed = parseLocalitaQuery(city);
+
+  if (parsed.kind === "cap") return geocodeItalianCap(parsed.cap);
+
+  if (parsed.kind === "city_cap") {
+    try {
+      return await geocodeItalianCap(parsed.cap);
+    } catch {
+      try {
+        return await geocodeOpenMeteo(parsed.city, true);
+      } catch {
+        throw new Error(`Località non trovata: ${city}`);
+      }
+    }
+  }
+
+  if (parsed.kind === "city") {
+    try {
+      return await geocodeOpenMeteo(parsed.city, true);
+    } catch {
+      return geocodeNominatimCity(parsed.city);
+    }
+  }
+
+  throw new Error(`Inserisci città o CAP valido (es. Busto Arsizio o 21052)`);
 }
 
 /**
@@ -240,12 +358,19 @@ async function resolveGeo(city) {
  */
 export async function fetchWeatherBundle(city, _legacyApiKey, opts = {}) {
   let geo;
-  if (opts.lat != null && opts.lon != null) {
+  const latIn = Number(opts.lat);
+  const lonIn = Number(opts.lon ?? opts.lng);
+  if (coordsValid(latIn, lonIn)) {
+    const parsed = parseLocalitaQuery(city);
+    const label =
+      parsed.kind === "city" || parsed.kind === "city_cap"
+        ? parsed.city
+        : city?.trim() || "Zona";
     geo = {
-      lat: Number(opts.lat),
-      lon: Number(opts.lon),
-      name: city?.trim() || "Zona",
-      comune: city?.trim() || null,
+      lat: latIn,
+      lon: lonIn,
+      name: label,
+      comune: label,
       country: "IT",
     };
   } else {

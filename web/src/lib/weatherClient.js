@@ -33,8 +33,12 @@ export async function fetchMeteoForCity(city, opts = {}) {
   const params = new URLSearchParams();
   if (trimmed) params.set("city", trimmed);
   if (opts.zonaId) params.set("zonaId", opts.zonaId);
-  if (opts.lat != null) params.set("lat", String(opts.lat));
-  if (opts.lon != null) params.set("lon", String(opts.lon));
+  const lat = Number(opts.lat);
+  const lon = Number(opts.lon ?? opts.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    params.set("lat", String(lat));
+    params.set("lon", String(lon));
+  }
 
   const res = await fetch(`/api/meteo?${params}`);
   const data = await res.json();
