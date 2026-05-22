@@ -122,6 +122,18 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     <div className="page dashboard">
       <DashPageHeader active="dashboard" heroBrand profile={profile} onLogout={logout} />
 
+      <ConsulenteZonaFoto
+        variant="google"
+        profile={profile}
+        userId={userId}
+        zonaId={zonaDefault?.id}
+        zonaNome={zonaDefault?.nome_zona}
+        onAnalisiComplete={async () => {
+          const analisi = await loadUltimaAnalisi(userId).catch(() => null);
+          setUltimaAnalisi(analisi);
+        }}
+      />
+
       {banner ? (
         <p className="dash-banner">
           {banner}{" "}
@@ -230,17 +242,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             motivo={visionUltima.motivo_analisi_suolo}
           />
         ) : null}
-
-        <ConsulenteZonaFoto
-          profile={profile}
-          userId={userId}
-          zonaId={zonaDefault?.id}
-          zonaNome={zonaDefault?.nome_zona}
-          onAnalisiComplete={async () => {
-            const analisi = await loadUltimaAnalisi(userId).catch(() => null);
-            setUltimaAnalisi(analisi);
-          }}
-        />
       </div>
 
       <footer className="dash-footer">

@@ -4,7 +4,9 @@ import { analizzaMacchiaZona, chiediAgronomoTesto } from "../lib/analizzaPrato";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
 import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
 
-const PLACEHOLDER = "Chiedi all'agronomo… es. perché qui non cresce l'erba?";
+const PLACEHOLDER_GOOGLE = "Chiedi all'agronomo";
+const PLACEHOLDER_CARD =
+  "Chiedi all'agronomo… es. perché qui non cresce l'erba?";
 
 export default function ConsulenteZonaFoto({
   profile,
@@ -12,7 +14,9 @@ export default function ConsulenteZonaFoto({
   zonaId,
   zonaNome,
   onAnalisiComplete,
+  variant = "card",
 }) {
+  const isGoogle = variant === "google";
   const inputRef = useRef(null);
   const fileInputRef = useRef(null);
   const [domanda, setDomanda] = useState("");
@@ -98,15 +102,8 @@ export default function ConsulenteZonaFoto({
     inputRef.current?.focus();
   }
 
-  return (
-    <section className="dash-card dash-card--wide agronomo-ask">
-      <h2 className="dash-card__title">Chiedi all&apos;agronomo</h2>
-      <p className="dash-card__sub">
-        Una domanda sul prato o una foto della zona (macchia, erba malata). Zona:{" "}
-        <strong>{zonaNome || "Prato principale"}</strong>
-        {profile?.localita ? ` · ${profile.localita}` : ""}
-      </p>
-
+  const bar = (
+    <>
       <input
         ref={fileInputRef}
         type="file"
@@ -116,8 +113,11 @@ export default function ConsulenteZonaFoto({
         onChange={onFile}
       />
 
-      <form className="agronomo-ask__bar" onSubmit={invia}>
-        <div className="agronomo-ask__field-wrap">
+      <form
+        className={isGoogle ? "agronomo-ask__google-form" : "agronomo-ask__bar"}
+        onSubmit={invia}
+      >
+        <div className={isGoogle ? "agronomo-ask__google-box" : "agronomo-ask__field-wrap"}>
           {foto?.previewUrl ? (
             <div className="agronomo-ask__thumb-chip">
               <img src={foto.previewUrl} alt="" />
@@ -135,48 +135,78 @@ export default function ConsulenteZonaFoto({
             ref={inputRef}
             type="text"
             className="agronomo-ask__input"
-            placeholder={PLACEHOLDER}
+            placeholder={isGoogle ? PLACEHOLDER_GOOGLE : PLACEHOLDER_CARD}
             value={domanda}
             onChange={(e) => setDomanda(e.target.value)}
             disabled={loading}
-            aria-label="Domanda all'agronomo"
+            aria-label="Chiedi all'agronomo"
           />
+          {isGoogle ? (
+            <>
+              <button
+                type="button"
+                className="agronomo-ask__google-btn agronomo-ask__google-btn--attach"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading || !haLocalita}
+                aria-label="Allega foto"
+                title="Allega foto"
+              >
+                <span className="agronomo-ask__plus" aria-hidden>
+                  +
+                </span>
+              </button>
+              <button
+                type="submit"
+                className="agronomo-ask__google-btn agronomo-ask__google-btn--send"
+                disabled={loading || !haLocalita || !haInvio}
+                aria-label="Invia"
+                title="Invia"
+              >
+                <span className="agronomo-ask__icon agronomo-ask__icon--send" aria-hidden />
+              </button>
+            </>
+          ) : null}
         </div>
-        <button
-          type="button"
-          className="agronomo-ask__icon-btn"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading || !haLocalita}
-          aria-label="Allega foto"
-          title="Allega foto"
-        >
-          <span className="agronomo-ask__icon agronomo-ask__icon--camera" aria-hidden />
-        </button>
-        <button
-          type="submit"
-          className="agronomo-ask__icon-btn agronomo-ask__icon-btn--send"
-          disabled={loading || !haLocalita || !haInvio}
-          aria-label="Invia"
-          title="Invia"
-        >
-          <span className="agronomo-ask__icon agronomo-ask__icon--send" aria-hidden />
-        </button>
+        {!isGoogle ? (
+          <>
+            <button
+              type="button"
+              className="agronomo-ask__icon-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || !haLocalita}
+              aria-label="Allega foto"
+              title="Allega foto"
+            >
+              <span className="agronomo-ask__icon agronomo-ask__icon--camera" aria-hidden />
+            </button>
+            <button
+              type="submit"
+              className="agronomo-ask__icon-btn agronomo-ask__icon-btn--send"
+              disabled={loading || !haLocalita || !haInvio}
+              aria-label="Invia"
+              title="Invia"
+            >
+              <span className="agronomo-ask__icon agronomo-ask__icon--send" aria-hidden />
+            </button>
+          </>
+        ) : null}
       </form>
+    </>
+  );
 
+  const feedback = (
+    <>
       {!haLocalita ? (
         <p className="form-msg form-msg--error">
           <Link to="/onboarding">Imposta la località</Link> nel profilo.
         </p>
       ) : null}
-
       {loading ? (
         <p className="agronomo-ask__loading">
           {foto ? "Analisi foto in corso…" : "L'agronomo risponde…"} (circa 1–2 min)
         </p>
       ) : null}
-
       {error ? <p className="form-msg form-msg--error">{error}</p> : null}
-
       {resultFoto && !loading ? (
         <div className="agronomo-ask__risposta">
           <p className="agronomo-ask__risposta-label">Analisi dalla foto</p>
@@ -189,7 +219,6 @@ export default function ConsulenteZonaFoto({
           />
         </div>
       ) : null}
-
       {resultTesto && !loading ? (
         <div className="agronomo-ask__risposta agronomo-ask__risposta--testo">
           <p className="agronomo-ask__risposta-label">Risposta</p>
@@ -202,12 +231,33 @@ export default function ConsulenteZonaFoto({
           ) : null}
         </div>
       ) : null}
-
       {(resultFoto || resultTesto) && !loading ? (
         <button type="button" className="btn btn-ghost btn-sm agronomo-ask__reset" onClick={nuovaRichiesta}>
           Nuova domanda
         </button>
       ) : null}
+    </>
+  );
+
+  if (isGoogle) {
+    return (
+      <section className="agronomo-ask agronomo-ask--google" aria-label="Chiedi all'agronomo">
+        {bar}
+        {feedback}
+      </section>
+    );
+  }
+
+  return (
+    <section className="dash-card dash-card--wide agronomo-ask">
+      <h2 className="dash-card__title">Chiedi all&apos;agronomo</h2>
+      <p className="dash-card__sub">
+        Una domanda sul prato o una foto della zona (macchia, erba malata). Zona:{" "}
+        <strong>{zonaNome || "Prato principale"}</strong>
+        {profile?.localita ? ` · ${profile.localita}` : ""}
+      </p>
+      {bar}
+      {feedback}
     </section>
   );
 }

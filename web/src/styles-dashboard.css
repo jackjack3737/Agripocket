@@ -220,6 +220,113 @@
 .dash-header--hero .dash-nav {
   padding-top: 0.55rem;
   border-top: 1px solid var(--border, #e8ece8);
+  margin-bottom: 0;
+}
+
+/* Chiedi all'agronomo — subito sotto il menu, stile Google */
+.agronomo-ask--google {
+  margin: 0.85rem 0 1.25rem;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.agronomo-ask__google-form {
+  margin: 0;
+}
+
+.agronomo-ask__google-box {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 0.35rem 0 1.1rem;
+  background: #fff;
+  border: 1px solid #dfe1e5;
+  border-radius: 28px;
+  box-shadow: 0 1px 6px rgba(32, 33, 36, 0.1);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.agronomo-ask__google-box:focus-within {
+  border-color: #a8c7b5;
+  box-shadow:
+    0 1px 8px rgba(32, 33, 36, 0.12),
+    0 0 0 1px rgba(26, 61, 46, 0.12);
+}
+
+.agronomo-ask--google .agronomo-ask__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0;
+  font-size: 1rem;
+}
+
+.agronomo-ask--google .agronomo-ask__thumb-chip {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-right: 0.15rem;
+}
+
+.agronomo-ask__google-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.agronomo-ask__google-btn:hover:not(:disabled) {
+  background: rgba(60, 64, 67, 0.06);
+}
+
+.agronomo-ask__google-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.agronomo-ask__google-btn--attach {
+  color: #5f6368;
+}
+
+.agronomo-ask__plus {
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1;
+  user-select: none;
+}
+
+.agronomo-ask__google-btn--send {
+  background: var(--accent, #1a3d2e);
+  margin-right: 0.15rem;
+}
+
+.agronomo-ask__google-btn--send:hover:not(:disabled) {
+  background: #245c42;
+}
+
+.agronomo-ask__google-btn--send .agronomo-ask__icon--send {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.agronomo-ask--google .agronomo-ask__loading,
+.agronomo-ask--google .form-msg,
+.agronomo-ask--google .agronomo-ask__risposta {
+  margin-top: 0.75rem;
 }
 
 .dash-nav__settings {
