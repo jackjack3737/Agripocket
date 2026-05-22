@@ -25,8 +25,16 @@ export default function DashPageHeader({
     return (
       <header className="dash-header dash-header--hero">
         <div className="dash-header__brandline">
-          <h1 className="dash-header__hero-brand">SOLUM</h1>
-          <p className="dash-header__hero-tagline">la scienza sotto il verde</p>
+          <Link to="/dashboard" className="dash-header__logo-link" aria-label="Solum — la scienza sotto il verde">
+            <img
+              src="/brand/solum-logo.png"
+              alt="Solum — la scienza sotto il verde"
+              className="dash-header__logo"
+              width={220}
+              height={120}
+              decoding="async"
+            />
+          </Link>
           <div className="dash-header__actions">
             <Link to="/onboarding" className="dash-header__action">
               Profilo
