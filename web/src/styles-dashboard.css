@@ -200,13 +200,13 @@
 
 .dash-header__tagline {
   margin: 0;
-  max-width: 9.5rem;
   font-size: clamp(0.9rem, 2.2vw, 1.1rem);
   font-weight: 400;
-  font-style: italic;
-  line-height: 1.35;
+  font-style: normal;
+  line-height: 1.2;
   letter-spacing: -0.01em;
   color: #4a4a48;
+  white-space: nowrap;
 }
 
 .dash-header--hero .dash-nav {
@@ -386,8 +386,7 @@
   }
 
   .dash-header__tagline {
-    max-width: 7.5rem;
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 3vw, 0.9rem);
   }
 
   .dash-nav__settings {
