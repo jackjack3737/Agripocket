@@ -1,7 +1,25 @@
+/* Stessa tipografia del profilo / onboarding */
 .dashboard {
   max-width: 52rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.dashboard .dash-card__title,
+.dashboard .stato-clinico__title,
+.dashboard .dash-calendar__head h2,
+.dashboard .dash-abitudini .dash-card__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.dashboard .dash-card__sub,
+.dashboard .dash-card__lead,
+.dashboard .dash-card__meta,
+.dashboard .intervento-row__title {
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 .dash-header {
@@ -163,36 +181,23 @@
 
 .dash-header__hero-brand {
   margin: 0;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Display",
-    "SF Pro Text",
-    system-ui,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  font-size: clamp(1.5rem, 4vw, 1.85rem);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  color: #1d1d1f;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 4.5vw, 2.25rem);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1.05;
+  color: var(--text);
   flex-shrink: 0;
 }
 
 .dash-header__hero-tagline {
   margin: 0;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Text",
-    system-ui,
-    sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.95rem;
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.2;
-  color: #6e6e73;
+  color: var(--muted);
   white-space: nowrap;
 }
 
