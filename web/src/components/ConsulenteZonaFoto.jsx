@@ -225,8 +225,14 @@ export default function ConsulenteZonaFoto({
           <p className="agronomo-ask__testo">{resultTesto.risposta}</p>
           {resultTesto.chunksUsed != null ? (
             <p className="dash-card__meta">
-              {resultTesto.fonte === "rag" ? "Knowledge base" : "Profilo e meteo"} ·{" "}
-              {resultTesto.chunksUsed} estratti
+              {resultTesto.fonte === "rag_verificato"
+                ? "Knowledge base (verificata)"
+                : resultTesto.fonte === "rag"
+                  ? "Knowledge base"
+                  : resultTesto.fonte === "kb_insufficiente"
+                    ? "Dati insufficienti in KB"
+                    : "Profilo e meteo"}{" "}
+              · {resultTesto.chunksUsed} estratti
             </p>
           ) : null}
         </div>
