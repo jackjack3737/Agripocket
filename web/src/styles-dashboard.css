@@ -4,6 +4,7 @@
   max-width: 52rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
+  background: var(--bg);
   font-family: var(--font-dashboard);
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -176,13 +177,15 @@
   flex-shrink: 0;
   line-height: 0;
   text-decoration: none;
+  background: var(--bg);
+  border-radius: 2px;
 }
 
 .dash-header__logo {
   display: block;
   width: auto;
-  height: clamp(3.5rem, 12vw, 5.25rem);
-  max-width: min(100%, 14rem);
+  height: clamp(4.75rem, 22vw, 7.75rem);
+  max-width: min(100%, 26rem);
   object-fit: contain;
   object-position: left center;
 }
@@ -355,8 +358,8 @@
 
 @media (max-width: 480px) {
   .dash-header__logo {
-    max-width: 11rem;
-    height: 3.25rem;
+    max-width: min(100%, 20rem);
+    height: clamp(4rem, 28vw, 5.5rem);
   }
 
   .dash-nav__settings {

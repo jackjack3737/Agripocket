@@ -30,8 +30,8 @@ export default function DashPageHeader({
               src="/brand/solum-logo.png"
               alt="Solum — la scienza sotto il verde"
               className="dash-header__logo"
-              width={220}
-              height={120}
+              width={416}
+              height={227}
               decoding="async"
             />
           </Link>
