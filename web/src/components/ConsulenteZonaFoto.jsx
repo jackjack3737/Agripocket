@@ -4,9 +4,9 @@ import { analizzaMacchiaZona, chiediAgronomoTesto } from "../lib/analizzaPrato";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
 import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
 
-const PLACEHOLDER_GOOGLE = "Chiedi all'agronomo";
+const PLACEHOLDER_GOOGLE = "Chiedi all'agronomo (foto opzionale)";
 const PLACEHOLDER_CARD =
-  "Chiedi all'agronomo… es. perché qui non cresce l'erba?";
+  "Domanda sul prato o foto della zona… es. quanto irrigo in estate?";
 
 export default function ConsulenteZonaFoto({
   profile,
@@ -227,11 +227,15 @@ export default function ConsulenteZonaFoto({
             <p className="dash-card__meta">
               {resultTesto.fonte === "rag_verificato"
                 ? "Knowledge base (verificata)"
-                : resultTesto.fonte === "rag"
-                  ? "Knowledge base"
-                  : resultTesto.fonte === "kb_insufficiente"
-                    ? "Dati insufficienti in KB"
-                    : "Profilo e meteo"}{" "}
+                : resultTesto.fonte === "profilo_meteo_verificato"
+                  ? "Profilo, mappa e meteo (verificato)"
+                  : resultTesto.fonte === "profilo_meteo"
+                    ? "Profilo, mappa e meteo"
+                    : resultTesto.fonte === "rag"
+                      ? "Knowledge base"
+                      : resultTesto.fonte === "kb_insufficiente"
+                        ? "Dati insufficienti"
+                        : "Profilo e meteo"}{" "}
               · {resultTesto.chunksUsed} estratti
             </p>
           ) : null}

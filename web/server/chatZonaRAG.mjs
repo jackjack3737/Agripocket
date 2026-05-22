@@ -10,6 +10,7 @@ import {
   formatZonesForPrompt,
   formatIrrigationForPrompt,
   formatOmbraSeedForPrompt,
+  normalizePratoZone,
 } from "./pratoZone.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
@@ -146,23 +147,49 @@ function formatStoricoAnalisi(storico, { visionNotaZona } = {}) {
   return parts.join("\n\n");
 }
 
+function haMappaUtile(profilo, zona) {
+  const pz = pratoZoneEffettivo(profilo, zona);
+  const { poligono, zone } = normalizePratoZone(pz);
+  return poligono.length >= 3 || zone.length > 0;
+}
+
+/** Profilo + meteo/mappa bastano per rispondere senza foto. */
+function contestoSufficienteSenzaFoto(ctx, profilo) {
+  if (!profilo?.localita?.trim()) return false;
+  const haProfilo =
+    Boolean(profilo.esposizione || profilo.irrigazione || profilo.tipo_terreno) ||
+    Boolean(profilo.superficie_mq || ctx.zona?.metri_quadri);
+  const haMeteo = Boolean(ctx.weatherBundle || ctx.meteoAgro);
+  const haMappa = haMappaUtile(profilo, ctx.zona);
+  return haProfilo && (haMeteo || haMappa);
+}
+
 function buildSearchQuery(domanda, ctx) {
   const v = ctx.ultimaVision;
-  return [
+  const p = ctx.profilo;
+  const base = [
     domanda,
     ctx.zona?.nome_zona,
     ctx.zona?.comune,
-    v?.sintesi_visiva,
-    v?.diagnosi_avanzata,
-    ...(v?.problemi_rilevati || []).map((p) => `${p?.problema || ""} ${p?.dettaglio || ""}`.trim()),
-    ...(v?.malattie_sospette || []).map((m) => (typeof m === "string" ? m : m?.nome)),
-    v?.patologia_confermata?.nome,
-    ctx.profilo?.tipo_terreno,
-    ctx.profilo?.esposizione,
-    ctx.profilo?.irrigazione,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    p?.localita,
+    p?.tipo_terreno,
+    p?.esposizione,
+    p?.irrigazione,
+    p?.marca_seme,
+    p?.pendenza,
+    p?.ombra_zone_pct,
+    ...(p?.problemi_noti || []),
+  ];
+  if (v) {
+    base.push(
+      v.sintesi_visiva,
+      v.diagnosi_avanzata,
+      ...(v.problemi_rilevati || []).map((x) => `${x?.problema || ""} ${x?.dettaglio || ""}`.trim()),
+      ...(v.malattie_sospette || []).map((m) => (typeof m === "string" ? m : m?.nome)),
+      v.patologia_confermata?.nome,
+    );
+  }
+  return base.filter(Boolean).join("\n");
 }
 
 function formatKbChunks(chunks) {
@@ -174,13 +201,17 @@ function formatKbChunks(chunks) {
     .join("\n\n---\n\n");
 }
 
-async function verificaRispostaRAG(apiKey, { domanda, bozza, kb }) {
-  const prompt = `Sei revisore agronomico. Controlla se la BOZZA risponde alla DOMANDA usando SOLO i CHUNK della Knowledge Base (e contesto già citato nella bozza).
+async function verificaRispostaRAG(apiKey, { domanda, bozza, kb, contestoAutorizzato, senzaFoto }) {
+  const prompt = `Sei revisore agronomico. Controlla se la BOZZA risponde alla DOMANDA in modo coerente.
 
 DOMANDA UTENTE:
 ${domanda}
 
-CHUNK KB (unica fonte tecnica autorizzata):
+${senzaFoto ? "MODALITÀ: nessuna foto allegata — profilo, mappa, meteo e KB sono fonti valide.\n" : ""}
+FONTI AUTORIZZATE (la bozza deve attenersi a queste, non inventare oltre):
+${contestoAutorizzato}
+
+CHUNK KNOWLEDGE BASE:
 ${kb}
 
 BOZZA:
@@ -192,13 +223,13 @@ Rispondi SOLO con JSON valido:
   "risposta_finale": "testo in italiano per il giardiniere, max 12 righe, concreto"
 }
 
-oppure se la bozza inventa dati, è fuori tema o i chunk non bastano:
+oppure se la bozza inventa dati, è fuori tema o nessuna fonte supporta la risposta:
 {
   "ok": false,
   "risposta_finale": "${RISPOSTA_INSUFFICIENTE}"
 }
 
-Criteri ok=false: prodotti/dosi/patologie non presenti nei chunk; risposta generica che ignora la domanda; più di 2 affermazioni non supportate.`;
+Criteri ok=false: prodotti/dosi/patologie non presenti nelle fonti; risposta generica che ignora la domanda; diagnosi certa su patologia senza foto né chunk che la supportano.`;
 
   const raw = await geminiGenerate(apiKey, prompt, { temperature: 0.1, maxOutputTokens: 1024, json: true });
   try {
@@ -324,7 +355,12 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
     console.warn("[chat-zona] KB:", e.message);
   }
 
-  if (chunksUtili.length < MIN_CHUNKS) {
+  const senzaFoto = !ctx.ultimaVision;
+  const contestoOk = contestoSufficienteSenzaFoto(ctx, profilo);
+  const puoSenzaKb =
+    senzaFoto && contestoOk && (haMappaUtile(profilo, ctx.zona) || ctx.weatherBundle || ctx.meteoAgro);
+
+  if (chunksUtili.length < MIN_CHUNKS && !puoSenzaKb) {
     return {
       risposta: RISPOSTA_INSUFFICIENTE,
       fonte: "kb_insufficiente",
@@ -333,7 +369,10 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
     };
   }
 
-  const kb = formatKbChunks(chunksUtili);
+  const kb =
+    chunksUtili.length > 0
+      ? formatKbChunks(chunksUtili)
+      : "(Nessun estratto KB specifico — usa profilo, mappa zone e meteo indicati nel contesto.)";
   let meteoBlock = "";
   if (ctx.weatherBundle) {
     meteoBlock = formatWeatherForPrompt(ctx.weatherBundle);
@@ -352,7 +391,13 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
   const visionBlock = formatVisionSummary(ctx.ultimaVision);
   const storicoBlock = formatStoricoAnalisi(ctx.storico, { visionNotaZona: ctx.visionNotaZona });
 
+  const modalitaFoto = senzaFoto
+    ? `MODALITÀ: l'utente NON ha caricato foto ora${contestoOk ? " — rispondi con profilo, mappa, meteo e knowledge base" : ""}. Non chiedere obbligatoriamente una foto se puoi dare consigli gestionali coerenti. Per diagnosi certa di malattia su macchia specifica suggerisci una foto o analisi suolo.`
+    : "MODALITÀ: disponibile analisi foto recente — integrala se pertinente alla domanda.";
+
   const prompt = `Sei un agronomo di tappeto erboso in Italia. Rispondi in italiano, tono chiaro e pratico per il giardiniere (max 12 righe utili).
+
+${modalitaFoto}
 
 DOMANDA UTENTE (rispondi SOLO a questa):
 ${q}
@@ -378,15 +423,22 @@ ${storicoBlock}
 ULTIMA VISIONE FOTO (prioritaria se pertinente alla domanda):
 ${visionBlock || "Nessuna foto analizzata per questa zona."}
 
-KNOWLEDGE BASE (UNICA FONTE TECNICA — non usare altro):
+KNOWLEDGE BASE (riferimento tecnico, integra con profilo/mappa/meteo):
 ${kb}
 
 REGOLE (Step B — bozza):
-1. Rispondi alla domanda usando SOLO chunk KB + contesto sopra.
-2. NON inventare prodotti commerciali, dosi numeriche o patologie assenti nei chunk.
-3. Se i chunk non coprono la domanda, rispondi ESATTAMENTE: "${RISPOSTA_INSUFFICIENTE}"
-4. Collega ET0/GDD/meteo solo se presenti nel contesto.
-5. Non ripetere il profilo intero: solo ciò che serve alla domanda.`;
+1. Fonti ammesse: profilo, mappa zone, meteo/ET0, storico foto (se presente), chunk KB.
+2. Senza foto: consigli su irrigazione, taglio, ombra, concimazione leggera e gestione sono ammessi se supportati dal profilo/mappa/meteo.
+3. NON inventare prodotti commerciali, dosi numeriche o patologie non supportate dalle fonti.
+4. Rispondi "${RISPOSTA_INSUFFICIENTE}" solo se nessuna fonte sopra copre la domanda (es. diagnosi precisa senza dati).
+5. Collega ET0/GDD/meteo quando presenti. Non ripetere tutto il profilo: solo ciò che serve.`;
+
+  const contestoAutorizzato = [
+    `Profilo: ${formatProfileForPrompt(profilo).slice(0, 1200)}`,
+    `Mappa: ${mappaBlock.slice(0, 800)}`,
+    `Meteo: ${(meteoBlock || "n/d").slice(0, 600)}`,
+    visionBlock ? `Visione foto: ${visionBlock}` : "Visione foto: non disponibile",
+  ].join("\n\n");
 
   const bozza = await geminiGenerate(geminiKey, prompt);
   if (!bozza) {
@@ -398,12 +450,23 @@ REGOLE (Step B — bozza):
     };
   }
 
-  const verifica = await verificaRispostaRAG(geminiKey, { domanda: q, bozza, kb });
+  const verifica = await verificaRispostaRAG(geminiKey, {
+    domanda: q,
+    bozza,
+    kb,
+    contestoAutorizzato,
+    senzaFoto,
+  });
   const risposta = verifica.risposta || RISPOSTA_INSUFFICIENTE;
+
+  let fonte = "rag";
+  if (verifica.ok) fonte = chunksUtili.length ? "rag_verificato" : "profilo_meteo_verificato";
+  else if (risposta === RISPOSTA_INSUFFICIENTE) fonte = "kb_insufficiente";
+  else if (chunksUtili.length === 0 && contestoOk) fonte = "profilo_meteo";
 
   return {
     risposta,
-    fonte: verifica.ok ? "rag_verificato" : verifica.risposta === RISPOSTA_INSUFFICIENTE ? "kb_insufficiente" : "rag",
+    fonte,
     chunksUsed: chunksUtili.length,
     zona: ctx.zona,
   };
