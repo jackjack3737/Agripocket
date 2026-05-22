@@ -1,25 +1,30 @@
-/* Stessa tipografia del profilo / onboarding */
+/* Tipografia unica dashboard — Outfit (tech minimal) */
 .dashboard {
+  --font-dashboard: "Outfit", system-ui, sans-serif;
   max-width: 52rem;
   margin: 0 auto;
   padding: 1.25rem 1rem 3rem;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-dashboard);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dashboard button,
+.dashboard input,
+.dashboard textarea,
+.dashboard select {
+  font-family: inherit;
 }
 
 .dashboard .dash-card__title,
 .dashboard .stato-clinico__title,
 .dashboard .dash-calendar__head h2,
-.dashboard .dash-abitudini .dash-card__title {
-  font-family: var(--font-display);
-  font-weight: 500;
+.dashboard .dash-abitudini .dash-card__title,
+.dashboard .weather-card__panel-title {
+  font-weight: 600;
   letter-spacing: -0.02em;
-}
-
-.dashboard .dash-card__sub,
-.dashboard .dash-card__lead,
-.dashboard .dash-card__meta,
-.dashboard .intervento-row__title {
-  font-family: "Inter", system-ui, sans-serif;
 }
 
 .dash-header {
@@ -41,7 +46,6 @@
 
 .dash-header__kicker {
   margin: 0 0 0.45rem;
-  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
   font-size: 0.65rem;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -57,7 +61,6 @@
 
 .dash-header__title {
   margin: 0 0 0.4rem;
-  font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 500;
   line-height: 1.15;
@@ -80,7 +83,6 @@
 }
 
 .dash-header__title-accent {
-  font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
   font-size: 0.78em;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -88,17 +90,7 @@
   opacity: 0.92;
 }
 
-/* Titolo dashboard — stile Apple (SF, tight tracking) */
 .dash-header__title--apple {
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Display",
-    "SF Pro Text",
-    system-ui,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
   font-size: clamp(2.15rem, 6vw, 3rem);
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -181,10 +173,9 @@
 
 .dash-header__hero-brand {
   margin: 0;
-  font-family: var(--font-display);
   font-size: clamp(1.75rem, 4.5vw, 2.25rem);
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   line-height: 1.05;
   color: var(--text);
   flex-shrink: 0;
@@ -192,7 +183,6 @@
 
 .dash-header__hero-tagline {
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.95rem;
   font-weight: 400;
   letter-spacing: -0.01em;
@@ -351,12 +341,6 @@
 .dash-nav__rotator {
   display: inline-block;
   min-width: 8.5rem;
-  font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Text",
-    system-ui,
-    sans-serif;
   font-size: 0.85rem;
   font-weight: 500;
   color: #2e6b47;
@@ -573,7 +557,6 @@
 }
 
 .prato-radar__media {
-  font-family: var(--font-display);
   font-size: 1.65rem;
   font-weight: 700;
   line-height: 1;
@@ -647,9 +630,8 @@
 
 .dash-card__title {
   margin: 0 0 0.5rem;
-  font-family: var(--font-display);
   font-size: 1.05rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .dash-card__sub,
@@ -678,9 +660,8 @@
 
 .dash-calendar__head h2 {
   margin: 0 0 0.35rem;
-  font-family: var(--font-display);
   font-size: 1.25rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .dash-calendar__lead {
@@ -1657,8 +1638,8 @@
 
 .stato-clinico__title {
   margin: 0;
-  font-family: var(--font-display);
   font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .stato-clinico__semaforo {
@@ -2112,4 +2093,14 @@
   white-space: pre-wrap;
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+/* Meteo e SVG radar: stesso font Outfit della dashboard */
+.dashboard .weather-card,
+.dashboard .weather-card * {
+  font-family: inherit;
+}
+
+.dashboard .prato-radar__svg text {
+  font-family: var(--font-dashboard);
 }
