@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import AppNav from "./AppNav";
 
+const TAGLINE_WORDS = ["la", "scienza", "sotto", "il", "verde"];
+
 export default function DashPageHeader({
   active,
   kicker,
@@ -36,7 +38,22 @@ export default function DashPageHeader({
                 decoding="async"
               />
             </Link>
-            <p className="dash-header__tagline">la scienza sotto il verde</p>
+            <p className="dash-header__tagline" aria-label="la scienza sotto il verde">
+              {TAGLINE_WORDS.map((word, i) => (
+                <span
+                  key={word}
+                  className={[
+                    "dash-header__tagline-word",
+                    word === "verde" && "dash-header__tagline-word--accent",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  style={{ "--tagline-i": i }}
+                >
+                  {word}
+                </span>
+              ))}
+            </p>
           </div>
           <div className="dash-header__actions">
             <Link to="/onboarding" className="dash-header__action">

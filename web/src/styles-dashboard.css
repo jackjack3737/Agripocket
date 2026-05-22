@@ -198,15 +198,95 @@
   object-position: left center;
 }
 
+@keyframes tagline-word-in {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(8px) scale(0.96);
+  }
+  55% {
+    opacity: 0.75;
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tagline-scan {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(220%);
+    opacity: 0;
+  }
+}
+
 .dash-header__tagline {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.38em;
   margin: 0;
-  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
-  font-weight: 400;
+  padding: 0.1em 0;
+  font-size: clamp(1.15rem, 3.6vw, 1.65rem);
+  font-weight: 500;
   font-style: normal;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   color: #4a4a48;
   white-space: nowrap;
+  overflow: hidden;
+}
+
+.dash-header__tagline::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -20%;
+  width: 35%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(46, 125, 50, 0.12) 40%,
+    rgba(46, 125, 50, 0.28) 50%,
+    rgba(46, 125, 50, 0.12) 60%,
+    transparent
+  );
+  pointer-events: none;
+  animation: tagline-scan 1.35s ease-out 0.55s both;
+}
+
+.dash-header__tagline-word {
+  display: inline-block;
+  opacity: 0;
+  animation: tagline-word-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) calc(0.4s + var(--tagline-i, 0) * 0.11s) both;
+}
+
+.dash-header__tagline-word--accent {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-header__tagline::after {
+    animation: none;
+    display: none;
+  }
+
+  .dash-header__tagline-word {
+    opacity: 1;
+    animation: none;
+    filter: none;
+    transform: none;
+  }
 }
 
 .dash-header--hero .dash-nav {
@@ -386,7 +466,8 @@
   }
 
   .dash-header__tagline {
-    font-size: clamp(0.75rem, 3vw, 0.9rem);
+    font-size: clamp(0.95rem, 4.2vw, 1.2rem);
+    gap: 0.32em;
   }
 
   .dash-nav__settings {
