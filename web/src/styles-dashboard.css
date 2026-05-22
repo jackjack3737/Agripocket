@@ -456,18 +456,43 @@
 }
 
 @media (max-width: 480px) {
-  .dash-header__brand-lockup {
-    gap: 0.65rem 0.85rem;
+  /* Logo + tagline a tutta larghezza (non compressi da Profilo/Esci), allineati alla nav */
+  .dash-header--hero .dash-header__brandline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .dash-header--hero .dash-header__brandline .dash-header__actions {
+    align-self: flex-end;
+    margin-left: 0;
+  }
+
+  .dash-header--hero .dash-header__brand-lockup {
+    width: 100%;
+    margin-left: -0.3rem;
+    gap: 0.5rem 0.7rem;
+  }
+
+  .dash-header--hero .dash-header__logo-link {
+    margin-left: -0.05rem;
   }
 
   .dash-header__logo {
-    max-width: min(48vw, 14rem);
-    height: clamp(3.75rem, 26vw, 5rem);
+    max-width: min(40vw, 11.5rem);
+    height: clamp(3.35rem, 22vw, 4.6rem);
   }
 
   .dash-header__tagline {
-    font-size: clamp(0.95rem, 4.2vw, 1.2rem);
-    gap: 0.32em;
+    font-size: clamp(0.88rem, 3.6vw, 1.12rem);
+    gap: 0.28em;
+    overflow: visible;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .dash-header__tagline::after {
+    animation-duration: 1.1s;
   }
 
   .dash-nav__settings {
@@ -476,6 +501,23 @@
     padding-left: 0;
     border-left: none;
     padding-top: 0.35rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .dash-header--hero .dash-header__brand-lockup {
+    margin-left: -0.35rem;
+    gap: 0.45rem 0.55rem;
+  }
+
+  .dash-header__logo {
+    max-width: min(36vw, 10rem);
+    height: clamp(3rem, 20vw, 4.1rem);
+  }
+
+  .dash-header__tagline {
+    font-size: 0.82rem;
+    gap: 0.22em;
   }
 }
 

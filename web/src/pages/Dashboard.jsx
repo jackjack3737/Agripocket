@@ -6,6 +6,7 @@ import PratoRadar from "../components/PratoRadar";
 import WeatherCard from "../components/WeatherCard";
 import StatoClinicoWidget from "../components/StatoClinicoWidget";
 import StatoClinicoGeminiBar from "../components/StatoClinicoGeminiBar";
+import PratoZoneEditor from "../components/PratoZoneEditor";
 import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
@@ -235,6 +236,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         </section>
 
         <StatoClinicoGeminiBar ultimaAnalisi={ultimaAnalisi} />
+
+        <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />
 
         {visionUltima?.richiede_analisi_suolo ? (
           <AnalisiSuoloAlert
