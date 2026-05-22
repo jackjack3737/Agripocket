@@ -217,12 +217,28 @@
   border-top: 1px solid var(--border, #e8ece8);
 }
 
-.dash-nav__rotator {
-  display: inline-block;
-  min-width: 5.5rem;
+.dash-nav__settings {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
   margin-left: 0.15rem;
   padding-left: 0.9rem;
   border-left: 1px solid #e0e6e0;
+}
+
+.dash-nav__settings-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a9a8f;
+  white-space: nowrap;
+}
+
+.dash-nav__rotator {
+  display: inline-block;
+  min-width: 8.5rem;
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -231,13 +247,13 @@
     sans-serif;
   font-size: 0.85rem;
   font-weight: 500;
-  font-style: italic;
   color: #2e6b47;
   opacity: 0;
   transform: translateY(2px);
   transition:
     opacity 0.22s ease,
     transform 0.22s ease;
+  white-space: nowrap;
 }
 
 .dash-nav__rotator--in {
@@ -251,12 +267,12 @@
     width: 100%;
   }
 
-  .dash-nav__rotator {
+  .dash-nav__settings {
     width: 100%;
     margin-left: 0;
     padding-left: 0;
     border-left: none;
-    padding-top: 0.25rem;
+    padding-top: 0.35rem;
   }
 }
 

@@ -1,19 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { frasiImpostazioniRotanti } from "../lib/impostazioniProfilo";
 
-export const ROTATING_HERO_WORDS = [
-  "giardino",
-  "pieno sole",
-  "automatica",
-  "maturo",
-  "rigoglioso",
-  "concimato",
-  "irrigato",
-  "tagliato",
-];
+export default function DashRotatingWord({ profile, intervalMs = 3200 }) {
+  const words = useMemo(() => frasiImpostazioniRotanti(profile), [profile]);
 
-export default function DashRotatingWord({ words = ROTATING_HERO_WORDS, intervalMs = 2800 }) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    setIndex(0);
+    setVisible(true);
+  }, [words.join("|")]);
 
   useEffect(() => {
     if (words.length <= 1) return undefined;
@@ -34,11 +31,14 @@ export default function DashRotatingWord({ words = ROTATING_HERO_WORDS, interval
   const current = words[index] ?? words[0];
 
   return (
-    <span
-      className={`dash-nav__rotator${visible ? " dash-nav__rotator--in" : ""}`}
-      aria-live="polite"
-    >
-      {current}
+    <span className="dash-nav__settings" title={`Le tue impostazioni: ${current}`}>
+      <span className="dash-nav__settings-label">Impostazioni</span>
+      <span
+        className={`dash-nav__rotator${visible ? " dash-nav__rotator--in" : ""}`}
+        aria-live="polite"
+      >
+        {current}
+      </span>
     </span>
   );
 }

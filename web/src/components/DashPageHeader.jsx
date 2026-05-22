@@ -11,6 +11,7 @@ export default function DashPageHeader({
   techTitle = false,
   appleTitle = false,
   heroBrand = false,
+  profile,
 }) {
   const titleClass = [
     "dash-header__title",
@@ -39,7 +40,7 @@ export default function DashPageHeader({
             </button>
           </div>
         </div>
-        <AppNav active={active} showRotatingWord />
+        <AppNav active={active} showRotatingWord profile={profile} />
       </header>
     );
   }

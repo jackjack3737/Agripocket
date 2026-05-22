@@ -120,7 +120,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <DashPageHeader active="dashboard" heroBrand onLogout={logout} />
+      <DashPageHeader active="dashboard" heroBrand profile={profile} onLogout={logout} />
 
       {banner ? (
         <p className="dash-banner">
