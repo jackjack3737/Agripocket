@@ -9,7 +9,6 @@ import StatoClinicoGeminiBar from "../components/StatoClinicoGeminiBar";
 import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
-import { profileSummary } from "../data/onboardingSteps";
 import { loadInterventi, loadUltimaAnalisi } from "../lib/dashboard";
 import { fetchMeteoForCity } from "../lib/weatherClient";
 import { loadZonaDefault } from "../lib/zonePrato";
@@ -18,7 +17,6 @@ import { AVVISO_MQ_MANCANTI, superficieMqVerificata } from "../lib/sicurezzaClie
 
 export default function Dashboard({ profile, session, onProfileUpdate }) {
   const location = useLocation();
-  const summary = profileSummary(profile);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
@@ -122,7 +120,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <DashPageHeader active="dashboard" heroBrand summary={summary} onLogout={logout} />
+      <DashPageHeader active="dashboard" heroBrand onLogout={logout} />
 
       {banner ? (
         <p className="dash-banner">

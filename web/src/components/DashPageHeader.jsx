@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import AppNav from "./AppNav";
-import DashHeroTagline from "./DashHeroTagline";
 
 export default function DashPageHeader({
   active,
@@ -24,7 +23,9 @@ export default function DashPageHeader({
   if (heroBrand) {
     return (
       <header className="dash-header dash-header--hero">
-        <div className="dash-header__top dash-header__top--actions-only">
+        <div className="dash-header__brandline">
+          <h1 className="dash-header__hero-brand">SOLUM</h1>
+          <p className="dash-header__hero-tagline">la scienza sotto il verde</p>
           <div className="dash-header__actions">
             <Link to="/onboarding" className="dash-header__action">
               Profilo
@@ -38,12 +39,7 @@ export default function DashPageHeader({
             </button>
           </div>
         </div>
-        <AppNav active={active} />
-        <div className="dash-header__hero">
-          <h1 className="dash-header__hero-brand">SOLUM</h1>
-          <DashHeroTagline />
-          {summary ? <p className="dash-header__hero-chip profile-chip">{summary}</p> : null}
-        </div>
+        <AppNav active={active} showRotatingWord />
       </header>
     );
   }

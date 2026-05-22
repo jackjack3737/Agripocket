@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import DashRotatingWord from "./DashRotatingWord";
 
 const LINKS = [
   { key: "dashboard", to: "/dashboard", label: "Dashboard" },
@@ -6,7 +7,7 @@ const LINKS = [
   { key: "calendario", to: "/calendario", label: "Calendario" },
 ];
 
-export default function AppNav({ active }) {
+export default function AppNav({ active, showRotatingWord = false }) {
   return (
     <nav className="dash-nav" aria-label="Sezioni app">
       {LINKS.map(({ key, to, label }) => (
@@ -18,6 +19,7 @@ export default function AppNav({ active }) {
           {label}
         </Link>
       ))}
+      {showRotatingWord ? <DashRotatingWord /> : null}
     </nav>
   );
 }

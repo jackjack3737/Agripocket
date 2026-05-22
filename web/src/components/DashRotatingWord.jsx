@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const DEFAULT_WORDS = [
+export const ROTATING_HERO_WORDS = [
   "giardino",
   "pieno sole",
   "automatica",
@@ -11,7 +11,7 @@ const DEFAULT_WORDS = [
   "tagliato",
 ];
 
-export default function DashHeroTagline({ words = DEFAULT_WORDS, intervalMs = 2800 }) {
+export default function DashRotatingWord({ words = ROTATING_HERO_WORDS, intervalMs = 2800 }) {
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -34,11 +34,11 @@ export default function DashHeroTagline({ words = DEFAULT_WORDS, intervalMs = 28
   const current = words[index] ?? words[0];
 
   return (
-    <p className="dash-header__hero-tagline">
-      <span className="dash-header__hero-fixed">la scienza sotto il verde</span>
-      <span className={`dash-header__hero-word${visible ? " dash-header__hero-word--in" : ""}`}>
-        {current}
-      </span>
-    </p>
+    <span
+      className={`dash-nav__rotator${visible ? " dash-nav__rotator--in" : ""}`}
+      aria-live="polite"
+    >
+      {current}
+    </span>
   );
 }
