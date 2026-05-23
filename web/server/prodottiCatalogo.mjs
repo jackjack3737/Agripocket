@@ -25,6 +25,7 @@ import {
   AVVISO_PRODOTTO_PROFESSIONALE,
   superficieMqVerificata,
 } from "./sicurezzaProdotti.mjs";
+import { getProdottiCached } from "./prodottiCache.mjs";
 
 const MAP_CATEGORIA_INTERVENTO = {
   diserbo: ["DISERBANTE SELETTIVO", "DISERBANTE", "DISERBANTE PRE-EMERGENZA", "DISERBANTE PFnPE"],
@@ -88,7 +89,7 @@ export function periodoCompatibile(periodoUso, meseCode = meseCorrenteCode()) {
   return p.includes(tri);
 }
 
-export async function loadProdotti(admin) {
+async function loadProdottiRaw(admin) {
   const { data, error } = await admin.from("Prodotti").select("*").order("nome");
   if (error) {
     console.warn("[prodotti] load:", error.message);
@@ -97,8 +98,50 @@ export async function loadProdotti(admin) {
   const enriched = (data ?? []).map((p) => ({
     ...p,
     categoria_legale: p.categoria_legale || inferCategoriaLegale(p),
+    macro_categoria: p.macro_categoria || inferMacroCategoriaProdotto(p),
+    dosaggio_standard_mq: p.dosaggio_standard_mq ?? p.dose_fogliare ?? p.dose_radicale,
+    periodo_ideale: p.periodo_ideale || p.periodo_uso,
   }));
   return filtraProdottiConsumer(enriched);
+}
+
+/** Catalogo con cache TTL (default 10 min). */
+export async function loadProdotti(admin) {
+  return getProdottiCached(admin, loadProdottiRaw);
+}
+
+/** Macro categoria brand-agnostic per guardrails (N, P, K, …). */
+export function inferMacroCategoriaProdotto(prodotto, intervento) {
+  if (prodotto?.macro_categoria) return prodotto.macro_categoria;
+  const cat = String(prodotto?.categoria || "").toUpperCase();
+  const blob = `${prodotto?.nome || ""} ${prodotto?.composizione || ""} ${prodotto?.descrizione || ""}`.toLowerCase();
+
+  if (/SEMENT/.test(cat)) return "Semente";
+  if (/BAGNANT/.test(cat)) return "Bagnante";
+  if (/FUNGICID/.test(cat)) return "Fungicida";
+  if (/INSETTICID/.test(cat)) return "Insetticida";
+  if (/DISERBANT/.test(cat)) return "Diserbante";
+  if (/BIOSTIM|BIOATTIV/.test(cat)) return "Biostimolante";
+  if (/potass|autumn k|\bk2o\b|0-0-[1-9]|kalium/.test(blob)) return "K";
+  if (/fosfor|phosph|\bp2o5\b/.test(blob)) return "P";
+  if (/azoto|urea|ammon|nitrat|\bnpk\b/.test(blob) && !/potass/.test(blob)) return "N";
+  if (/leonardit|humus|micorriz|ammend|correttiv|ferro chelat/.test(blob)) return "Correttivo";
+  if (/CONCIME|NPK|FERTIL/.test(cat)) {
+    const m = blob.match(/(\d+)\s*[-–]\s*(\d+)\s*[-–]\s*(\d+)/);
+    if (m) {
+      const n = Number(m[1]);
+      const p = Number(m[2]);
+      const k = Number(m[3]);
+      if (k >= n && k >= p) return "K";
+      if (n >= p && n >= k) return "N";
+      if (p >= n && p >= k) return "P";
+    }
+    return "N";
+  }
+  const ic = String(intervento?.categoria || "").toLowerCase();
+  if (ic === "biostimolante") return "Biostimolante";
+  if (ic === "concime") return "N";
+  return "Altro";
 }
 
 export function mqPrato(profilo) {
@@ -354,13 +397,7 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
   const topScore = ranked[0]?.score ?? 0;
 
   const blocchi = [];
-  if (prodotto && simili.length > 1) {
-    const perché = motiviPunteggio(prodotto, opts, topScore).join(", ");
-    blocchi.push(
-      `Principale (punteggio ${topScore}): ${prodotto.nome} — ${perché}. Non è l'unico prodotto valido.`,
-    );
-    blocchi.push(formattaOpzioniCatalogo(simili, profilo, fito));
-  } else if (prodotto && simili.length === 1) {
+  if (prodotto) {
     blocchi.push(
       `Prodotto catalogo: ${prodotto.nome} (${motiviPunteggio(prodotto, opts, topScore).join(", ")}).`,
     );
@@ -418,12 +455,14 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
     ...intervento,
     prodotto_id: prodotto.id,
     prodotto_nome: prodotto.nome,
+    macro_categoria: inferMacroCategoriaProdotto(prodotto, intervento),
     dose_totale: dose.dose_totale,
     dose_unita: dose.dose_unita,
     dose_per_mq: dose.dose_per_mq,
     dose_display: dose.dose_display,
+    dosaggio_calcolato: `${dose.dose_display} per ${mq} m²`,
     avviso_fitofarmaco: false,
-    descrizione: descrizioneFinale.slice(0, 1200),
+    descrizione: descrizioneFinale.slice(0, 900),
   };
 }
 

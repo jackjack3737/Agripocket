@@ -91,6 +91,9 @@ export function InterventoRow({ item, onToggle, onPin }) {
           ) : null}
         </div>
         <p className="intervento-row__title">{item.titolo}</p>
+        {item.messaggio_ux ? (
+          <p className="intervento-row__ux">{item.messaggio_ux}</p>
+        ) : null}
         {fito ? (
           <p className="intervento-row__avviso intervento-row__avviso--fito" role="note">
             {AVVISO_FITOFARMACO}
@@ -103,14 +106,21 @@ export function InterventoRow({ item, onToggle, onPin }) {
               {item.prodotto_nome !== item.titolo ? "Principale: " : ""}
               {item.prodotto_nome}
             </span>
-            {mostraDose ? (
+            {mostraDose || item.dosaggio_calcolato ? (
               <span className="intervento-row__dose">
-                {formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
+                {item.dosaggio_calcolato ||
+                  formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
               </span>
             ) : null}
           </p>
         ) : null}
-        {item.descrizione ? (
+        {item.razionale_scientifico ? (
+          <p className="intervento-row__razionale">
+            <span className="intervento-row__razionale-label">Perché ora: </span>
+            {item.razionale_scientifico}
+          </p>
+        ) : null}
+        {item.descrizione && item.descrizione !== item.razionale_scientifico ? (
           <p className="intervento-row__desc">
             {item.descrizione.includes("Alternative catalogo")
               ? item.descrizione.split(/(?=Alternative catalogo)/).map((chunk, i) => (

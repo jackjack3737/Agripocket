@@ -77,6 +77,10 @@ function rowIntervento(userId, analisiId, i, fonte, zonaId = null) {
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
+    razionale_scientifico: i.razionale_scientifico ?? null,
+    messaggio_ux: i.messaggio_ux ?? null,
+    macro_categoria: i.macro_categoria ?? null,
+    dosaggio_calcolato: i.dosaggio_calcolato ?? null,
     manual_override: fonte === "ia_foto" ? true : !!i.manual_override,
   };
   if (i.avviso_fitofarmaco) {

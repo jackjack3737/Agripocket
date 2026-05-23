@@ -6,6 +6,7 @@
 import {
   arricchisciInterventoConProdotto,
   filtraPoolMarca,
+  inferMacroCategoriaProdotto,
   periodoCompatibile,
 } from "./prodottiCatalogo.mjs";
 import { concimeAmmessoPerProfilo } from "./livelloConcimi.mjs";
@@ -98,6 +99,21 @@ function giaCopertoDaPiano(interventi, prodotto) {
   });
 }
 
+/** Evita più prodotti della stessa macro_categoria nello stesso mese (es. 3 concimi K). */
+function giaMacroNelMese(interventi, prodotto, dataIso) {
+  const macro = inferMacroCategoriaProdotto(prodotto);
+  const mese = (dataIso || "").slice(0, 7);
+  if (!mese) return false;
+  return interventi.some((i) => {
+    const m = (i.data_prevista || "").slice(0, 7);
+    if (m !== mese) return false;
+    const im =
+      i.macro_categoria ||
+      (i.prodotto_id === prodotto.id ? macro : inferMacroCategoriaProdotto({ categoria: i.categoria }, i));
+    return im === macro;
+  });
+}
+
 function interventoDaProdotto(prodotto, profilo, oggi) {
   const tipo = mappaTipoProdotto(prodotto);
   if (!tipo) return null;
@@ -153,6 +169,7 @@ export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi
 
     const row = interventoDaProdotto(p, profilo, oggi);
     if (!row) continue;
+    if (giaMacroNelMese([...interventiPiano, ...extra], p, row.data_prevista)) continue;
     extra.push(row);
   }
 

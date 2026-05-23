@@ -3,6 +3,7 @@
  */
 
 import { configLivelloImpegno, normalizzaLivelloImpegno } from "./livelloImpegno.mjs";
+import { applicaGuardrailsCalendario } from "./agronomicGuardrails.mjs";
 
 const ROUTINE_CATEGORIE = new Set(["taglio", "irrigazione"]);
 const LIQUID_HINT = /liquid|liquido|umett|biostim|tryko|vigor|pre-stress|always|surfact/i;
@@ -101,14 +102,25 @@ export function capInterventiPerLivello(interventi, profilo) {
   return sorted.slice(0, cfg.maxInterventi);
 }
 
-/** Pipeline post-generazione Gemini + catalogo. */
-export function sanitizzaPianoCompleto(interventi, profilo, _oggi) {
+/** Pipeline post-generazione Gemini + catalogo + guardrails agronomici. */
+export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {}) {
   let list = [...interventi];
   list = rimuoviRoutineCalendario(list);
   list = bloccoTermicoEstivo(list);
   list = applicaTankMix(list);
   list = capInterventiPerLivello(list, profilo);
-  return list;
+
+  const { storico = [], prodotti = [] } = opts;
+  const { interventi: conGuardrails, bloccati, deduped } = await applicaGuardrailsCalendario(list, {
+    storico,
+    prodotti,
+    profilo,
+    oggi: oggi || new Date().toISOString().slice(0, 10),
+  });
+  if (bloccati > 0 || deduped > 0) {
+    console.info(`[guardrails] bloccati=${bloccati} dedupe=${deduped}`);
+  }
+  return conGuardrails;
 }
 
 /** Patologia fungina visibile in foto. */

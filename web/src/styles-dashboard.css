@@ -1217,6 +1217,26 @@
   font-size: 0.78rem;
 }
 
+.intervento-row__ux {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  font-weight: 450;
+}
+
+.intervento-row__razionale {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.intervento-row__razionale-label {
+  font-weight: 600;
+  color: #5a6b5e;
+}
+
 .intervento-row__desc {
   margin: 0;
   font-size: 0.82rem;

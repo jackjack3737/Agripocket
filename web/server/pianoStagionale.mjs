@@ -10,6 +10,7 @@ import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
 import { formatProfileForPrompt } from "./profileContext.mjs";
 import { configLivelloImpegno, testoLivelloPerPrompt } from "./livelloImpegno.mjs";
 import { applicaRegolaTrasemina, sanitizzaPianoCompleto } from "./sanitizzaCalendario.mjs";
+import { loadStoricoTrattamenti } from "./agronomicGuardrails.mjs";
 import {
   REGOLE_FITOFARMACI_PROMPT,
   filtraInterventiFitofarmacoCurativo,
@@ -313,6 +314,10 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
+    razionale_scientifico: i.razionale_scientifico ?? null,
+    messaggio_ux: i.messaggio_ux ?? null,
+    macro_categoria: i.macro_categoria ?? null,
+    dosaggio_calcolato: i.dosaggio_calcolato ?? null,
     manual_override: false,
   }));
 
@@ -325,7 +330,18 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
       if (error.code === "PGRST205") return { count: 0, tablesMissing: true };
       if (/prodotto_|dose_/.test(error.message || "")) {
         const slim = batch.map(
-          ({ prodotto_id, prodotto_nome, dose_totale, dose_unita, dose_per_mq, ...r }) => r,
+          ({
+            prodotto_id,
+            prodotto_nome,
+            dose_totale,
+            dose_unita,
+            dose_per_mq,
+            razionale_scientifico,
+            messaggio_ux,
+            macro_categoria,
+            dosaggio_calcolato,
+            ...r
+          }) => r,
         );
         const retry = await admin.from("prato_interventi").insert(slim).select("*");
         if (retry.error) throw new Error(`Salvataggio piano: ${retry.error.message}`);
@@ -403,7 +419,11 @@ export async function generaPianoStagionale({ authHeader, env }) {
   );
   const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(conCatalogo, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
-  const sanitizzati = sanitizzaPianoCompleto(conControlli, profilo, oggi);
+  const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
+  const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
+    storico,
+    prodotti,
+  });
   const saved = await persistPianoStagionale(admin, userData.user.id, sanitizzati, profilo);
 
   return {
