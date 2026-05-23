@@ -388,6 +388,16 @@
   cursor: not-allowed;
 }
 
+.agronomo-ask__google-btn--mic {
+  color: #5f6368;
+}
+
+.agronomo-ask__google-btn--mic-on {
+  color: #c62828;
+  background: rgba(198, 40, 40, 0.1);
+  animation: agronomo-mic-pulse 1.2s ease-in-out infinite;
+}
+
 .agronomo-ask__google-btn--attach {
   color: #5f6368;
 }
@@ -2368,6 +2378,41 @@
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M4 8h3l2-3h6l2 3h3v12H4V8z'/%3E%3Ccircle cx='12' cy='13' r='3.5'/%3E%3C/svg%3E")
     center / contain no-repeat;
   background-color: var(--accent, #1a3d2e);
+}
+
+.agronomo-ask__icon--mic {
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  background-color: currentColor;
+}
+
+.agronomo-ask__icon-btn--mic {
+  color: var(--accent, #1a3d2e);
+}
+
+.agronomo-ask__icon-btn--mic-on {
+  color: #c62828;
+  background: rgba(198, 40, 40, 0.12);
+  animation: agronomo-mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes agronomo-mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.agronomo-ask__listening {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: #c62828;
+  font-weight: 500;
 }
 
 .agronomo-ask__icon--send {

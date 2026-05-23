@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { analizzaMacchiaZona, chiediAgronomoTesto } from "../lib/analizzaPrato";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
+import { useSpeechInput } from "../lib/useSpeechInput";
 import SintesiAnalisiBlocks from "./SintesiAnalisiBlocks";
 
 const PLACEHOLDER_GOOGLE = "Chiedi all'agronomo (foto opzionale)";
@@ -35,6 +36,14 @@ export default function ConsulenteZonaFoto({
     setError("");
   }
 
+  const speech = useSpeechInput({
+    onFinal: (text) => {
+      setDomanda((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+      resetRisultati();
+      inputRef.current?.focus();
+    },
+  });
+
   async function onFile(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -64,6 +73,7 @@ export default function ConsulenteZonaFoto({
       return;
     }
 
+    speech.stop();
     setLoading(true);
     setError("");
     setResultFoto(null);
@@ -96,6 +106,7 @@ export default function ConsulenteZonaFoto({
   }
 
   function nuovaRichiesta() {
+    speech.stop();
     setDomanda("");
     setFoto(null);
     resetRisultati();
@@ -145,6 +156,26 @@ export default function ConsulenteZonaFoto({
             <>
               <button
                 type="button"
+                className={`agronomo-ask__google-btn agronomo-ask__google-btn--mic${speech.listening ? " agronomo-ask__google-btn--mic-on" : ""}`}
+                onClick={() => {
+                  speech.clearError();
+                  speech.toggle();
+                }}
+                disabled={loading || !haLocalita || !speech.supported}
+                aria-pressed={speech.listening}
+                aria-label={speech.listening ? "Ferma dettatura" : "Dettatura vocale"}
+                title={
+                  speech.supported
+                    ? speech.listening
+                      ? "Ferma dettatura"
+                      : "Parla (microfono)"
+                    : "Microfono non supportato (usa Chrome o Edge)"
+                }
+              >
+                <span className="agronomo-ask__icon agronomo-ask__icon--mic" aria-hidden />
+              </button>
+              <button
+                type="button"
                 className="agronomo-ask__google-btn agronomo-ask__google-btn--attach"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading || !haLocalita}
@@ -180,6 +211,26 @@ export default function ConsulenteZonaFoto({
               <span className="agronomo-ask__icon agronomo-ask__icon--camera" aria-hidden />
             </button>
             <button
+              type="button"
+              className={`agronomo-ask__icon-btn agronomo-ask__icon-btn--mic${speech.listening ? " agronomo-ask__icon-btn--mic-on" : ""}`}
+              onClick={() => {
+                speech.clearError();
+                speech.toggle();
+              }}
+              disabled={loading || !haLocalita || !speech.supported}
+              aria-pressed={speech.listening}
+              aria-label={speech.listening ? "Ferma dettatura" : "Dettatura vocale"}
+              title={
+                speech.supported
+                  ? speech.listening
+                    ? "Ferma dettatura"
+                    : "Parla (microfono)"
+                  : "Microfono non supportato"
+              }
+            >
+              <span className="agronomo-ask__icon agronomo-ask__icon--mic" aria-hidden />
+            </button>
+            <button
               type="submit"
               className="agronomo-ask__icon-btn agronomo-ask__icon-btn--send"
               disabled={loading || !haLocalita || !haInvio}
@@ -206,7 +257,14 @@ export default function ConsulenteZonaFoto({
           {foto ? "Analisi foto in corso…" : "L'agronomo risponde…"} (circa 1–2 min)
         </p>
       ) : null}
-      {error ? <p className="form-msg form-msg--error">{error}</p> : null}
+      {error || speech.error ? (
+        <p className="form-msg form-msg--error">{error || speech.error}</p>
+      ) : null}
+      {speech.listening ? (
+        <p className="agronomo-ask__listening" role="status">
+          In ascolto… parla ora, poi tocca di nuovo il microfono per fermare.
+        </p>
+      ) : null}
       {resultFoto && !loading ? (
         <div className="agronomo-ask__risposta">
           <p className="agronomo-ask__risposta-label">Analisi dalla foto</p>
