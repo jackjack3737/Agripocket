@@ -9,7 +9,7 @@ import { updatePratoZoneMappa } from "../lib/supabase";
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 const ZONE_BUTTONS = [
-  { tool: "irrigatore", label: "Irrigatori", desc: "Statici o dinamici, con tempi suggeriti" },
+  { tool: "irrigatore", label: "Irrigatori", desc: "Statico, rotator o oscillante" },
   { tool: "ombra", label: "Ombra", desc: "Siepi, alberi, zone poco sole" },
   { tool: "muschio", label: "Muschio", desc: "Zone con muschio o problemi" },
   { tool: "pendenza", label: "Pendenza", desc: "Direzione in cui scende l'acqua" },

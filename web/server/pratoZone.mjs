@@ -9,8 +9,16 @@ export const ZONE_TYPES = {
 
 export const IRRIGATOR_MODES = {
   statico: { label: "Statico", short: "S", desc: "Getti fissi / pop-up" },
-  dinamico: { label: "Dinamico", short: "D", desc: "Rotativo o oscillante" },
+  rotator: { label: "Rotator", short: "R", desc: "Testina a settore rotante" },
+  dinamico: { label: "Oscillante", short: "O", desc: "Irrigatore a banda / mammella" },
 };
+
+export function normalizeIrrigatorModalita(raw) {
+  const v = String(raw || "statico").toLowerCase();
+  if (v === "rotator" || v === "rotativo" || v === "testine") return "rotator";
+  if (v === "dinamico" || v === "oscillante") return "dinamico";
+  return "statico";
+}
 
 function uid() {
   return `z_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -35,7 +43,7 @@ function normalizeZone(z) {
     const lat = Number(z.lat);
     const lng = Number(z.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    const modalita = z.modalita === "dinamico" ? "dinamico" : "statico";
+    const modalita = normalizeIrrigatorModalita(z.modalita);
     return { id, tipo: "irrigatore", lat, lng, modalita };
   }
   if (z.tipo === "ombra" || z.tipo === "muschio") {
@@ -266,11 +274,12 @@ export function ensureOmbraOverseedInterventi(interventi, pratoZone, profilo, og
 
 export function countZonesByType(pratoZone) {
   const { zone } = normalizePratoZone(pratoZone);
-  const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, dinamico: 0 };
+  const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, rotator: 0, dinamico: 0 };
   for (const z of zone) {
     if (out[z.tipo] != null) out[z.tipo] += 1;
     if (z.tipo === "irrigatore") {
-      if (z.modalita === "dinamico") out.dinamico += 1;
+      if (z.modalita === "rotator") out.rotator += 1;
+      else if (z.modalita === "dinamico") out.dinamico += 1;
       else out.statico += 1;
     }
   }

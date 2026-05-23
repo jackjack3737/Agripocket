@@ -9,6 +9,7 @@ import StatoClinicoGeminiBar from "../components/StatoClinicoGeminiBar";
 import PratoZoneEditor from "../components/PratoZoneEditor";
 import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
+import IrrigationWidget from "../components/IrrigationWidget";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
 import { loadInterventi, loadUltimaAnalisi } from "../lib/dashboard";
 import { fetchMeteoForCity } from "../lib/weatherClient";
@@ -175,6 +176,8 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
               <WeatherCard bundle={weather} compact zonaNome={zonaDefault?.nome_zona} />
             ) : null}
           </section>
+
+          <IrrigationWidget profile={profile} enabled={!!profile?.localita} />
 
           <StatoClinicoWidget
             ultimaAnalisi={ultimaAnalisi}

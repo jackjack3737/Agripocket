@@ -18,7 +18,8 @@ export default function IrrigationZoneCard({ profile, hideEditLink = false }) {
     <section className="dash-card dash-card--irrigation">
       <h2 className="dash-card__title">Irrigazione da mappa</h2>
       <p className="dash-card__sub">
-        Tempi stimati da irrigatori segnati ({counts.statico} statici, {counts.dinamico} dinamici).
+        Tempi stimati da irrigatori segnati ({counts.statico} statici, {counts.rotator} rotator, {counts.dinamico}{" "}
+        oscillanti).
       </p>
       {advice.programmaSintesi ? <p className="irrigation-zone__summary">{advice.programmaSintesi}</p> : null}
       {advice.perTesta.length > 0 ? (

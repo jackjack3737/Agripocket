@@ -1,0 +1,181 @@
+.irrigation-widget {
+  border-radius: 14px;
+  padding: 1rem 1.05rem;
+  background: #fff;
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  box-shadow: 0 4px 18px rgba(25, 80, 120, 0.08);
+}
+
+.irrigation-widget--muted {
+  background: #f8fafb;
+  border-color: #e2e8ec;
+}
+
+.irrigation-widget--up {
+  border-color: rgba(46, 125, 50, 0.35);
+  background: linear-gradient(180deg, #f1faf3 0%, #fff 40%);
+}
+
+.irrigation-widget--down {
+  border-color: rgba(2, 119, 189, 0.3);
+  background: linear-gradient(180deg, #eef7fc 0%, #fff 40%);
+}
+
+.irrigation-widget--off {
+  border-color: rgba(120, 144, 156, 0.35);
+  background: linear-gradient(180deg, #f4f6f7 0%, #fff 45%);
+}
+
+.irrigation-widget--ok {
+  border-color: rgba(56, 142, 60, 0.25);
+}
+
+.irrigation-widget__head {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.irrigation-widget__icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 10px;
+  background: #e3f2fd;
+  color: #1565c0;
+  flex-shrink: 0;
+}
+
+.irrigation-widget__icon {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+.irrigation-widget__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2e3a;
+}
+
+.irrigation-widget__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: #5a6b75;
+}
+
+.irrigation-widget__lead {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #4a5a62;
+}
+
+.irrigation-widget__loading,
+.irrigation-widget__error {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.irrigation-widget__error {
+  color: #c62828;
+}
+
+.irrigation-widget__azione {
+  margin: 0 0 0.75rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.irrigation-widget__azione--up {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.irrigation-widget__azione--down {
+  background: #e1f5fe;
+  color: #01579b;
+}
+
+.irrigation-widget__azione--off {
+  background: #eceff1;
+  color: #455a64;
+}
+
+.irrigation-widget__azione--ok {
+  background: #f1f8e9;
+  color: #33691e;
+}
+
+.irrigation-widget__centralina {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.65rem;
+  border-radius: 10px;
+  background: #f5fafd;
+  border: 1px solid #d0e8f5;
+}
+
+.irrigation-widget__stat {
+  text-align: center;
+}
+
+.irrigation-widget__stat--primary strong {
+  font-size: 1.45rem;
+  color: #0d47a1;
+}
+
+.irrigation-widget__stat-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #5a7a8a;
+  margin-bottom: 0.15rem;
+}
+
+.irrigation-widget__stat strong {
+  font-size: 1.1rem;
+  color: #1565c0;
+}
+
+.irrigation-widget__pausa,
+.irrigation-widget__base {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #4a6270;
+}
+
+.irrigation-widget__edu {
+  padding: 0.65rem 0.7rem;
+  border-radius: 10px;
+  background: linear-gradient(165deg, #e8f4fc 0%, #eef8f0 100%);
+  margin-bottom: 0.55rem;
+}
+
+.irrigation-widget__messaggio {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #2f4048;
+}
+
+.irrigation-widget__tech {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  color: #78909c;
+}
+
+.irrigation-widget__refresh {
+  width: 100%;
+}

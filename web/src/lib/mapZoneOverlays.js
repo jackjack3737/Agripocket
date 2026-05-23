@@ -1,4 +1,4 @@
-import { ZONE_TYPES } from "./pratoZone";
+import { IRRIGATOR_MODES, ZONE_TYPES } from "./pratoZone";
 
 /**
  * @param {google.maps.Map} map
@@ -19,12 +19,13 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
   for (const z of zones) {
     const style = ZONE_TYPES[z.tipo];
     if (z.tipo === "irrigatore") {
+      const mode = IRRIGATOR_MODES[z.modalita] || IRRIGATOR_MODES.statico;
       const m = new window.google.maps.Marker({
         position: { lat: z.lat, lng: z.lng },
         map,
-        title: z.modalita === "dinamico" ? "Irrigatore dinamico" : "Irrigatore statico",
+        title: `Irrigatore ${mode.label}`,
         label: {
-          text: z.modalita === "dinamico" ? "D" : "S",
+          text: mode.short,
           color: "#fff",
           fontWeight: "700",
           fontSize: "11px",

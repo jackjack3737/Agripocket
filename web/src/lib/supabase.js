@@ -133,6 +133,11 @@ export async function savePratoProfilo(userId, profile) {
       return mq != null ? Math.round(mq) : null;
     })(),
     localita: profile.localita?.trim() || null,
+    tipo_irrigatori: profile.tipo_irrigatori || null,
+    tempo_irrigazione_base:
+      profile.tempo_irrigazione_base != null && Number(profile.tempo_irrigazione_base) > 0
+        ? Math.round(Number(profile.tempo_irrigazione_base))
+        : null,
     onboarding_completato: true,
     disclaimer_accettato_at: profile.disclaimer_accettato ? new Date().toISOString() : null,
   };

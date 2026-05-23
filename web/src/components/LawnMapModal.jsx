@@ -511,7 +511,7 @@ export default function LawnMapModal({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className={`map-modal map-modal--wide${isZoneEdit ? " map-modal--zone-edit" : ""}`}
+        className={`map-modal map-modal--wide${isZoneEdit ? " map-modal--zone-edit" : ""}${isZoneEdit && zoneToolProp === "irrigatore" ? " map-modal--irrigatore" : ""}`}
         role="dialog"
         aria-labelledby="map-modal-title"
       >
@@ -536,10 +536,11 @@ export default function LawnMapModal({
 
         {loadError && !missingKey && <div className="map-modal-banner map-modal-banner--error">{loadError}</div>}
 
+        <div className="map-modal-body">
         {!missingKey && !loadError && isZoneEdit && (
           <p className="map-modal-hint">
             {zoneToolProp === "irrigatore"
-              ? "Tocca la mappa per ogni irrigatore, poi scegli statico o dinamico."
+              ? "Tocca la mappa per ogni irrigatore, poi scegli il tipo (statico, rotator o oscillante)."
               : zoneToolProp === "pendenza"
                 ? "Due tap: inizio e fine della freccia (verso dove scende l'acqua)."
                 : "Tocca i vertici dell'area, poi «Chiudi area»."}{" "}
@@ -656,7 +657,7 @@ export default function LawnMapModal({
           </div>
         ) : null}
 
-        {zones.length > 0 && inZones && isZoneEdit && (
+        {zones.length > 0 && inZones && isZoneEdit && !irrigatorPick && (
           <ul className="map-zone-list">
             {zones.map((z) => (
               <li key={z.id}>
@@ -671,29 +672,36 @@ export default function LawnMapModal({
             ))}
           </ul>
         )}
+        </div>
 
-        <div ref={mapElRef} className="map-modal-map" />
+        <div className="map-modal-map-wrap">
+          <div ref={mapElRef} className="map-modal-map" />
 
-        {irrigatorPick && (
-          <div className="map-irrigator-pick" role="dialog" aria-label="Tipo irrigatore">
-            <p>Che tipo di irrigatore è qui?</p>
-            <div className="map-irrigator-pick__actions">
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => confirmIrrigator("statico")}>
-                {IRRIGATOR_MODES.statico.label}
-                <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.statico.desc}</span>
-              </button>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => confirmIrrigator("dinamico")}>
-                {IRRIGATOR_MODES.dinamico.label}
-                <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.dinamico.desc}</span>
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIrrigatorPick(null)}>
-                Annulla
-              </button>
+          {irrigatorPick ? (
+            <div className="map-irrigator-pick map-irrigator-pick--sheet" role="dialog" aria-label="Tipo irrigatore">
+              <p>Che tipo di irrigatore è qui?</p>
+              <div className="map-irrigator-pick__actions">
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => confirmIrrigator("statico")}>
+                  {IRRIGATOR_MODES.statico.label}
+                  <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.statico.desc}</span>
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => confirmIrrigator("rotator")}>
+                  {IRRIGATOR_MODES.rotator.label}
+                  <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.rotator.desc}</span>
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => confirmIrrigator("dinamico")}>
+                  {IRRIGATOR_MODES.dinamico.label}
+                  <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.dinamico.desc}</span>
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIrrigatorPick(null)}>
+                  Annulla
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          ) : null}
+        </div>
 
-        <div className="map-modal-footer">
+        <div className="map-modal-footer map-modal-footer--sticky">
           <div className="map-modal-area">
             {vertices.length < 3 ? (
               <span className="map-area-muted">Area: — (almeno 3 punti)</span>

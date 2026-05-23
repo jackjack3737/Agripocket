@@ -7,6 +7,8 @@ import { fetchWeatherBundle } from "./server/weatherCore.mjs";
 import { rispondiChatZona } from "./server/chatZonaRAG.mjs";
 import { buildRaccomandazioneSemina } from "./server/raccomandazioneSementi.mjs";
 import { loadProdotti } from "./server/prodottiCatalogo.mjs";
+import { calcolaIrrigazioneGiornalieraAsync } from "./server/motoreIrrigazione.mjs";
+import { queryKnowledgeBasePrioritized } from "./server/kbQuery.mjs";
 import { createJob, updateJob, adminClient, getJobForUser } from "./server/jobs.mjs";
 import { checkRateLimit } from "./server/rateLimit.mjs";
 
@@ -339,6 +341,105 @@ export function analizzaPratoPlugin() {
       });
 
       server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/irrigazione-giornaliera")) return next();
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/json");
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+          res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+          res.end();
+          return;
+        }
+        if (req.method !== "GET" && req.method !== "POST") {
+          res.statusCode = 405;
+          res.end();
+          return;
+        }
+
+        const auth = req.headers.authorization || "";
+        if (!auth) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: "Non autenticato" }));
+          return;
+        }
+
+        try {
+          const user = await authUser(req, env);
+          if (!user) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: "Sessione non valida" }));
+            return;
+          }
+          const admin = adminClient(env);
+          const { data: profilo } = await admin
+            .from("prato_profilo")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          if (!profilo?.localita?.trim()) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: "Imposta la località nel profilo." }));
+            return;
+          }
+
+          let pratoZone = profilo?.prato_zone;
+          if (typeof pratoZone === "string") {
+            try {
+              pratoZone = JSON.parse(pratoZone);
+            } catch {
+              pratoZone = null;
+            }
+          }
+          const poligono = pratoZone?.poligono;
+          const gps =
+            Array.isArray(poligono) && poligono.length >= 3
+              ? {
+                  lat: poligono.reduce((s, p) => s + Number(p.lat), 0) / poligono.length,
+                  lon: poligono.reduce((s, p) => s + Number(p.lng ?? p.lon), 0) / poligono.length,
+                }
+              : null;
+
+          const weatherBundle = await fetchWeatherBundle(profilo.localita, null, {
+            lat: gps?.lat,
+            lon: gps?.lon,
+          });
+
+          const geminiKey = env.GEMINI_API_KEY?.trim();
+          const embedFn = geminiKey
+            ? async (text) => {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${encodeURIComponent(geminiKey)}`;
+                const r = await fetch(url, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    model: "models/gemini-embedding-001",
+                    content: { parts: [{ text }] },
+                  }),
+                });
+                if (!r.ok) return null;
+                const d = await r.json();
+                return d?.embedding?.values;
+              }
+            : null;
+
+          const risultato = await calcolaIrrigazioneGiornalieraAsync(profilo, weatherBundle, {
+            admin,
+            geminiEmbed: embedFn,
+            queryKnowledgeBasePrioritized: geminiKey ? queryKnowledgeBasePrioritized : null,
+          });
+
+          res.statusCode = 200;
+          res.end(JSON.stringify({ ...risultato, data_consiglio: new Date().toISOString().slice(0, 10) }));
+        } catch (e) {
+          console.error("[irrigazione-giornaliera]", e);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message || String(e) }));
+        }
+      });
+
+      server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith("/api/raccomandazione-semina")) return next();
 
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -479,7 +580,7 @@ export function analizzaPratoPlugin() {
 
       if (env.GEMINI_API_KEY) {
         console.log(
-          "[agripocket] API: analizza-prato · genera-piano · raccomandazione-semina · chat-zona · reset-profilo · job-status · meteo",
+          "[agripocket] API: analizza-prato · genera-piano · irrigazione-giornaliera · raccomandazione-semina · chat-zona · reset-profilo · job-status · meteo",
         );
       } else {
         console.warn("[agripocket] Manca crawler/.env — foto prato non funzionerà");

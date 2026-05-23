@@ -9,8 +9,17 @@ export const ZONE_TYPES = {
 
 export const IRRIGATOR_MODES = {
   statico: { label: "Statico", short: "S", desc: "Getti fissi / pop-up" },
-  dinamico: { label: "Dinamico", short: "D", desc: "Rotativo o oscillante" },
+  rotator: { label: "Rotator", short: "R", desc: "Testina a settore rotante" },
+  dinamico: { label: "Oscillante", short: "O", desc: "Irrigatore a banda / mammella" },
 };
+
+/** @param {string} raw */
+export function normalizeIrrigatorModalita(raw) {
+  const v = String(raw || "statico").toLowerCase();
+  if (v === "rotator" || v === "rotativo" || v === "testine") return "rotator";
+  if (v === "dinamico" || v === "oscillante") return "dinamico";
+  return "statico";
+}
 
 function uid() {
   return `z_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -35,7 +44,7 @@ function normalizeZone(z) {
     const lat = Number(z.lat);
     const lng = Number(z.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    const modalita = z.modalita === "dinamico" ? "dinamico" : "statico";
+    const modalita = normalizeIrrigatorModalita(z.modalita);
     return { id, tipo: "irrigatore", lat, lng, modalita };
   }
   if (z.tipo === "ombra" || z.tipo === "muschio") {
@@ -295,11 +304,12 @@ export function ensureOmbraOverseedInterventi(interventi, pratoZone, profilo, og
 
 export function countZonesByType(pratoZone) {
   const { zone } = normalizePratoZone(pratoZone);
-  const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, dinamico: 0 };
+  const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, rotator: 0, dinamico: 0 };
   for (const z of zone) {
     if (out[z.tipo] != null) out[z.tipo] += 1;
     if (z.tipo === "irrigatore") {
-      if (z.modalita === "dinamico") out.dinamico += 1;
+      if (z.modalita === "rotator") out.rotator += 1;
+      else if (z.modalita === "dinamico") out.dinamico += 1;
       else out.statico += 1;
     }
   }
@@ -324,20 +334,32 @@ export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month
   }
 
   if (!heads.length) {
-    suggerimenti.push("Segna gli irrigatori sulla mappa (statico o dinamico) per tempi su misura.");
+    suggerimenti.push("Segna gli irrigatori sulla mappa (statico, rotator o oscillante) per tempi su misura.");
     return { perTesta, suggerimenti, programmaSintesi: null };
   }
 
   let idxStatic = 0;
+  let idxRot = 0;
   let idxDyn = 0;
 
   for (const h of heads) {
-    if (h.modalita === "dinamico") {
+    if (h.modalita === "rotator") {
+      idxRot += 1;
+      const min = estate ? 28 : primavera ? 20 : 15;
+      perTesta.push({
+        id: h.id,
+        label: `Rotator ${idxRot}`,
+        modalita: "rotator",
+        minutiPerCiclo: min,
+        frequenza: estate ? "2 passate/settimana (mattina)" : "1 passata/settimana se siccità",
+        nota: "Settore rotante: una passata regolare; verifica che copra tutta l'area.",
+      });
+    } else if (h.modalita === "dinamico") {
       idxDyn += 1;
       const min = estate ? 38 : primavera ? 25 : 18;
       perTesta.push({
         id: h.id,
-        label: `Irrigatore dinamico ${idxDyn}`,
+        label: `Oscillante ${idxDyn}`,
         modalita: "dinamico",
         minutiPerCiclo: min,
         frequenza: estate
@@ -345,7 +367,7 @@ export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month
           : primavera
             ? "1–2 passate/settimana"
             : "1 passata/settimana se siccità",
-        nota: "Rotativo/oscillante: una passata lunga; in vento forte riduci del 20%.",
+        nota: "A banda: una passata lunga; in vento forte riduci del 20%.",
       });
     } else {
       idxStatic += 1;
@@ -397,7 +419,7 @@ export function formatZonesForPrompt(pratoZone) {
   const counts = countZonesByType(pratoZone);
   if (counts.irrigatore) {
     lines.push(
-      `Irrigatori in mappa: ${counts.statico} statici, ${counts.dinamico} dinamici (rotativi/oscillanti).`,
+      `Irrigatori in mappa: ${counts.statico} statici, ${counts.rotator} rotator, ${counts.dinamico} oscillanti.`,
     );
   }
   if (counts.ombra) {
