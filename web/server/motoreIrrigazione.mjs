@@ -1,6 +1,5 @@
 /**
- * Motore irrigazione — bilancio idrico (ET0 × Kc − pioggia) → minuti centralina.
- * Precision Turfgrass Management semplificato per utente finale.
+ * Motore irrigazione — bilancio idrico a serbatoio (ET0 × Kc − pioggia utile) → minuti per linea centralina.
  */
 
 import { normalizzaInputIrrigazione } from "./irrigazioneInput.mjs";
@@ -14,11 +13,12 @@ function modalitaToTipoCentralina(modalita) {
   return "statici";
 }
 
-const KC_PRATO = 0.75;
+export const KC_PRATO = 0.75;
 const COEFF_OMBRA_ALTA = 0.7;
 const SOGLIA_OMBRA_ALTA = 50;
 const SOGLIA_MINUTI_CYCLE_SOAK = 15;
-const PAUSA_TRA_CICLI_MIN = 60;
+const PAUSA_TRA_CICLI_MIN = 45;
+const MAD_FRAZIONE = 0.5;
 
 const PLUVIOMETRIA_MM_H = {
   statici: 35,
@@ -29,8 +29,132 @@ const PLUVIOMETRIA_MM_H = {
 
 const GIORNI_BREVI = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
 
+/** Capacità di campo indicativa (mm acqua utile nel profilo radici). */
+export function capacitaCampoMm(tipo_terreno) {
+  if (tipo_terreno === "argilloso") return 20;
+  if (tipo_terreno === "sabbioso") return 8;
+  return 14;
+}
+
+/** Kc stagionale per prato da giardino (Italia). */
+export function kcStagionale(dataRef = new Date()) {
+  const m = new Date(dataRef).getMonth() + 1;
+  if (m >= 6 && m <= 8) return 0.82;
+  if ((m >= 3 && m <= 5) || m === 9 || m === 10) return 0.65;
+  return 0.58;
+}
+
+export function pluviometriaMmOra(tipo_irrigatori, pluviometriaManuale) {
+  const man = Number(pluviometriaManuale);
+  if (Number.isFinite(man) && man > 0) return man;
+  return PLUVIOMETRIA_MM_H[tipo_irrigatori] ?? PLUVIOMETRIA_MM_H.dinamici;
+}
+
+export function modificatoreOmbra(percentuale_ombra) {
+  const pct = Number(percentuale_ombra) || 0;
+  return pct > SOGLIA_OMBRA_ALTA ? COEFF_OMBRA_ALTA : 1;
+}
+
+export function minutiDaFabbisogno(fabbisogno_mm, pluviometria_mm_ora) {
+  if (fabbisogno_mm == null || fabbisogno_mm <= 0) return 0;
+  const pluv = Math.max(1, Number(pluviometria_mm_ora) || 12);
+  return Math.max(0, Math.round((fabbisogno_mm / pluv) * 60));
+}
+
+/** Pioggia che entra nel suolo senza superare la capacità di campo. */
+export function pioggiaEfficaceMm(precip_mm, bilancioSuoloMm, cap) {
+  const spazio = Math.max(0, cap - bilancioSuoloMm);
+  return Math.min(Number(precip_mm || 0) * 0.85, spazio);
+}
+
 /**
- * Estrae ET0 e precipitazioni (ieri + oggi) dal bundle meteo Open-Meteo.
+ * Bilancio suolo su più giorni (serbatoio). Restituisce mm da reintegrare oggi e schema 7 gg.
+ */
+export function simulaBilancioIdricoSettimana({
+  giorniForecast,
+  input,
+  kc,
+  percentuale_ombra,
+}) {
+  const cap = capacitaCampoMm(input.tipo_terreno);
+  const mad = cap * MAD_FRAZIONE;
+  const modOmbra = modificatoreOmbra(percentuale_ombra);
+  let suolo = cap * 0.75;
+
+  const schemaGiorni = [];
+
+  for (const giorno of giorniForecast) {
+    const et0 = Number(giorno.et0_mm ?? 3);
+    const precip = Number(giorno.precip_mm ?? 0);
+    const etc = et0 * kc * modOmbra;
+
+    suolo -= etc;
+    const pioggiaUtile = pioggiaEfficaceMm(precip, suolo, cap);
+    suolo += pioggiaUtile;
+    suolo = Math.min(Math.max(suolo, 0), cap);
+
+    let irriga = false;
+    let mm_necessari = 0;
+
+    if (precip >= 8) {
+      irriga = false;
+    } else if (suolo <= mad) {
+      irriga = true;
+      mm_necessari = Math.round((cap - suolo) * 10) / 10;
+      suolo = cap;
+    }
+
+    schemaGiorni.push({
+      iso: giorno.iso,
+      nome: giorno.nome,
+      et0_mm: Math.round(et0 * 10) / 10,
+      precip_mm: Math.round(precip * 10) / 10,
+      etc_mm: Math.round(etc * 10) / 10,
+      stato_suolo_mm: Math.round(suolo * 10) / 10,
+      irriga,
+      mm_necessari,
+    });
+  }
+
+  const oggi = schemaGiorni[0];
+  const fabbisogno_oggi_mm = oggi?.irriga ? oggi.mm_necessari : 0;
+  const saturazione = (oggi?.precip_mm ?? 0) >= 8 || (oggi && !oggi.irriga && oggi.stato_suolo_mm >= cap * 0.9);
+
+  return {
+    fabbisogno_oggi_mm,
+    saturazione_suolo: saturazione,
+    capacita_campo_mm: cap,
+    schema_giorni: schemaGiorni,
+  };
+}
+
+function forecast7Giorni(weatherBundle, meteo) {
+  const ag = weatherBundle?.agronomic;
+  const forecastRows = ag?.forecast_daily || ag?.gdd?.serie || [];
+  const byDate = new Map();
+  for (const r of forecastRows) {
+    if (r?.date) byDate.set(r.date, r);
+  }
+
+  const oggiDate = new Date();
+  const out = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(oggiDate);
+    d.setDate(oggiDate.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const row = byDate.get(iso) || {};
+    out.push({
+      iso,
+      nome: GIORNI_BREVI[d.getDay()],
+      et0_mm: row.et0_mm ?? row.et0 ?? (i === 0 ? meteo.et0_mm : null) ?? ag?.et0_mm_media_7g ?? 3,
+      precip_mm: row.rain_mm ?? row.precipitation_sum ?? row.precip_mm ?? 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * Estrae ET0 e precipitazioni dal bundle meteo.
  */
 export function estraiMeteoIrrigazione(weatherBundle) {
   const ag = weatherBundle?.agronomic;
@@ -61,33 +185,20 @@ export function estraiMeteoIrrigazione(weatherBundle) {
   const precip_ieri = Number(ieriRow.precip_mm ?? 0);
 
   const main = weatherBundle?.current?.weather?.[0]?.main;
-  const pioggiaInCorso = main === "Rain" || main === "Drizzle" || main === "Thunderstorm";
+  const pioggia_in_corso = main === "Rain" || main === "Drizzle" || main === "Thunderstorm";
 
   return {
     et0_mm: et0_oggi != null ? Number(et0_oggi) : null,
     et0_mm_ieri: et0_ieri != null ? Number(et0_ieri) : null,
-    precipitazioni_mm: Math.round((precip_oggi + precip_ieri * 0.5) * 10) / 10,
+    precipitazioni_mm: Math.round((precip_oggi + precip_ieri * 0.3) * 10) / 10,
     precip_oggi_mm: precip_oggi,
     precip_ieri_mm: precip_ieri,
-    pioggia_in_corso: pioggiaInCorso,
+    pioggia_in_corso,
     fonte: weatherBundle?.provider || "open-meteo",
   };
 }
 
-export function pluviometriaMmOra(tipo_irrigatori, pluviometriaManuale) {
-  const man = Number(pluviometriaManuale);
-  if (Number.isFinite(man) && man > 0) return man;
-  return PLUVIOMETRIA_MM_H[tipo_irrigatori] ?? PLUVIOMETRIA_MM_H.dinamici;
-}
-
-export function modificatoreOmbra(percentuale_ombra) {
-  const pct = Number(percentuale_ombra) || 0;
-  return pct > SOGLIA_OMBRA_ALTA ? COEFF_OMBRA_ALTA : 1;
-}
-
-/**
- * Fabbisogno netto mm/giorno.
- */
+/** @deprecated Usare bilancio a serbatoio; mantenuto per test. */
 export function calcolaFabbisognoMm(et0_mm, precipitazioni_mm, percentuale_ombra, kc = KC_PRATO) {
   if (et0_mm == null || Number.isNaN(et0_mm)) return null;
   const modOmbra = modificatoreOmbra(percentuale_ombra);
@@ -95,20 +206,7 @@ export function calcolaFabbisognoMm(et0_mm, precipitazioni_mm, percentuale_ombra
   return Math.round(fabbisogno * 100) / 100;
 }
 
-export function minutiDaFabbisogno(fabbisogno_mm, pluviometria_mm_ora) {
-  if (fabbisogno_mm == null || fabbisogno_mm <= 0) return 0;
-  const pluv = Math.max(1, Number(pluviometria_mm_ora) || 12);
-  return Math.max(0, Math.round((fabbisogno_mm / pluv) * 60));
-}
-
-/**
- * Cycle & soak + note terreno sabbioso.
- */
-export function calcolaCicli({
-  minuti_totali,
-  tipo_terreno,
-  pendenza,
-}) {
+export function calcolaCicli({ minuti_totali, tipo_terreno, pendenza }) {
   const argilloso = tipo_terreno === "argilloso";
   const pendenzaAlta = pendenza === "forte" || pendenza === "media";
 
@@ -119,20 +217,19 @@ export function calcolaCicli({
       pausa_tra_cicli_min: null,
       frazionamento_settimanale: true,
       nota_tecnica:
-        "Terreno sabbioso: meglio irrigare meno minuti ma più spesso nella settimana, così l'acqua non scende in profondità lasciando la superficie secca.",
+        "Terreno sabbioso: meglio irrigare meno minuti ma più spesso nella settimana.",
     };
   }
 
   if ((argilloso || pendenzaAlta) && minuti_totali > SOGLIA_MINUTI_CYCLE_SOAK) {
-    const cicli = minuti_totali <= 24 ? 2 : 3;
-    const minuti_per_ciclo = Math.max(5, Math.ceil(minuti_totali / cicli));
+    const cicli = minuti_totali <= 25 ? 2 : 3;
+    const minuti_per_ciclo = Math.max(4, Math.ceil(minuti_totali / cicli));
     return {
       cicli_consigliati: cicli,
       minuti_per_ciclo,
       pausa_tra_cicli_min: PAUSA_TRA_CICLI_MIN,
       frazionamento_settimanale: false,
-      nota_tecnica:
-        "Suolo compatto o in pendenza: più passate brevi con pausa tra un ciclo e l'altro evitano ruscellamento e pozzanghere.",
+      nota_tecnica: "Suolo compatto o pendenza: più passate brevi con pausa anti-ruscellamento.",
     };
   }
 
@@ -146,74 +243,49 @@ export function calcolaCicli({
 }
 
 function determinaAzione(fabbisogno_mm, minuti_totali, tempo_base, ctx) {
-  if (ctx.pioggia_in_corso || fabbisogno_mm != null && fabbisogno_mm <= 0) {
-    return "SPEGNI";
-  }
-  if (minuti_totali <= 0) return "SPEGNI";
-  if (ctx.irrigazione_profilo === "pioggia" && fabbisogno_mm < 1) return "SPEGNI";
+  if (ctx.pioggia_in_corso || ctx.saturazione_suolo) return "SPEGNI";
+  if (fabbisogno_mm == null || fabbisogno_mm <= 0 || minuti_totali <= 0) return "SPEGNI";
+  if (ctx.irrigazione_profilo === "pioggia" && fabbisogno_mm < 0.5) return "SPEGNI";
 
   const base = Math.max(1, tempo_base);
-  if (minuti_totali > base * 1.2) return "AUMENTA";
-  if (minuti_totali < base * 0.55) return "DIMINUISCI";
-  return "MANTIENI";
+  if (minuti_totali > base * 1.15) return "AUMENTA";
+  if (minuti_totali < base * 0.6) return "DIMINUISCI";
+  return "IRRIGA";
 }
 
-function generaMessaggioUx({
-  azione,
-  input,
-  meteo,
-  fabbisogno_mm,
-  minuti_totali,
-  cicli,
-  kc,
-}) {
+function generaMessaggioUx({ azione, input, meteo, fabbisogno_mm, minuti_totali, cicli, kc, bilancio }) {
   if (azione === "SPEGNI") {
+    if (bilancio?.saturazione_suolo) {
+      return "Il suolo è già saturo (pioggia recente o capacità di campo raggiunta): tieni la centralina spenta per evitare ristagni e funghi.";
+    }
     if (meteo.pioggia_in_corso) {
-      return "Oggi piove (o è in arrivo): la natura irriga al posto tuo. Spegni la centralina e riaccendi solo quando il prato inizia ad appassire leggermente al mattino.";
+      return "Oggi piove: la natura irriga al posto tuo. Spegni la centralina e riaccendi solo se il prato non si rialza al mattino.";
     }
-    if ((meteo.precipitazioni_mm ?? 0) >= 3) {
-      return `Le ultime piogge hanno già dato acqua sufficiente (${meteo.precipitazioni_mm} mm conteggiati). Non serve irrigare oggi: risparmi acqua e eviti ristagni che favoriscono funghi.`;
-    }
-    return "Il bilancio idrico di oggi è a posto: il prato non ha bisogno di acqua aggiuntiva. Lascia la centralina spenta e controlla domani mattina.";
+    return "Nessun deficit idrico oggi: il bilancio a serbatoio non richiede irrigazione.";
   }
 
-  const parti = [];
-
-  if (meteo.et0_mm != null) {
-    parti.push(
-      input.percentuale_ombra > SOGLIA_OMBRA_ALTA
-        ? `Con le temperature attuali il prato in ombra «beve» meno (ho ridotto il fabbisogno del 30% rispetto al sole pieno).`
-        : `Oggi il prato può evaporare circa ${meteo.et0_mm} mm di acqua (ET0).`,
-    );
-  }
+  const parti = [
+    `Oggi il prato deve reintegrare circa ${fabbisogno_mm} mm di acqua (Kc stagionale ${kc}, ET0 ${meteo.et0_mm ?? "—"} mm).`,
+    `Imposta la centralina su circa ${minuti_totali} minuti totali per linea (in base al tipo di irrigatori), preferibilmente tra le 6:00 e le 8:00.`,
+  ];
 
   if (cicli.cicli_consigliati > 1) {
     parti.push(
-      `Hai un terreno ${input.tipo_terreno === "argilloso" ? "argilloso" : "che assorbe lentamente"}${input.pendenza !== "piana" ? " e una certa pendenza" : ""}: invece di un unico ciclo lungo, imposta la centralina su ${cicli.cicli_consigliati} partenze da ${cicli.minuti_per_ciclo} minuti ciascuna, distanziate di circa ${cicli.pausa_tra_cicli_min} minuti. Così l'acqua entra nel suolo senza scivolare via.`,
-    );
-  } else if (cicli.frazionamento_settimanale) {
-    parti.push(
-      `Terreno sabbioso: non usare tutti i minuti in un solo giorno. Meglio ${minuti_totali} minuti oggi e, se serve, un altro passaggio leggero tra 2–3 giorni.`,
-    );
-  } else {
-    parti.push(
-      azione === "AUMENTA"
-        ? `Rispetto ai ${input.tempo_irrigazione_base} minuti che avevi impostato, oggi servono circa ${minuti_totali} minuti totali: gira la rotella verso l'alto.`
-        : azione === "DIMINUISCI"
-          ? `Oggi basta meno acqua: circa ${minuti_totali} minuti totali (meno dei tuoi ${input.tempo_irrigazione_base} minuti abituali).`
-          : `I tuoi ${input.tempo_irrigazione_base} minuti sono vicini al fabbisogno di oggi (~${minuti_totali} min): puoi mantenere l'impostazione attuale.`,
+      `Su terreno ${input.tipo_terreno === "argilloso" ? "argilloso" : "lento"} o in pendenza: ${cicli.cicli_consigliati} partenze da ${cicli.minuti_per_ciclo} min con pausa di ${cicli.pausa_tra_cicli_min ?? 45} min.`,
     );
   }
 
-  parti.push(
-    `Applica al mattino presto (6:00–8:00) o nel tardo pomeriggio: meno perdite per evaporazione e foglie più felici.`,
-  );
+  if (input.tempo_irrigazione_base && minuti_totali > input.tempo_irrigazione_base * 1.15) {
+    parti.push(`È più dei tuoi ${input.tempo_irrigazione_base} min abituali: aumenta leggermente il tempo in centralina.`);
+  } else if (input.tempo_irrigazione_base && minuti_totali < input.tempo_irrigazione_base * 0.6) {
+    parti.push(`È meno dei tuoi ${input.tempo_irrigazione_base} min abituali: puoi ridurre oggi.`);
+  }
 
   return parti.join(" ").slice(0, 980);
 }
 
 /**
- * Schema settimanale: frequenza (ogni giorno / ogni 2 giorni…) + griglia 7 giorni.
+ * Schema settimanale con accumulo deficit (serbatoio).
  */
 export function calcolaSchemaSettimanale({
   weatherBundle,
@@ -224,240 +296,209 @@ export function calcolaSchemaSettimanale({
   cicli,
   azione,
   kc = KC_PRATO,
+  pluv_riferimento = 20,
 }) {
-  const ag = weatherBundle?.agronomic;
-  const forecastRows = ag?.forecast_daily || ag?.gdd?.serie || [];
-  const byDate = new Map();
-  for (const r of forecastRows) {
-    if (r?.date) byDate.set(r.date, r);
-  }
+  const forecast = forecast7Giorni(weatherBundle, meteo);
+  const bilancio = simulaBilancioIdricoSettimana({
+    giorniForecast: forecast,
+    input,
+    kc,
+    percentuale_ombra: input.percentuale_ombra,
+  });
 
-  const oggiDate = new Date();
-  const giorni = [];
-  let sommaFabb = 0;
-
-  for (let i = 0; i < 7; i += 1) {
-    const d = new Date(oggiDate);
-    d.setDate(oggiDate.getDate() + i);
-    const iso = d.toISOString().slice(0, 10);
-    const row = byDate.get(iso) || {};
-    const et0 = row.et0_mm ?? row.et0 ?? (i === 0 ? meteo.et0_mm : null) ?? ag?.et0_mm_media_7g ?? 3;
-    const precip = Number(row.rain_mm ?? row.precipitation_sum ?? row.precip_mm ?? 0);
-    const fab = calcolaFabbisognoMm(et0, precip * 0.6, input.percentuale_ombra, kc) ?? 0;
-    sommaFabb += Math.max(0, fab);
-    giorni.push({
-      iso,
-      nome: GIORNI_BREVI[d.getDay()],
-      et0_mm: et0 != null ? Math.round(Number(et0) * 10) / 10 : null,
-      precip_mm: Math.round(precip * 10) / 10,
-      fabbisogno_mm: fab,
+  const schemaGiorni = bilancio.schema_giorni.map((g) => {
+    if (!g.irriga) {
+      const nota =
+        g.precip_mm >= 8 ? "Pioggia" : g.iso === forecast[0]?.iso && azione === "SPEGNI" ? "Oggi no" : "Riposo";
+      return {
+        ...g,
+        minuti: 0,
+        passate: 0,
+        nota,
+        fabbisogno_mm: 0,
+      };
+    }
+    const min = minutiDaFabbisogno(g.mm_necessari, pluv_riferimento);
+    const cicl = calcolaCicli({
+      minuti_totali: min,
+      tipo_terreno: input.tipo_terreno,
+      pendenza: input.pendenza,
     });
-  }
-
-  const mediaFabb = sommaFabb / 7;
-  const et0Rif = meteo.et0_mm ?? ag?.et0_mm_oggi ?? ag?.et0_mm_media_7g ?? 3;
-  const minutiPassata =
-    azione === "SPEGNI" ? 0 : cicli.minuti_per_ciclo || minuti_totali || input.tempo_irrigazione_base || 10;
-  const cicliPerGiorno = azione === "SPEGNI" ? 0 : cicli.cicli_consigliati || 1;
-
-  let intervallo = 2;
-  if (input.tipo_terreno === "sabbioso" || cicli.frazionamento_settimanale) {
-    intervallo = 2;
-  } else if (azione === "SPEGNI" && (meteo.precipitazioni_mm ?? 0) >= 4) {
-    intervallo = 3;
-  } else if (et0Rif >= 4.2 || mediaFabb >= 2.8) {
-    intervallo = 1;
-  } else if (mediaFabb >= 1.4 || et0Rif >= 2.8) {
-    intervallo = 2;
-  } else {
-    intervallo = 3;
-  }
-
-  const schemaGiorni = giorni.map((g, idx) => {
-    if (g.precip_mm >= 5) {
-      return { ...g, irriga: false, minuti: 0, passate: 0, nota: "Pioggia" };
-    }
-    if (azione === "SPEGNI" && idx === 0) {
-      return { ...g, irriga: false, minuti: 0, passate: 0, nota: "Oggi no" };
-    }
-    const irriga = g.fabbisogno_mm > 0.4 && idx % intervallo === 0;
-    if (!irriga) {
-      return { ...g, irriga: false, minuti: 0, passate: 0, nota: "Riposo" };
-    }
     return {
       ...g,
-      irriga: true,
-      minuti: minutiPassata,
-      passate: cicliPerGiorno,
-      nota: cicliPerGiorno > 1 ? `${cicliPerGiorno}×${minutiPassata} min` : `${minutiPassata} min`,
+      fabbisogno_mm: g.mm_necessari,
+      minuti: cicl.minuti_per_ciclo,
+      passate: cicl.cicli_consigliati,
+      nota:
+        cicl.cicli_consigliati > 1
+          ? `${g.mm_necessari} mm · ${cicl.cicli_consigliati}×${cicl.minuti_per_ciclo} min`
+          : `${g.mm_necessari} mm · ${min} min`,
     };
   });
 
   const passateSettimana = schemaGiorni.filter((g) => g.irriga).length;
-  const frequenzaLabel =
-    intervallo === 1 ? "Ogni giorno" : intervallo === 2 ? "Ogni 2 giorni" : "Ogni 3 giorni";
+  const giorniIrrigui = schemaGiorni.filter((g) => g.irriga);
+  let intervallo = 1;
+  if (passateSettimana >= 5) intervallo = 1;
+  else if (passateSettimana >= 3) intervallo = 2;
+  else if (passateSettimana >= 1) intervallo = 3;
+  else intervallo = 0;
 
-  let impostazione_centralina;
-  if (passateSettimana === 0) {
-    impostazione_centralina =
-      "Centralina spenta questa settimana: la pioggia copre il fabbisogno. Riattiva quando il prato non si rialza al mattino.";
-  } else if (intervallo === 1 && cicliPerGiorno > 1) {
-    impostazione_centralina = `Programma giornaliero: ${cicliPerGiorno} partenze da ${minutiPassata} min (mattina presto), con pausa di circa ${cicli.pausa_tra_cicli_min || 60} min tra un ciclo e l'altro.`;
-  } else if (intervallo === 1) {
-    impostazione_centralina = `Programma giornaliero: 1 partenza da ${minutiPassata} min, preferibilmente tra le 6:00 e le 8:00.`;
-  } else {
-    const esempio = schemaGiorni
-      .filter((g) => g.irriga)
-      .slice(0, 3)
-      .map((g) => g.nome)
-      .join(", ");
-    impostazione_centralina = `Se la centralina supporta «ogni ${intervallo} giorni», impostala così con ${minutiPassata} min a passata. Altrimenti irriga manualmente in ${passateSettimana} giorni (es. ${esempio}).`;
-  }
+  const frequenzaLabel =
+    intervallo === 0
+      ? "Nessuna passata"
+      : intervallo === 1
+        ? "Quando il suolo scende sotto soglia (spesso ogni giorno in estate)"
+        : `Circa ogni ${intervallo} giorni (deficit accumulato)`;
+
+  const minutiMedi =
+    giorniIrrigui.length > 0
+      ? Math.round(giorniIrrigui.reduce((s, g) => s + (g.minuti || 0) * (g.passate || 1), 0) / giorniIrrigui.length)
+      : 0;
+
+  const impostazione_centralina =
+    passateSettimana === 0
+      ? "Centralina spenta: pioggia o suolo saturo nella settimana prevista."
+      : `Programma a deficit: irriga solo nei giorni indicati in griglia, con i mm indicati (non un tempo fisso «ogni N giorni» se il suolo è ancora umido).`;
 
   const riepilogo_ux = [
     passateSettimana === 0
-      ? "Questa settimana non serve irrigare: pioggia e umidità coprono il prato."
-      : `Questa settimana: ${passateSettimana} passat${passateSettimana === 1 ? "a" : "e"} — ${frequenzaLabel.toLowerCase()}, circa ${minutiPassata} minuti per volta${
-          cicliPerGiorno > 1 ? ` (${cicliPerGiorno} cicli nello stesso giorno)` : ""
-        }.`,
-    intervallo > 1 && input.tipo_terreno === "sabbioso"
-      ? "Su terreno sabbioso meglio poche passate frequenti che un solo ciclo lungo."
+      ? "Settimana senza irrigazione necessaria: serbatoio idrico coperto da pioggia o ET0 bassa."
+      : `${passateSettimana} giorn${passateSettimana === 1 ? "o" : "i"} con irrigazione — recupero deficit fino a ${bilancio.capacita_campo_mm} mm nel suolo.`,
+    giorniIrrigui[0]?.mm_necessari
+      ? `Prossima passata tipica: ~${giorniIrrigui[0].mm_necessari} mm (~${minutiMedi} min con impianto di riferimento).`
       : null,
   ]
     .filter(Boolean)
     .join(" ")
-    .slice(0, 480);
+    .slice(0, 520);
 
   return {
     frequenza: {
-      intervallo_giorni: intervallo,
+      intervallo_giorni: intervallo || 1,
       label: frequenzaLabel,
       passate_settimana: passateSettimana,
-      minuti_per_passata: minutiPassata,
-      cicli_per_giorno_irriguo: cicliPerGiorno,
+      minuti_per_passata: minutiMedi,
+      cicli_per_giorno_irriguo: cicli.cicli_consigliati || 1,
     },
     giorni: schemaGiorni,
     riepilogo_ux,
     impostazione_centralina,
     oggi_irriga: schemaGiorni[0]?.irriga ?? false,
+    bilancio_serbatoio: {
+      capacita_campo_mm: bilancio.capacita_campo_mm,
+      fabbisogno_oggi_mm: bilancio.fabbisogno_oggi_mm,
+    },
     meteo_fonte: meteo.fonte || weatherBundle?.provider || "open-meteo",
   };
 }
 
+/** Raggruppa teste mappa per linea idraulica (stesso tipo = stessa elettrovalvola tipica). */
+function raggruppaLineeIdrauliche(heads) {
+  const map = new Map();
+  for (const h of heads) {
+    const m = h.modalita;
+    if (!map.has(m)) map.set(m, []);
+    map.get(m).push(h);
+  }
+  return [...map.entries()]
+    .sort((a, b) => (ORDINE_MODALITA[a[0]] ?? 9) - (ORDINE_MODALITA[b[0]] ?? 9))
+    .map(([modalita, teste], idx) => ({ modalita, teste, linea_numero: idx + 1 }));
+}
+
 /**
- * Programma centralina zona per zona (da irrigatori in mappa).
+ * Programma per linea centralina (non dividere mm per numero teste).
  */
 export function calcolaProgrammaZoneCentralina(
   profilo,
-  { fabbisogno_mm, azione, schema_settimanale, input, cicli_globali },
+  { mm_target, azione, schema_settimanale, input },
 ) {
   const { zone } = normalizePratoZone(profilo?.prato_zone);
   const heads = zone
     .filter((z) => z.tipo === "irrigatore")
-    .map((z) => ({ ...z, modalita: normalizeIrrigatorModalita(z.modalita) }))
-    .sort(
-      (a, b) =>
-        (ORDINE_MODALITA[a.modalita] ?? 9) - (ORDINE_MODALITA[b.modalita] ?? 9) ||
-        String(a.id).localeCompare(String(b.id)),
-    );
+    .map((z) => ({ ...z, modalita: normalizeIrrigatorModalita(z.modalita) }));
 
   if (!heads.length) return null;
 
+  const linee = raggruppaLineeIdrauliche(heads);
   const freq = schema_settimanale?.frequenza;
-  const intervallo = freq?.intervallo_giorni ?? 2;
-  const frequenzaLabel = freq?.label ?? (intervallo === 1 ? "Ogni giorno" : `Ogni ${intervallo} giorni`);
-  const giorniAttivi = (schema_settimanale?.giorni || [])
-    .filter((g) => g.irriga)
-    .map((g) => g.nome);
+  const frequenzaLabel = freq?.label ?? "A deficit (vedi griglia settimanale)";
+  const giorniAttivi = (schema_settimanale?.giorni || []).filter((g) => g.irriga).map((g) => g.nome);
   const oggiIrriga = schema_settimanale?.oggi_irriga !== false && azione !== "SPEGNI";
   const orario = "06:30";
+  const mm = Math.max(0, Number(mm_target) || 0);
 
-  const fabPerTesta =
-    fabbisogno_mm != null && fabbisogno_mm > 0 && heads.length
-      ? fabbisogno_mm / heads.length
-      : 0;
-
-  const contatori = { statico: 0, rotator: 0, dinamico: 0 };
-  const zoneOut = [];
-
-  for (let i = 0; i < heads.length; i += 1) {
-    const h = heads[i];
-    contatori[h.modalita] += 1;
-    const n = contatori[h.modalita];
-    const tipo = modalitaToTipoCentralina(h.modalita);
+  const zoneOut = linee.map((linea) => {
+    const tipo = modalitaToTipoCentralina(linea.modalita);
     const pluv = pluviometriaMmOra(tipo);
-    const modeLabel = IRRIGATOR_MODES[h.modalita]?.label || h.modalita;
+    const modeLabel = IRRIGATOR_MODES[linea.modalita]?.label || linea.modalita;
+    const nTeste = linea.teste.length;
 
-    let minutiTotaliZona = 0;
-    if (oggiIrriga && fabPerTesta > 0) {
-      minutiTotaliZona = minutiDaFabbisogno(fabPerTesta, pluv);
-      if (minutiTotaliZona < 3 && fabPerTesta > 0.2) minutiTotaliZona = 3;
+    let minutiTotaliLinea = 0;
+    if (oggiIrriga && mm > 0) {
+      minutiTotaliLinea = minutiDaFabbisogno(mm, pluv);
     }
 
     const cicliZona = calcolaCicli({
-      minuti_totali: minutiTotaliZona,
+      minuti_totali: minutiTotaliLinea,
       tipo_terreno: input.tipo_terreno,
       pendenza: input.pendenza,
     });
 
     let cicli = azione === "SPEGNI" ? 0 : cicliZona.cicli_consigliati;
     let minutiPerCiclo = azione === "SPEGNI" ? 0 : cicliZona.minuti_per_ciclo;
-    if (h.modalita === "dinamico" && minutiTotaliZona > 0 && minutiTotaliZona <= 45) {
+    if (linea.modalita === "dinamico" && minutiTotaliLinea > 0 && minutiTotaliLinea <= 50) {
       cicli = 1;
-      minutiPerCiclo = minutiTotaliZona;
+      minutiPerCiclo = minutiTotaliLinea;
     }
 
-    const zonaNumero = i + 1;
-    const etichetta = `Zona ${zonaNumero} · ${modeLabel} ${n}`;
+    const etichetta = `Linea ${linea.linea_numero} · ${modeLabel}${nTeste > 1 ? ` (${nTeste} teste)` : ""}`;
 
     let impostazione;
-    if (azione === "SPEGNI" || minutiTotaliZona === 0) {
-      impostazione = `${etichetta}: OFF (nessuna irrigazione oggi).`;
+    if (azione === "SPEGNI" || minutiTotaliLinea === 0) {
+      impostazione = `${etichetta}: OFF oggi.`;
     } else if (cicli > 1) {
-      impostazione = `${etichetta}: ${cicli} partenze × ${minutiPerCiclo} min, ${frequenzaLabel.toLowerCase()}, ore ${orario}${
-        cicliZona.pausa_tra_cicli_min ? ` (pausa ${cicliZona.pausa_tra_cicli_min} min tra cicli)` : ""
-      }.`;
+      impostazione = `${etichetta}: reintegrare ${mm} mm → ${cicli} partenze × ${minutiPerCiclo} min (totale ${minutiTotaliLinea} min), ore ${orario}. ${frequenzaLabel}.`;
     } else {
-      impostazione = `${etichetta}: ${minutiPerCiclo} min, ${frequenzaLabel.toLowerCase()}, ore ${orario}.`;
+      impostazione = `${etichetta}: reintegrare ${mm} mm → ${minutiPerCiclo} min, ore ${orario}. ${frequenzaLabel}.`;
     }
 
-    zoneOut.push({
-      zona_numero: zonaNumero,
-      id: h.id,
+    return {
+      zona_numero: linea.linea_numero,
+      linea_idraulica: linea.modalita,
       etichetta,
-      modalita: h.modalita,
+      modalita: linea.modalita,
       tipo_irrigatore: tipo,
       pluviometria_mm_h: pluv,
+      numero_teste: nTeste,
+      teste_ids: linea.teste.map((t) => t.id),
+      mm_da_evadere: mm,
       minuti_per_ciclo: minutiPerCiclo,
       cicli,
-      minuti_totali_zona: minutiTotaliZona,
+      minuti_totali_linea: minutiTotaliLinea,
+      minuti_totali_zona: minutiTotaliLinea,
       pausa_tra_cicli_min: cicli > 1 ? cicliZona.pausa_tra_cicli_min : null,
       frequenza_label: frequenzaLabel,
-      intervallo_giorni: intervallo,
       giorni_settimana: giorniAttivi,
       orario_consigliato: orario,
-      attiva_oggi: oggiIrriga && minutiTotaliZona > 0,
+      attiva_oggi: oggiIrriga && minutiTotaliLinea > 0,
       impostazione,
       nota:
-        h.modalita === "statico"
-          ? "Getti fissi: preferisci cicli brevi e frequenti."
-          : h.modalita === "rotator"
-            ? "Settore rotante: una passata regolare; verifica la copertura."
-            : "Oscillante: una passata continua; in vento forte riduci i minuti del 20%.",
-    });
-  }
-
-  const minutiSomma = zoneOut.reduce((s, z) => s + z.minuti_totali_zona, 0);
-  const sintesi =
-    heads.length === 1
-      ? `Un irrigatore in mappa: programma la Zona 1 sulla centralina come indicato sotto.`
-      : `${heads.length} zone in mappa (${zoneOut.map((z) => z.etichetta.split("·")[1]?.trim()).join(", ")}): imposta ogni uscita della centralina con i minuti e la frequenza della rispettiva zona.`;
+        nTeste > 1
+          ? "Più teste sulla stessa linea: un solo programma in centralina, minuti per l'intera elettrovalvola."
+          : null,
+    };
+  });
 
   return {
-    numero_zone: heads.length,
+    numero_zone: zoneOut.length,
+    numero_teste_mappa: heads.length,
     zone: zoneOut,
-    minuti_totali_zone: minutiSomma,
-    sintesi,
+    minuti_totali_zone: zoneOut.reduce((s, z) => s + z.minuti_totali_linea, 0),
+    sintesi:
+      linee.length === 1
+        ? "Una linea in mappa: imposta un solo programma in centralina con i minuti sotto."
+        : `${linee.length} linee idrauliche (${linee.map((l) => IRRIGATOR_MODES[l.modalita]?.label).join(", ")}): ogni uscita centralina = una linea, con ${mm} mm da reintegrare quando irrighi (non divisi per testa).`,
     ordine_centralina: zoneOut.map((z) => ({
       uscita: z.zona_numero,
       etichetta: z.etichetta,
@@ -467,74 +508,22 @@ export function calcolaProgrammaZoneCentralina(
   };
 }
 
-/**
- * Calcolo principale.
- * @param {object} profilo — riga prato_profilo (+ prato_zone)
- * @param {object} weatherBundle — output fetchWeatherBundle
- * @param {{ kc?: number, pluviometria_mm_ora?: number }} [opts]
- */
 export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {}) {
   const input = normalizzaInputIrrigazione(profilo);
   const meteo = estraiMeteoIrrigazione(weatherBundle);
-  const kc = opts.kc ?? KC_PRATO;
+  const kc = opts.kc ?? kcStagionale();
 
-  if (input.irrigazione_profilo === "pioggia" && (meteo.precipitazioni_mm ?? 0) < 1 && meteo.et0_mm < 2) {
-    const cicliOff = { cicli_consigliati: 0, minuti_per_ciclo: 0, frazionamento_settimanale: false };
-    const schema_settimanale_pioggia = calcolaSchemaSettimanale({
-      weatherBundle,
-      input,
-      meteo,
-      fabbisogno_mm: 0,
-      minuti_totali: 0,
-      cicli: cicliOff,
-      azione: "SPEGNI",
-      kc,
-    });
-    return {
-      azione_irrigazione: "SPEGNI",
-      dati_tecnici: {
-        fabbisogno_calcolato_mm: 0,
-        minuti_totali_consigliati: 0,
-        et0_mm: meteo.et0_mm,
-        precipitazioni_mm: meteo.precipitazioni_mm,
-        kc,
-        modificatore_ombra: modificatoreOmbra(input.percentuale_ombra),
-      },
-      dati_centralina: {
-        cicli_consigliati: 0,
-        minuti_per_ciclo: 0,
-        pausa_tra_cicli_min: null,
-        tempo_base_minuti: input.tempo_irrigazione_base,
-      },
-      input_utilizzato: input,
-      meteo,
-      messaggio_ux:
-        "Hai indicato che il prato vive soprattutto di pioggia naturale: oggi non serve accendere l'impianto salvo siccità prolungata con foglie che non si rialzano la mattina.",
-      meteo_utilizzato: meteo.et0_mm != null,
-      schema_settimanale: schema_settimanale_pioggia,
-      programma_zone: calcolaProgrammaZoneCentralina(profilo, {
-        fabbisogno_mm: 0,
-        azione: "SPEGNI",
-        schema_settimanale: schema_settimanale_pioggia,
-        input,
-        cicli_globali: cicliOff,
-      }),
-      calcolato_il: new Date().toISOString(),
-    };
-  }
-
-  const pluv = pluviometriaMmOra(input.tipo_irrigatori, opts.pluviometria_mm_ora);
-  const fabbisogno_mm = calcolaFabbisognoMm(
-    meteo.et0_mm,
-    meteo.precipitazioni_mm,
-    input.percentuale_ombra,
+  const forecast = forecast7Giorni(weatherBundle, meteo);
+  const bilancio = simulaBilancioIdricoSettimana({
+    giorniForecast: forecast,
+    input,
     kc,
-  );
+    percentuale_ombra: input.percentuale_ombra,
+  });
 
-  let minuti_totali = 0;
-  if (fabbisogno_mm != null && fabbisogno_mm > 0) {
-    minuti_totali = minutiDaFabbisogno(fabbisogno_mm, pluv);
-  }
+  const fabbisogno_mm = bilancio.fabbisogno_oggi_mm;
+  const pluv = pluviometriaMmOra(input.tipo_irrigatori, opts.pluviometria_mm_ora);
+  let minuti_totali = fabbisogno_mm > 0 ? minutiDaFabbisogno(fabbisogno_mm, pluv) : 0;
 
   const cicli = calcolaCicli({
     minuti_totali,
@@ -545,16 +534,7 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
   const azione = determinaAzione(fabbisogno_mm, minuti_totali, input.tempo_irrigazione_base, {
     pioggia_in_corso: meteo.pioggia_in_corso,
     irrigazione_profilo: input.irrigazione_profilo,
-  });
-
-  const messaggio_ux = generaMessaggioUx({
-    azione,
-    input,
-    meteo,
-    fabbisogno_mm,
-    minuti_totali,
-    cicli,
-    kc,
+    saturazione_suolo: bilancio.saturazione_suolo,
   });
 
   const schema_settimanale = calcolaSchemaSettimanale({
@@ -566,26 +546,40 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     cicli,
     azione,
     kc,
+    pluv_riferimento: pluv,
   });
 
   const programma_zone = calcolaProgrammaZoneCentralina(profilo, {
-    fabbisogno_mm,
+    mm_target: fabbisogno_mm,
     azione,
     schema_settimanale,
     input,
-    cicli_globali: cicli,
+  });
+
+  const messaggio_ux = generaMessaggioUx({
+    azione,
+    input,
+    meteo,
+    fabbisogno_mm,
+    minuti_totali,
+    cicli,
+    kc,
+    bilancio,
   });
 
   return {
     azione_irrigazione: azione,
     dati_tecnici: {
-      fabbisogno_calcolato_mm: fabbisogno_mm ?? 0,
+      fabbisogno_calcolato_mm: fabbisogno_mm,
       minuti_totali_consigliati: minuti_totali,
       et0_mm: meteo.et0_mm,
-      precipitazioni_mm: meteo.precipitazioni_mm,
+      precipitazioni_mm: meteo.precip_oggi_mm,
       pluviometria_mm_ora: pluv,
       kc,
+      kc_stagionale: true,
+      capacita_campo_mm: bilancio.capacita_campo_mm,
       modificatore_ombra: modificatoreOmbra(input.percentuale_ombra),
+      saturazione_suolo: bilancio.saturazione_suolo,
     },
     dati_centralina: {
       cicli_consigliati: azione === "SPEGNI" ? 0 : cicli.cicli_consigliati,
@@ -593,10 +587,11 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
       pausa_tra_cicli_min: cicli.pausa_tra_cicli_min,
       tempo_base_minuti: input.tempo_irrigazione_base,
       tipo_irrigatori: input.tipo_irrigatori,
+      mm_da_evadere_oggi: fabbisogno_mm,
     },
     input_utilizzato: input,
     meteo,
-    meteo_utilizzato: meteo.et0_mm != null || (meteo.precipitazioni_mm ?? 0) > 0,
+    meteo_utilizzato: meteo.et0_mm != null,
     schema_settimanale,
     programma_zone,
     messaggio_ux,
@@ -604,11 +599,8 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
   };
 }
 
-/**
- * Opzionale: arricchisce Kc da RAG (libri universitari). Fallback 0.75.
- */
 export async function kcDaKnowledgeBase(admin, geminiEmbed, queryKnowledgeBasePrioritized) {
-  if (!admin || !geminiEmbed || !queryKnowledgeBasePrioritized) return KC_PRATO;
+  if (!admin || !geminiEmbed || !queryKnowledgeBasePrioritized) return kcStagionale();
   try {
     const emb = await geminiEmbed(
       "coefficiente colturale Kc prato tappeto erboso irrigazione ET0 evapotraspirazione",
@@ -628,14 +620,11 @@ export async function kcDaKnowledgeBase(admin, geminiEmbed, queryKnowledgeBasePr
   } catch {
     /* fallback */
   }
-  return KC_PRATO;
+  return kcStagionale();
 }
 
-/**
- * Pipeline async completa (profilo + meteo + opz. RAG).
- */
 export async function calcolaIrrigazioneGiornalieraAsync(profilo, weatherBundle, opts = {}) {
-  let kc = KC_PRATO;
+  let kc = kcStagionale();
   if (opts.admin && opts.geminiEmbed && opts.queryKnowledgeBasePrioritized) {
     kc = await kcDaKnowledgeBase(
       opts.admin,

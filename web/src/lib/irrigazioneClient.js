@@ -46,8 +46,9 @@ export async function fetchIrrigazioneGiornaliera(opts = {}) {
 }
 
 export const AZIONE_IRRIGAZIONE_LABEL = {
-  AUMENTA: { label: "Aumenta i minuti", tone: "up" },
-  DIMINUISCI: { label: "Riduci i minuti", tone: "down" },
+  IRRIGA: { label: "Irriga oggi", tone: "ok" },
+  AUMENTA: { label: "Irriga — aumenta i minuti", tone: "up" },
+  DIMINUISCI: { label: "Irriga — meno minuti", tone: "down" },
   MANTIENI: { label: "Mantieni così", tone: "ok" },
   SPEGNI: { label: "Spegni oggi", tone: "off" },
 };

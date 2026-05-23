@@ -14,7 +14,7 @@ function IrrigationZoneProgram({ programma }) {
 
   return (
     <section className="irrigation-widget__zone-prog" aria-label="Programma centralina per zona">
-      <h3 className="irrigation-widget__zone-prog-title">Centralina — zona per zona</h3>
+      <h3 className="irrigation-widget__zone-prog-title">Centralina — una riga per linea</h3>
       {programma.sintesi ? <p className="irrigation-widget__zone-prog-sintesi">{programma.sintesi}</p> : null}
       <ul className="irrigation-widget__zone-list">
         {programma.zone.map((z) => (
@@ -30,11 +30,18 @@ function IrrigationZoneProgram({ programma }) {
             </div>
             {z.attiva_oggi ? (
               <div className="irrigation-widget__zone-stats">
+                {z.mm_da_evadere != null ? (
+                  <span>
+                    <em>Acqua</em> {z.mm_da_evadere} mm
+                  </span>
+                ) : null}
                 <span>
-                  <em>Minuti</em> {z.cicli > 1 ? `${z.cicli}×${z.minuti_per_ciclo}` : z.minuti_per_ciclo}
+                  <em>Minuti linea</em>{" "}
+                  {z.cicli > 1 ? `${z.cicli}×${z.minuti_per_ciclo}` : z.minuti_per_ciclo || z.minuti_totali_linea}
                 </span>
                 <span>
-                  <em>Frequenza</em> {z.frequenza_label}
+                  <em>Quando</em> {z.frequenza_label?.slice(0, 40)}
+                  {(z.frequenza_label?.length ?? 0) > 40 ? "…" : ""}
                 </span>
                 <span>
                   <em>Ora</em> {z.orario_consigliato}
@@ -269,8 +276,9 @@ export default function IrrigationWidget({ profile, enabled = true }) {
 
           {tecnici?.et0_mm != null ? (
             <p className="irrigation-widget__tech" role="note">
-              ET0 oggi {tecnici.et0_mm} mm · fabbisogno netto {tecnici.fabbisogno_calcolato_mm} mm
-              {tecnici.precipitazioni_mm != null ? ` · pioggia conteggiata ${tecnici.precipitazioni_mm} mm` : ""}
+              ET0 {tecnici.et0_mm} mm · Kc {tecnici.kc} · da reintegrare oggi {tecnici.fabbisogno_calcolato_mm} mm
+              {tecnici.capacita_campo_mm != null ? ` · cap. campo ~${tecnici.capacita_campo_mm} mm` : ""}
+              {tecnici.precipitazioni_mm != null ? ` · pioggia oggi ${tecnici.precipitazioni_mm} mm` : ""}
             </p>
           ) : null}
         </>
