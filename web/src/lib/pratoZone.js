@@ -605,6 +605,7 @@ export function countZonesByType(pratoZone) {
 export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month = new Date().getMonth() + 1 }) {
   const { zone } = normalizePratoZone(pratoZone);
   const heads = zone.filter((z) => z.tipo === "irrigatore");
+  const counts = countZonesByType(pratoZone);
   const estate = month >= 5 && month <= 9;
   const primavera = month >= 3 && month <= 4;
 

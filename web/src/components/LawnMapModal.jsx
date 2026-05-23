@@ -529,7 +529,7 @@ export default function LawnMapModal({
   }, [open, mapReady, isZoneEdit, zoneToolProp, lawnPolygons, validPolygons.length]);
 
   useEffect(() => {
-    if (!open || inZones || !mapRef.current) return;
+    if (!open || !mapRef.current) return;
     const map = mapRef.current;
     polyRefs.current.forEach((p) => p?.setMap(null));
     polyRefs.current = lawnPolygons.map((ring, idx) => {
@@ -548,7 +548,7 @@ export default function LawnMapModal({
         zIndex: active ? 2 : 1,
       });
     }).filter(Boolean);
-  }, [lawnPolygons, activePolyIndex, open, mapTick, inZones]);
+  }, [lawnPolygons, activePolyIndex, open, mapTick]);
 
   useEffect(() => {
     if (!open || inZones) return;
@@ -626,15 +626,18 @@ export default function LawnMapModal({
   }, [panMode, zoneTool, inZones, open, mapTick]);
 
   async function handleApply() {
-    if (!validPolygons.length || areaSqm <= 0) return;
     setApplyBusy(true);
 
     let localita;
     let superficie_mq;
     let prato_zone;
-    const poligoni = validPolygons.map((ring) => ring.map((p) => ({ lat: p.lat, lng: p.lng })));
 
     if (isZoneEdit) {
+      const poligoniEsistenti = getLawnPolygons(normalizePratoZone(initialPratoZone));
+      const poligoni =
+        validPolygons.length > 0
+          ? validPolygons.map((ring) => ring.map((p) => ({ lat: p.lat, lng: p.lng })))
+          : poligoniEsistenti;
       const replaceTypes =
         zoneToolProp === "esposizione" ? ["esposizione", "ombra"] : [zoneToolProp];
       prato_zone = mergePratoZoneUpdate(initialPratoZone, {
@@ -643,6 +646,11 @@ export default function LawnMapModal({
         replaceTypes,
       });
     } else {
+      if (!validPolygons.length || areaSqm <= 0) {
+        setApplyBusy(false);
+        return;
+      }
+      const poligoni = validPolygons.map((ring) => ring.map((p) => ({ lat: p.lat, lng: p.lng })));
       prato_zone = mergePratoZoneUpdate(initialPratoZone, { poligoni });
       localita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
       if (!localita) {
@@ -668,6 +676,7 @@ export default function LawnMapModal({
 
   const missingKey = !apiKey?.trim();
   const canBoundary = validPolygons.length > 0 && areaSqm > 0;
+  const canSaveZones = isZoneEdit && getLawnPolygons(normalizePratoZone(initialPratoZone)).length > 0;
   const previewLocalita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
   const irrCount = zones.filter((z) => z.tipo === "irrigatore").length;
 
@@ -1058,7 +1067,7 @@ export default function LawnMapModal({
             <button
               type="button"
               className="map-modal-apply"
-              disabled={!canBoundary || applyBusy}
+              disabled={applyBusy || (isZoneEdit ? !canSaveZones : !canBoundary)}
               onClick={handleApply}
             >
               {applyBusy
