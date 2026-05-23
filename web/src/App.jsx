@@ -6,11 +6,16 @@ import Onboarding from "./pages/Onboarding";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
 import CalendarioLavori from "./pages/CalendarioLavori";
-import Home from "./pages/Home";
+function appEntryPath(session, needsOnboarding) {
+  if (!session) return "/login";
+  if (needsOnboarding) return "/onboarding";
+  return "/dashboard";
+}
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileReady, setProfileReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,14 +49,17 @@ export default function App() {
   useEffect(() => {
     if (!session?.user?.id) {
       setProfile(null);
+      setProfileReady(true);
       return;
     }
+    setProfileReady(false);
     loadPratoProfilo(session.user.id)
       .then(setProfile)
-      .catch(() => setProfile(null));
+      .catch(() => setProfile(null))
+      .finally(() => setProfileReady(true));
   }, [session]);
 
-  if (loading) {
+  if (loading || (session && !profileReady)) {
     return (
       <div className="app-loading">
         <div className="spinner" />
@@ -64,10 +72,12 @@ export default function App() {
     session &&
     (!profile || !profile.onboarding_completato || !profile.disclaimer_accettato_at);
 
+  const entry = appEntryPath(session, needsOnboarding);
+
   return (
     <Routes>
-      <Route path="/" element={<Home session={session} />} />
-      <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/" element={<Navigate to={entry} replace />} />
+      <Route path="/login" element={session ? <Navigate to={entry} replace /> : <Login />} />
       <Route
         path="/onboarding"
         element={
@@ -120,15 +130,7 @@ export default function App() {
           )
         }
       />
-      <Route
-        path="*"
-        element={
-          <Navigate
-            to={!session ? "/login" : needsOnboarding ? "/onboarding" : "/dashboard"}
-            replace
-          />
-        }
-      />
+      <Route path="*" element={<Navigate to={entry} replace />} />
     </Routes>
   );
 }

@@ -31,7 +31,7 @@ export default function Login() {
           password,
         });
         if (error) throw error;
-        nav("/onboarding", { replace: true });
+        nav("/", { replace: true });
       }
     } catch (err) {
       setMsg(err.message || "Errore");
@@ -42,9 +42,6 @@ export default function Login() {
 
   return (
     <div className="page auth">
-      <Link className="back-link" to="/">
-        Indietro
-      </Link>
       <h1>{mode === "login" ? "Accedi" : "Registrazione"}</h1>
       <form className="auth-form" onSubmit={submit}>
         {mode === "register" && (
