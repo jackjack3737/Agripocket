@@ -9,7 +9,6 @@ import "./styles-animations.css";
 import "./styles-grass-exam.css";
 import "./styles-chat-photo.css";
 import "./styles-dashboard.css";
-import "./styles-brand.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

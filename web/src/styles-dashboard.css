@@ -194,6 +194,8 @@
   width: auto;
   height: clamp(4.5rem, 20vw, 7rem);
   max-width: min(55vw, 18rem);
+  object-fit: contain;
+  object-position: left center;
 }
 
 @keyframes tagline-word-in {
@@ -236,7 +238,10 @@
   margin: 0;
   padding: 0.1em 0;
   font-size: clamp(1.15rem, 3.6vw, 1.65rem);
+  font-weight: 500;
+  font-style: normal;
   line-height: 1.15;
+  letter-spacing: -0.02em;
   color: #4a4a48;
   white-space: nowrap;
   overflow: hidden;

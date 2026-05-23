@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import AppNav from "./AppNav";
-import SolumWordmark from "./SolumWordmark";
 
 const TAGLINE_WORDS = ["la", "scienza", "sotto", "il", "verde"];
 
@@ -30,7 +29,14 @@ export default function DashPageHeader({
         <div className="dash-header__brandline">
           <div className="dash-header__brand-lockup">
             <Link to="/dashboard" className="dash-header__logo-link" aria-label="Solum">
-              <SolumWordmark className="dash-header__logo" />
+              <img
+                src="/brand/solum-mark.png"
+                alt="Solum"
+                className="dash-header__logo"
+                width={320}
+                height={126}
+                decoding="async"
+              />
             </Link>
             <p className="dash-header__tagline" aria-label="la scienza sotto il verde">
               {TAGLINE_WORDS.map((word, i) => (
