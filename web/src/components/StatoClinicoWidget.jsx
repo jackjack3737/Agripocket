@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { calcolaStatoClinico } from "../lib/statoClinico";
 import { resolveSignedFotoFromAnalisi } from "../lib/fotoPrato";
+import { getIrrigazioneCached, IRRIGAZIONE_REFRESH_EVENT } from "../lib/irrigazioneClient";
+import { valutaAlertMeteoIrrigazione } from "../lib/meteoIrrigazioneAlert";
+
 function parseVision(raw) {
   if (!raw) return null;
   if (typeof raw === "object") return raw;
@@ -12,13 +15,74 @@ function parseVision(raw) {
   }
 }
 
+function parseIrrigazioneProfilo(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function MeteoIrrigazioneAlerts({ alert, profile }) {
+  if (!alert?.consiglia_irrigazione) return null;
+
+  const irrigazioneAttiva = profile?.irrigazione && profile.irrigazione !== "pioggia";
+
+  function scrollEAggiornaIrrigazione() {
+    window.dispatchEvent(new CustomEvent(IRRIGAZIONE_REFRESH_EVENT));
+    const el = document.getElementById("irrigazione-widget");
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  return (
+    <div
+      className={`stato-clinico__alerts stato-clinico__alerts--${alert.livello}`}
+      role="alert"
+    >
+      <p className="stato-clinico__alerts-title">Meteo aggiornato</p>
+      <ul className="stato-clinico__alerts-motivi">
+        {alert.motivi.map((m, i) => (
+          <li key={i}>{m}</li>
+        ))}
+      </ul>
+      {alert.ore_da_calcolo != null ? (
+        <p className="stato-clinico__alerts-meta">
+          Ultimo calcolo irrigazione: circa {alert.ore_da_calcolo} ore fa.
+        </p>
+      ) : null}
+      <div className="stato-clinico__alerts-actions">
+        {irrigazioneAttiva ? (
+          <button type="button" className="btn btn-primary btn-sm" onClick={scrollEAggiornaIrrigazione}>
+            Aggiorna irrigazione
+          </button>
+        ) : null}
+        {alert.consiglia_programma ? (
+          <>
+            <button type="button" className="btn btn-outline btn-sm" onClick={scrollEAggiornaIrrigazione}>
+              Apri programma centralina
+            </button>
+            <Link className="btn btn-outline btn-sm" to="/calendario">
+              Calendario lavori
+            </Link>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function StatoClinicoWidget({
   ultimaAnalisi,
   zonaNome,
   weather,
   userId,
+  profile,
 }) {
   const [thumbUrl, setThumbUrl] = useState(null);
+  const [irrCacheTick, setIrrCacheTick] = useState(0);
+
   const vision = useMemo(
     () => parseVision(ultimaAnalisi?.vision_json),
     [ultimaAnalisi?.vision_json],
@@ -28,6 +92,27 @@ export default function StatoClinicoWidget({
     () => calcolaStatoClinico({ vision, weather, agronomic: weather?.agronomic }),
     [vision, weather],
   );
+
+  const irrigazioneProfilo = useMemo(
+    () => parseIrrigazioneProfilo(profile?.irrigazione_oggi),
+    [profile?.irrigazione_oggi],
+  );
+
+  const alertMeteo = useMemo(() => {
+    if (!weather || profile?.irrigazione === "pioggia") return null;
+    return valutaAlertMeteoIrrigazione({
+      weather,
+      irrigazioneUltima: getIrrigazioneCached(),
+      irrigazioneProfilo,
+    });
+    // irrCacheTick: ricalcola dopo refresh irrigazione
+  }, [weather, irrigazioneProfilo, profile?.irrigazione, irrCacheTick]);
+
+  useEffect(() => {
+    const onRefresh = () => setIrrCacheTick((n) => n + 1);
+    window.addEventListener(IRRIGAZIONE_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(IRRIGAZIONE_REFRESH_EVENT, onRefresh);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +148,8 @@ export default function StatoClinicoWidget({
           {stato.label}
         </span>
       </div>
+
+      {alertMeteo ? <MeteoIrrigazioneAlerts alert={alertMeteo} profile={profile} /> : null}
 
       <div className="stato-clinico__body">
         <div className="stato-clinico__thumb">

@@ -2,7 +2,10 @@
  * Motore irrigazione — bilancio idrico a serbatoio (ET0 × Kc − pioggia utile) → minuti per linea centralina.
  */
 
-import { normalizzaInputIrrigazione } from "./irrigazioneInput.mjs";
+import {
+  normalizzaInputIrrigazione,
+  upgradePendenzaUnLivello,
+} from "./irrigazioneInput.mjs";
 import {
   IRRIGATOR_MODES,
   normalizeIrrigatorModalita,
@@ -54,9 +57,18 @@ export function pluviometriaMmOra(tipo_irrigatori, pluviometriaManuale) {
   return PLUVIOMETRIA_MM_H[tipo_irrigatori] ?? PLUVIOMETRIA_MM_H.dinamici;
 }
 
+/** Riduzione ET da % area in ombra (poligoni mappa o profilo). */
 export function modificatoreOmbra(percentuale_ombra) {
-  const pct = Number(percentuale_ombra) || 0;
-  return pct > SOGLIA_OMBRA_ALTA ? COEFF_OMBRA_ALTA : 1;
+  const pct = Math.min(100, Math.max(0, Number(percentuale_ombra) || 0));
+  if (pct <= 0) return 1;
+  if (pct >= 75) return 0.65;
+  return 1 - (pct / 75) * 0.35;
+}
+
+/** Riduzione mm per linea se parte delle teste è dentro poligoni ombra. */
+export function modificatoreMmLinea(frazioneTesteInOmbra) {
+  const f = Math.min(1, Math.max(0, Number(frazioneTesteInOmbra) || 0));
+  return 1 - f * 0.35;
 }
 
 export function minutiDaFabbisogno(fabbisogno_mm, pluviometria_mm_ora) {
@@ -202,6 +214,23 @@ export function estraiMeteoIrrigazione(weatherBundle) {
   };
 }
 
+/** Impronta meteo al momento del calcolo (per alert cambio previsioni). */
+export function snapshotMeteoIrrigazione(weatherBundle, meteo) {
+  const ag = weatherBundle?.agronomic;
+  const rows = ag?.forecast_daily || [];
+  let precip3g = 0;
+  for (let i = 0; i < Math.min(3, rows.length); i++) {
+    precip3g += Number(rows[i]?.rain_mm ?? rows[i]?.precipitation_sum ?? 0);
+  }
+  return {
+    et0_mm: meteo?.et0_mm ?? null,
+    precip_oggi_mm: meteo?.precip_oggi_mm ?? 0,
+    precip_prossimi_3gg_mm: Math.round(precip3g * 10) / 10,
+    pioggia_in_corso: !!meteo?.pioggia_in_corso,
+    et0_media_7g: ag?.et0_mm_media_7g ?? null,
+  };
+}
+
 /** @deprecated Usare bilancio a serbatoio; mantenuto per test. */
 export function calcolaFabbisognoMm(et0_mm, precipitazioni_mm, percentuale_ombra, kc = KC_PRATO) {
   if (et0_mm == null || Number.isNaN(et0_mm)) return null;
@@ -257,7 +286,17 @@ function determinaAzione(fabbisogno_mm, minuti_totali, tempo_base, ctx) {
   return "IRRIGA";
 }
 
-function generaMessaggioUx({ azione, input, meteo, fabbisogno_mm, minuti_totali, cicli, kc, bilancio }) {
+function generaMessaggioUx({
+  azione,
+  input,
+  meteo,
+  fabbisogno_mm,
+  minuti_totali,
+  cicli,
+  kc,
+  bilancio,
+}) {
+  const mappa = input.contesto_mappa;
   if (azione === "SPEGNI") {
     if (bilancio?.saturazione_suolo) {
       return "Il suolo è già saturo (pioggia recente o capacità di campo raggiunta): tieni la centralina spenta per evitare ristagni e funghi.";
@@ -283,6 +322,17 @@ function generaMessaggioUx({ azione, input, meteo, fabbisogno_mm, minuti_totali,
     parti.push(`È più dei tuoi ${input.tempo_irrigazione_base} min abituali: aumenta leggermente il tempo in centralina.`);
   } else if (input.tempo_irrigazione_base && minuti_totali < input.tempo_irrigazione_base * 0.6) {
     parti.push(`È meno dei tuoi ${input.tempo_irrigazione_base} min abituali: puoi ridurre oggi.`);
+  }
+
+  if (mappa?.ha_zone_ombra && input.percentuale_ombra > 0) {
+    parti.push(
+      `Zone in ombra in mappa (~${input.percentuale_ombra}% del prato): fabbisogno ridotto; le linee con getti in ombra hanno minuti ancora più bassi.`,
+    );
+  }
+  if (mappa?.ha_pendenza_mappa) {
+    parti.push(
+      `Pendenze segnate in mappa: sulle linee vicino alle frecce di discesa sono consigliati cicli brevi con pausa (anti-ruscellamento).`,
+    );
   }
 
   return parti.join(" ").slice(0, 980);
@@ -453,6 +503,7 @@ export function calcolaProgrammaZoneCentralina(
   const oggiIrriga = schema_settimanale?.oggi_irriga !== false && azione !== "SPEGNI";
   const orario = "06:30";
   const mm = Math.max(0, Number(mm_target) || 0);
+  const testeById = input.contesto_mappa?.teste_by_id || {};
 
   const zoneOut = linee.map((linea) => {
     const tipo = modalitaToTipoCentralina(linea.modalita);
@@ -460,15 +511,25 @@ export function calcolaProgrammaZoneCentralina(
     const modeLabel = IRRIGATOR_MODES[linea.modalita]?.label || linea.modalita;
     const nTeste = linea.teste.length;
 
+    const inOmbra = linea.teste.filter((t) => testeById[t.id]?.in_ombra).length;
+    const fracOmbra = nTeste > 0 ? inOmbra / nTeste : 0;
+    const modLinea = modificatoreMmLinea(fracOmbra);
+    const mmLinea = Math.round(mm * modLinea * 10) / 10;
+
+    const vicinoPendenza = linea.teste.some((t) => testeById[t.id]?.vicino_pendenza);
+    const pendenzaLinea = vicinoPendenza
+      ? upgradePendenzaUnLivello(input.pendenza)
+      : input.pendenza;
+
     let minutiTotaliLinea = 0;
-    if (oggiIrriga && mm > 0) {
-      minutiTotaliLinea = minutiDaFabbisogno(mm, pluv);
+    if (oggiIrriga && mmLinea > 0) {
+      minutiTotaliLinea = minutiDaFabbisogno(mmLinea, pluv);
     }
 
     const cicliZona = calcolaCicli({
       minuti_totali: minutiTotaliLinea,
       tipo_terreno: input.tipo_terreno,
-      pendenza: input.pendenza,
+      pendenza: pendenzaLinea,
     });
 
     let cicli = azione === "SPEGNI" ? 0 : cicliZona.cicli_consigliati;
@@ -484,9 +545,9 @@ export function calcolaProgrammaZoneCentralina(
     if (azione === "SPEGNI" || minutiTotaliLinea === 0) {
       impostazione = `${etichetta}: OFF oggi.`;
     } else if (cicli > 1) {
-      impostazione = `${etichetta}: reintegrare ${mm} mm → ${cicli} partenze × ${minutiPerCiclo} min (totale ${minutiTotaliLinea} min), ore ${orario}. ${frequenzaLabel}.`;
+      impostazione = `${etichetta}: reintegrare ${mmLinea} mm → ${cicli} partenze × ${minutiPerCiclo} min (totale ${minutiTotaliLinea} min), ore ${orario}. ${frequenzaLabel}.`;
     } else {
-      impostazione = `${etichetta}: reintegrare ${mm} mm → ${minutiPerCiclo} min, ore ${orario}. ${frequenzaLabel}.`;
+      impostazione = `${etichetta}: reintegrare ${mmLinea} mm → ${minutiPerCiclo} min, ore ${orario}. ${frequenzaLabel}.`;
     }
 
     return {
@@ -498,7 +559,10 @@ export function calcolaProgrammaZoneCentralina(
       pluviometria_mm_h: pluv,
       numero_teste: nTeste,
       teste_ids: linea.teste.map((t) => t.id),
-      mm_da_evadere: mm,
+      mm_da_evadere: mmLinea,
+      mm_base_prato: mm,
+      teste_in_ombra: inOmbra,
+      pendenza_linea: pendenzaLinea,
       minuti_per_ciclo: minutiPerCiclo,
       cicli,
       minuti_totali_linea: minutiTotaliLinea,
@@ -516,6 +580,10 @@ export function calcolaProgrammaZoneCentralina(
         linea.tipi_misti
           ? "Tipi diversi sulla stessa uscita: minuti calcolati sul tipo più frequente in mappa."
           : null,
+        inOmbra > 0
+          ? `${inOmbra}/${nTeste} teste in zona ombra: mm ridotti rispetto al sole.`
+          : null,
+        vicinoPendenza ? "Vicino a pendenza in mappa: cicli brevi con pausa consigliati." : null,
       ]
         .filter(Boolean)
         .join(" ")
@@ -612,6 +680,18 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
       kc_stagionale: true,
       capacita_campo_mm: bilancio.capacita_campo_mm,
       modificatore_ombra: modificatoreOmbra(input.percentuale_ombra),
+      percentuale_ombra_mappa: input.percentuale_ombra,
+      pendenza_effettiva: input.pendenza,
+      contesto_mappa: input.contesto_mappa
+        ? {
+            ha_zone_ombra: input.contesto_mappa.ha_zone_ombra,
+            ha_pendenza_mappa: input.contesto_mappa.ha_pendenza_mappa,
+            pct_ombra_prato: input.contesto_mappa.pct_ombra_prato,
+            num_pendenza: input.contesto_mappa.num_pendenza,
+            num_teste_in_ombra: input.contesto_mappa.num_teste_in_ombra,
+            num_teste_vicino_pendenza: input.contesto_mappa.num_teste_vicino_pendenza,
+          }
+        : null,
       saturazione_suolo: bilancio.saturazione_suolo,
     },
     dati_centralina: {
@@ -628,6 +708,7 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     schema_settimanale,
     programma_zone,
     messaggio_ux,
+    meteo_snapshot: snapshotMeteoIrrigazione(weatherBundle, meteo),
     calcolato_il: new Date().toISOString(),
   };
 }

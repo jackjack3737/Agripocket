@@ -1,33 +1,68 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchIrrigazioneGiornaliera, AZIONE_IRRIGAZIONE_LABEL } from "../lib/irrigazioneClient";
+import {
+  fetchIrrigazioneGiornaliera,
+  AZIONE_IRRIGAZIONE_LABEL,
+  IRRIGAZIONE_REFRESH_EVENT,
+} from "../lib/irrigazioneClient";
 import "../styles-irrigation-widget.css";
 
-const MODALITA_BADGE = {
-  statico: "S",
-  rotator: "R",
-  dinamico: "O",
-};
+function formatMinutiLinea(z) {
+  if (!z.attiva_oggi) return "OFF";
+  if (z.cicli > 1) return `${z.cicli}×${z.minuti_per_ciclo} min`;
+  const m = z.minuti_totali_linea ?? z.minuti_per_ciclo ?? 0;
+  return m > 0 ? `${m} min` : "OFF";
+}
 
-function IrrigationZoneProgram({ programma }) {
+/** Riga compatta: Linea 1 → tot minuti */
+function IrrigationProgramCompact({ programma, centralina, tecnici, azione }) {
+  if (programma?.zone?.length) {
+    return (
+      <ul className="irrigation-widget__lines" aria-label="Programma per linea centralina">
+        {programma.zone.map((z) => (
+          <li key={z.zona_numero} className="irrigation-widget__line">
+            <span className="irrigation-widget__line-n">Linea {z.zona_numero}</span>
+            <strong className="irrigation-widget__line-v">{formatMinutiLinea(z)}</strong>
+          </li>
+        ))}
+        {programma.minuti_totali_zone > 0 ? (
+          <li className="irrigation-widget__line irrigation-widget__line--tot">
+            <span className="irrigation-widget__line-n">Totale</span>
+            <strong className="irrigation-widget__line-v">{programma.minuti_totali_zone} min</strong>
+          </li>
+        ) : null}
+      </ul>
+    );
+  }
+
+  if (azione === "SPEGNI") {
+    return <p className="irrigation-widget__lines-single">Centralina spenta oggi</p>;
+  }
+
+  const min = tecnici?.minuti_totali_consigliati ?? centralina?.minuti_per_ciclo;
+  if (min > 0) {
+    const cicli = centralina?.cicli_consigliati;
+    const label =
+      cicli > 1 ? `${cicli}×${centralina.minuti_per_ciclo} min` : `${min} min`;
+    return <p className="irrigation-widget__lines-single">{label}</p>;
+  }
+
+  return null;
+}
+
+function IrrigationZoneProgramDetails({ programma }) {
   if (!programma?.zone?.length) return null;
 
   return (
-    <section className="irrigation-widget__zone-prog" aria-label="Programma centralina per zona">
-      <h3 className="irrigation-widget__zone-prog-title">Centralina — una riga per linea</h3>
+    <div className="irrigation-widget__zone-details">
       {programma.sintesi ? <p className="irrigation-widget__zone-prog-sintesi">{programma.sintesi}</p> : null}
       <ul className="irrigation-widget__zone-list">
         {programma.zone.map((z) => (
           <li
-            key={z.id || z.zona_numero}
+            key={z.zona_numero}
             className={`irrigation-widget__zone-card${z.attiva_oggi ? "" : " irrigation-widget__zone-card--off"}`}
           >
-            <div className="irrigation-widget__zone-card-head">
-              <span className={`irrigation-widget__zone-badge irrigation-widget__zone-badge--${z.modalita}`}>
-                {MODALITA_BADGE[z.modalita] || "?"}
-              </span>
-              <strong className="irrigation-widget__zone-name">{z.etichetta}</strong>
-            </div>
+            <strong className="irrigation-widget__zone-name">Linea {z.zona_numero}</strong>
             {z.attiva_oggi ? (
               <div className="irrigation-widget__zone-stats">
                 {z.mm_da_evadere != null ? (
@@ -36,12 +71,7 @@ function IrrigationZoneProgram({ programma }) {
                   </span>
                 ) : null}
                 <span>
-                  <em>Minuti linea</em>{" "}
-                  {z.cicli > 1 ? `${z.cicli}×${z.minuti_per_ciclo}` : z.minuti_per_ciclo || z.minuti_totali_linea}
-                </span>
-                <span>
-                  <em>Quando</em> {z.frequenza_label?.slice(0, 40)}
-                  {(z.frequenza_label?.length ?? 0) > 40 ? "…" : ""}
+                  <em>Minuti</em> {formatMinutiLinea(z)}
                 </span>
                 <span>
                   <em>Ora</em> {z.orario_consigliato}
@@ -50,21 +80,14 @@ function IrrigationZoneProgram({ programma }) {
             ) : (
               <p className="irrigation-widget__zone-off">Spenta oggi</p>
             )}
-            {z.giorni_settimana?.length ? (
-              <p className="irrigation-widget__zone-giorni">
-                Giorni: <strong>{z.giorni_settimana.join(" · ")}</strong>
-              </p>
+            {z.impostazione ? (
+              <p className="irrigation-widget__zone-impostazione">{z.impostazione}</p>
             ) : null}
-            <p className="irrigation-widget__zone-impostazione">{z.impostazione}</p>
+            {z.nota ? <p className="irrigation-widget__zone-nota">{z.nota}</p> : null}
           </li>
         ))}
       </ul>
-      {programma.minuti_totali_zone > 0 ? (
-        <p className="irrigation-widget__zone-totale">
-          Totale stimato tutte le zone: <strong>{programma.minuti_totali_zone} min</strong> (se tutte attive oggi)
-        </p>
-      ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -74,14 +97,13 @@ function IrrigationWeeklySchedule({ schema, azione }) {
 
   return (
     <section className="irrigation-widget__settimana" aria-label="Programma irrigazione settimanale">
-      <h3 className="irrigation-widget__settimana-title">Programma settimanale</h3>
+      <h3 className="irrigation-widget__settimana-title">Settimana</h3>
       <p className="irrigation-widget__settimana-freq">
         <strong>{freq?.label || "Frequenza"}</strong>
         {freq?.passate_settimana != null ? (
           <span>
             {" "}
-            · {freq.passate_settimana} passat{freq.passate_settimana === 1 ? "a" : "e"} in 7 giorni
-            {freq.minuti_per_passata ? ` · ${freq.minuti_per_passata} min a passata` : ""}
+            · {freq.passate_settimana} passat{freq.passate_settimana === 1 ? "a" : "e"} / 7 gg
           </span>
         ) : null}
       </p>
@@ -91,14 +113,11 @@ function IrrigationWeeklySchedule({ schema, azione }) {
           <div
             key={g.iso}
             role="listitem"
-            className={`irrigation-widget__giorno${g.irriga ? " irrigation-widget__giorno--on" : ""}${g.nota === "Oggi no" ? " irrigation-widget__giorno--oggi-off" : ""}`}
+            className={`irrigation-widget__giorno${g.irriga ? " irrigation-widget__giorno--on" : ""}`}
           >
             <span className="irrigation-widget__giorno-nome">{g.nome}</span>
             {g.irriga ? (
-              <>
-                <span className="irrigation-widget__giorno-stato">Irriga</span>
-                <span className="irrigation-widget__giorno-min">{g.nota || `${g.minuti} min`}</span>
-              </>
+              <span className="irrigation-widget__giorno-min">{g.nota || `${g.minuti} min`}</span>
             ) : (
               <span className="irrigation-widget__giorno-stato irrigation-widget__giorno-stato--off">
                 {g.nota || "—"}
@@ -109,15 +128,8 @@ function IrrigationWeeklySchedule({ schema, azione }) {
       </div>
 
       {schema.riepilogo_ux ? <p className="irrigation-widget__settimana-riepilogo">{schema.riepilogo_ux}</p> : null}
-      {schema.impostazione_centralina ? (
-        <p className="irrigation-widget__settimana-centralina">
-          <span className="irrigation-widget__settimana-centralina-label">In centralina: </span>
-          {schema.impostazione_centralina}
-        </p>
-      ) : null}
-
       {azione === "SPEGNI" && schema.oggi_irriga === false ? (
-        <p className="irrigation-widget__settimana-oggi">Oggi: centralina spenta (pioggia o fabbisogno coperto).</p>
+        <p className="irrigation-widget__settimana-oggi">Oggi: nessuna irrigazione necessaria.</p>
       ) : null}
     </section>
   );
@@ -136,12 +148,38 @@ function IconDroplet() {
   );
 }
 
+function IconChevron({ open }) {
+  return (
+    <svg
+      className={`irrigation-widget__chevron${open ? " irrigation-widget__chevron--open" : ""}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function IrrigationWidget({ profile, enabled = true }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const canRun = enabled && profile?.localita?.trim() && profile?.irrigazione !== "pioggia";
+
+  function loadIrrigazione(force = false) {
+    setLoading(true);
+    setError("");
+    return fetchIrrigazioneGiornaliera({ force })
+      .then((payload) => {
+        setData(payload);
+        if (force) setExpanded(true);
+      })
+      .catch((e) => setError(e.message || "Errore calcolo"))
+      .finally(() => setLoading(false));
+  }
 
   useEffect(() => {
     if (!canRun) {
@@ -166,12 +204,19 @@ export default function IrrigationWidget({ profile, enabled = true }) {
     };
   }, [canRun, profile?.localita, profile?.tipo_irrigatori, profile?.tempo_irrigazione_base, profile?.prato_zone]);
 
+  useEffect(() => {
+    if (!canRun) return;
+    const onRefresh = () => loadIrrigazione(true);
+    window.addEventListener(IRRIGAZIONE_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(IRRIGAZIONE_REFRESH_EVENT, onRefresh);
+  }, [canRun, profile?.localita, profile?.tipo_irrigatori, profile?.tempo_irrigazione_base, profile?.prato_zone]);
+
   if (!profile?.localita?.trim()) {
     return (
       <section className="irrigation-widget irrigation-widget--muted">
-        <h2 className="irrigation-widget__title">Irrigazione smart</h2>
+        <h2 className="irrigation-widget__title">Irrigazione</h2>
         <p className="irrigation-widget__lead">
-          <Link to="/onboarding">Imposta la località</Link> per calcolare i minuti di irrigazione da ET0 e pioggia.
+          <Link to="/onboarding">Imposta la località</Link> per il programma da ET0 e pioggia.
         </p>
       </section>
     );
@@ -180,10 +225,8 @@ export default function IrrigationWidget({ profile, enabled = true }) {
   if (profile?.irrigazione === "pioggia") {
     return (
       <section className="irrigation-widget irrigation-widget--muted">
-        <h2 className="irrigation-widget__title">Irrigazione smart</h2>
-        <p className="irrigation-widget__lead">
-          Profilo «solo pioggia»: il motore resta in stand-by. In siccità prolungata valuta irrigazione manuale.
-        </p>
+        <h2 className="irrigation-widget__title">Irrigazione</h2>
+        <p className="irrigation-widget__lead">Profilo «solo pioggia»: motore in stand-by.</p>
       </section>
     );
   }
@@ -194,110 +237,112 @@ export default function IrrigationWidget({ profile, enabled = true }) {
   const tecnici = data?.dati_tecnici;
   const schema = data?.schema_settimanale;
   const programmaZone = data?.programma_zone;
-  const meteoUsato = data?.meteo_utilizzato;
-  const hasZoneProgram = programmaZone?.zone?.length > 0;
+  const hasData = data && !loading;
 
   return (
-    <section className={`irrigation-widget${azione ? ` irrigation-widget--${meta?.tone || "ok"}` : ""}`}>
-      <header className="irrigation-widget__head">
-        <div className="irrigation-widget__icon-wrap">
-          <IconDroplet />
-        </div>
-        <div>
-          <h2 className="irrigation-widget__title">Irrigazione di oggi</h2>
-          <p className="irrigation-widget__sub">
-            Minuti e frequenza da bilancio idrico (ET0 − pioggia)
-            {meteoUsato ? " · meteo incluso" : ""}
-          </p>
-        </div>
-      </header>
+    <section
+      id="irrigazione-widget"
+      className={`irrigation-widget irrigation-widget--compact${azione ? ` irrigation-widget--${meta?.tone || "ok"}` : ""}${expanded ? " irrigation-widget--expanded" : ""}`}
+    >
+      <button
+        type="button"
+        className="irrigation-widget__toggle"
+        onClick={() => hasData && setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls="irrigation-widget-details"
+        disabled={!hasData}
+      >
+        <span className="irrigation-widget__toggle-main">
+          <span className="irrigation-widget__icon-wrap">
+            <IconDroplet />
+          </span>
+          <span className="irrigation-widget__toggle-text">
+            <span className="irrigation-widget__title-row">
+              <span className="irrigation-widget__title">Irrigazione oggi</span>
+              {meta ? (
+                <span className={`irrigation-widget__pill irrigation-widget__pill--${meta.tone}`}>
+                  {meta.label}
+                </span>
+              ) : null}
+            </span>
+            {loading ? (
+              <span className="irrigation-widget__loading-inline">Calcolo…</span>
+            ) : hasData ? (
+              <IrrigationProgramCompact
+                programma={programmaZone}
+                centralina={centralina}
+                tecnici={tecnici}
+                azione={azione}
+              />
+            ) : error ? (
+              <span className="irrigation-widget__error-inline">{error}</span>
+            ) : null}
+          </span>
+        </span>
+        {hasData ? <IconChevron open={expanded} /> : null}
+      </button>
 
-      {loading ? <p className="irrigation-widget__loading">Calcolo in corso…</p> : null}
-      {error && !loading ? <p className="irrigation-widget__error">{error}</p> : null}
-
-      {data && !loading ? (
-        <>
-          {meta ? (
-            <p className={`irrigation-widget__azione irrigation-widget__azione--${meta.tone}`}>
-              {meta.label}
-            </p>
+      {hasData && expanded ? (
+        <div id="irrigation-widget-details" className="irrigation-widget__details">
+          {programmaZone?.zone?.length ? (
+            <IrrigationZoneProgramDetails programma={programmaZone} />
           ) : null}
 
-          {hasZoneProgram ? <IrrigationZoneProgram programma={programmaZone} /> : null}
-
-          {!hasZoneProgram && azione !== "SPEGNI" && centralina?.cicli_consigliati > 0 ? (
-            <div className="irrigation-widget__centralina" role="group" aria-label="Impostazioni centralina">
-              <div className="irrigation-widget__stat irrigation-widget__stat--primary">
-                <span className="irrigation-widget__stat-label">Minuti totali</span>
-                <strong>{tecnici?.minuti_totali_consigliati ?? 0}</strong>
-              </div>
-              {centralina.cicli_consigliati > 1 ? (
-                <>
-                  <div className="irrigation-widget__stat">
-                    <span className="irrigation-widget__stat-label">Cicli</span>
-                    <strong>{centralina.cicli_consigliati}</strong>
-                  </div>
-                  <div className="irrigation-widget__stat">
-                    <span className="irrigation-widget__stat-label">Minuti per ciclo</span>
-                    <strong>{centralina.minuti_per_ciclo}</strong>
-                  </div>
-                  {centralina.pausa_tra_cicli_min ? (
-                    <p className="irrigation-widget__pausa">
-                      Pausa tra i cicli: circa {centralina.pausa_tra_cicli_min} minuti
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <div className="irrigation-widget__stat">
-                  <span className="irrigation-widget__stat-label">Un ciclo da</span>
-                  <strong>{centralina.minuti_per_ciclo} min</strong>
-                </div>
-              )}
-              {centralina.tempo_base_minuti ? (
-                <p className="irrigation-widget__base">
-                  Riferimento centralina: {centralina.tempo_base_minuti} min · impianto{" "}
-                  {centralina.tipo_irrigatori || "—"}
-                </p>
-              ) : null}
+          {!programmaZone?.zone?.length && azione !== "SPEGNI" && centralina?.cicli_consigliati > 0 ? (
+            <div className="irrigation-widget__centralina">
+              <p>
+                <strong>{tecnici?.minuti_totali_consigliati ?? 0} min</strong>
+                {centralina.cicli_consigliati > 1
+                  ? ` · ${centralina.cicli_consigliati} cicli da ${centralina.minuti_per_ciclo} min`
+                  : null}
+              </p>
             </div>
           ) : null}
 
           {schema ? <IrrigationWeeklySchedule schema={schema} azione={azione} /> : null}
 
-          <div className="irrigation-widget__edu">
+          {data.messaggio_ux ? (
             <p className="irrigation-widget__messaggio">{data.messaggio_ux}</p>
-          </div>
+          ) : null}
 
-          {meteoUsato ? (
+          {data.meteo_utilizzato ? (
             <p className="irrigation-widget__meteo-badge" role="note">
-              Calcolo basato su previsioni e dati meteo della tua località (ET0, pioggia recente e prevista).
+              Calcolo con meteo locale (ET0, pioggia).
+            </p>
+          ) : null}
+
+          {tecnici?.contesto_mappa?.ha_zone_ombra || tecnici?.contesto_mappa?.ha_pendenza_mappa ? (
+            <p className="irrigation-widget__mappa-badge" role="note">
+              Mappa:
+              {tecnici.contesto_mappa.ha_zone_ombra
+                ? ` ombra ~${tecnici.percentuale_ombra_mappa ?? tecnici.contesto_mappa.pct_ombra_prato}%`
+                : ""}
+              {tecnici.contesto_mappa.ha_pendenza_mappa
+                ? ` · pendenza ${tecnici.pendenza_effettiva || "—"}`
+                : ""}
             </p>
           ) : null}
 
           {tecnici?.et0_mm != null ? (
             <p className="irrigation-widget__tech" role="note">
-              ET0 {tecnici.et0_mm} mm · Kc {tecnici.kc} · da reintegrare oggi {tecnici.fabbisogno_calcolato_mm} mm
-              {tecnici.capacita_campo_mm != null ? ` · cap. campo ~${tecnici.capacita_campo_mm} mm` : ""}
-              {tecnici.precipitazioni_mm != null ? ` · pioggia oggi ${tecnici.precipitazioni_mm} mm` : ""}
+              ET0 {tecnici.et0_mm} mm · Kc {tecnici.kc} · oggi {tecnici.fabbisogno_calcolato_mm} mm
+              {tecnici.precipitazioni_mm != null ? ` · pioggia ${tecnici.precipitazioni_mm} mm` : ""}
             </p>
           ) : null}
-        </>
-      ) : null}
 
-      <button
-        type="button"
-        className="irrigation-widget__refresh btn btn-outline btn-sm"
-        disabled={loading}
-        onClick={() => {
-          setLoading(true);
-          fetchIrrigazioneGiornaliera({ force: true })
-            .then(setData)
-            .catch((e) => setError(e.message))
-            .finally(() => setLoading(false));
-        }}
-      >
-        Aggiorna calcolo
-      </button>
+          <button
+            type="button"
+            className="irrigation-widget__refresh btn btn-outline btn-sm"
+            disabled={loading}
+            onClick={(e) => {
+              e.stopPropagation();
+              loadIrrigazione(true);
+            }}
+          >
+            Aggiorna calcolo
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

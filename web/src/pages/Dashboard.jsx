@@ -184,6 +184,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             zonaNome={zonaDefault?.nome_zona}
             weather={weather}
             userId={userId}
+            profile={profile}
           />
         </div>
 

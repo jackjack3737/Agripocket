@@ -94,7 +94,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       {saving ? <p className="dash-card__loading">Salvataggio mappa…</p> : null}
 
       <OmbraSeedCard profile={profile} />
-      <IrrigationZoneCard profile={profile} hideEditLink />
+      <IrrigationZoneCard profile={profile} />
 
       <LawnMapModal
         key={activeTool || "zone-map"}

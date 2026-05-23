@@ -8,6 +8,23 @@ function cacheKeyForToday() {
   return `${CACHE_KEY_PREFIX}${new Date().toISOString().slice(0, 10)}`;
 }
 
+/** Ultimo calcolo irrigazione in cache (sessione odierna). */
+export function getIrrigazioneCached() {
+  try {
+    const raw = sessionStorage.getItem(cacheKeyForToday());
+    if (!raw) return null;
+    const { at, payload } = JSON.parse(raw);
+    const sameDay = new Date(at).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+    if (!sameDay || !payload?.azione_irrigazione) return null;
+    if (!payload.calcolato_il) payload.calcolato_il = new Date(at).toISOString();
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export const IRRIGAZIONE_REFRESH_EVENT = "agripocket:refresh-irrigazione";
+
 /**
  * @param {{ force?: boolean }} [opts]
  * @returns {Promise<object>}

@@ -1,53 +1,56 @@
-import { Link } from "react-router-dom";
-import { suggestIrrigation, countZonesByType } from "../lib/pratoZone";
+import { countZonesByType, normalizePratoZone } from "../lib/pratoZone";
 
-export default function IrrigationZoneCard({ profile, hideEditLink = false }) {
+/** Riepilogo linee centralina in mappa (senza elenco singoli getti). */
+function riepilogoLinee(pratoZone) {
+  const { zone } = normalizePratoZone(pratoZone);
+  const byLinea = new Map();
+  for (const z of zone) {
+    if (z.tipo !== "irrigatore") continue;
+    const L = z.linea ?? 1;
+    if (!byLinea.has(L)) byLinea.set(L, { n: 0, statico: 0, rotator: 0, dinamico: 0 });
+    const row = byLinea.get(L);
+    row.n += 1;
+    if (z.modalita === "rotator") row.rotator += 1;
+    else if (z.modalita === "dinamico") row.dinamico += 1;
+    else row.statico += 1;
+  }
+  return [...byLinea.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([linea, c]) => {
+      const tipi = [];
+      if (c.statico) tipi.push(`${c.statico} stat.`);
+      if (c.rotator) tipi.push(`${c.rotator} rot.`);
+      if (c.dinamico) tipi.push(`${c.dinamico} osc.`);
+      return { linea, n: c.n, label: tipi.join(", ") };
+    });
+}
+
+export default function IrrigationZoneCard({ profile }) {
   const pratoZone = profile?.prato_zone;
   if (!pratoZone) return null;
 
   const counts = countZonesByType(pratoZone);
-  const advice = suggestIrrigation({
-    pratoZone,
-    superficie_mq: profile?.superficie_mq,
-    irrigazione: profile?.irrigazione,
-  });
+  const linee = riepilogoLinee(pratoZone);
 
-  if (!counts.irrigatore && !advice.suggerimenti.length) return null;
+  if (!counts.irrigatore) return null;
 
   return (
-    <section className="dash-card dash-card--irrigation">
-      <h2 className="dash-card__title">Irrigazione da mappa</h2>
-      <p className="dash-card__sub">
-        Tempi stimati da irrigatori segnati ({counts.statico} statici, {counts.rotator} rotator, {counts.dinamico}{" "}
-        oscillanti).
+    <div className="irrigation-zone irrigation-zone--compact">
+      <p className="irrigation-zone__hint">
+        {linee.length} uscit{linee.length === 1 ? "a" : "e"} in mappa · programma giornaliero nel riquadro
+        irrigazione sopra.
       </p>
-      {advice.programmaSintesi ? <p className="irrigation-zone__summary">{advice.programmaSintesi}</p> : null}
-      {advice.perTesta.length > 0 ? (
-        <ul className="irrigation-zone__list">
-          {advice.perTesta.map((p) => (
-            <li key={p.id}>
-              <strong>{p.label}</strong>
-              <span className={`irrigation-zone__badge irrigation-zone__badge--${p.modalita}`}>
-                {p.modalita}
-              </span>
-              <p className="irrigation-zone__meta">
-                {p.minutiPerCiclo} min per ciclo · {p.frequenza}
-              </p>
-              <p className="irrigation-zone__note">{p.nota}</p>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {advice.suggerimenti.map((s, i) => (
-        <p key={i} className="irrigation-zone__hint">
-          {s}
-        </p>
-      ))}
-      {!hideEditLink ? (
-        <Link className="btn btn-outline btn-sm dash-card__cta" to="/onboarding">
-          Modifica mappa zone
-        </Link>
-      ) : null}
-    </section>
+      <ul className="irrigation-zone__lines">
+        {linee.map((l) => (
+          <li key={l.linea}>
+            <strong>Linea {l.linea}</strong>
+            <span>
+              {l.n} gett{l.n === 1 ? "o" : "i"}
+              {l.label ? ` (${l.label})` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

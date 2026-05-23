@@ -6,6 +6,165 @@
   box-shadow: 0 4px 18px rgba(25, 80, 120, 0.08);
 }
 
+.irrigation-widget--compact {
+  padding: 0;
+  overflow: hidden;
+}
+
+.irrigation-widget__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.irrigation-widget__toggle:disabled {
+  cursor: default;
+}
+
+.irrigation-widget__toggle-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.irrigation-widget__toggle-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.irrigation-widget__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.irrigation-widget__pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.irrigation-widget__pill--up {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.irrigation-widget__pill--down {
+  background: #e1f5fe;
+  color: #01579b;
+}
+
+.irrigation-widget__pill--off {
+  background: #eceff1;
+  color: #455a64;
+}
+
+.irrigation-widget__pill--ok {
+  background: #f1f8e9;
+  color: #33691e;
+}
+
+.irrigation-widget__chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: #78909c;
+  transition: transform 0.2s ease;
+}
+
+.irrigation-widget__chevron--open {
+  transform: rotate(180deg);
+}
+
+.irrigation-widget__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.irrigation-widget__line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.irrigation-widget__line-n {
+  color: #5a6b75;
+}
+
+.irrigation-widget__line-v {
+  color: #0d47a1;
+  font-size: 0.95rem;
+}
+
+.irrigation-widget__line--tot {
+  margin-top: 0.15rem;
+  padding-top: 0.2rem;
+  border-top: 1px dashed #cfd8dc;
+}
+
+.irrigation-widget__line--tot .irrigation-widget__line-n {
+  font-weight: 600;
+  color: #37474f;
+}
+
+.irrigation-widget__lines-single {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0d47a1;
+}
+
+.irrigation-widget__loading-inline,
+.irrigation-widget__error-inline {
+  font-size: 0.82rem;
+  color: #5a6b75;
+}
+
+.irrigation-widget__error-inline {
+  color: #c62828;
+}
+
+.irrigation-widget__details {
+  padding: 0 0.75rem 0.75rem;
+  border-top: 1px solid rgba(33, 150, 243, 0.12);
+}
+
+.irrigation-widget--compact .irrigation-widget__icon-wrap {
+  width: 2rem;
+  height: 2rem;
+}
+
+.irrigation-widget--compact .irrigation-widget__title {
+  font-size: 0.95rem;
+}
+
+.irrigation-widget__zone-details {
+  margin-bottom: 0.65rem;
+}
+
 .irrigation-widget--muted {
   background: #f8fafb;
   border-color: #e2e8ec;
@@ -407,6 +566,25 @@
   background: #eceff1;
   border-radius: 8px;
   border-left: 3px solid #42a5f5;
+}
+
+.irrigation-widget__mappa-badge {
+  margin: 0 0 0.55rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #4e342e;
+  background: #fff8e1;
+  border-radius: 8px;
+  border-left: 3px solid #ef6c00;
+}
+
+.irrigation-widget__zone-nota {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #5a6b5e;
+  font-style: italic;
 }
 
 @media (max-width: 380px) {

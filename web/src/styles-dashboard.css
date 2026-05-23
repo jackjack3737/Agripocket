@@ -1653,10 +1653,38 @@
 }
 
 .irrigation-zone__hint {
-  margin: 0.35rem 0 0;
-  font-size: 0.8rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
   color: var(--muted);
   line-height: 1.4;
+}
+
+.irrigation-zone--compact {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.irrigation-zone__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.irrigation-zone__lines li {
+  display: flex;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.irrigation-zone__lines strong {
+  color: #1565c0;
 }
 
 .profile-reset-inline {
@@ -1932,6 +1960,53 @@
 .stato-clinico__motivo {
   color: var(--muted);
   margin-top: 0.5rem !important;
+}
+
+.stato-clinico__alerts {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.stato-clinico__alerts--attenzione {
+  background: #fff8e1;
+  border: 1px solid #ffcc80;
+  color: #5d4037;
+}
+
+.stato-clinico__alerts--info {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  color: #0d47a1;
+}
+
+.stato-clinico__alerts-title {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.stato-clinico__alerts-motivi {
+  margin: 0 0 0.4rem;
+  padding-left: 1.1rem;
+}
+
+.stato-clinico__alerts-motivi li {
+  margin-bottom: 0.2rem;
+}
+
+.stato-clinico__alerts-meta {
+  margin: 0 0 0.5rem;
+  font-size: 0.76rem;
+  opacity: 0.9;
+}
+
+.stato-clinico__alerts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 /* Barra Analisi Gemini: larga come la colonna meteo + stato clinico */

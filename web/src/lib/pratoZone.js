@@ -189,6 +189,109 @@ export function computeOmbraZoneAreas(pratoZone) {
   };
 }
 
+/** % ombra numerica (0–100) sul prato da poligoni disegnati. */
+export function computeOmbraZonePctNumeric(pratoZone) {
+  return computeOmbraZoneAreas(pratoZone)?.pctTotal ?? 0;
+}
+
+const PENDENZA_VICINANZA_M = 12;
+
+function pointInPolygon(lat, lng, path) {
+  if (!path?.length) return false;
+  let inside = false;
+  for (let i = 0, j = path.length - 1; i < path.length; j = i++) {
+    const yi = path[i].lat;
+    const xi = path[i].lng;
+    const yj = path[j].lat;
+    const xj = path[j].lng;
+    const intersect =
+      yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-15) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function haversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dLat = p2 - p1;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function distanzaPuntoSegmentoM(lat, lng, latA, lngA, latB, lngB) {
+  const lat0 = (latA + latB) / 2;
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos((lat0 * Math.PI) / 180);
+  const ax = lngA * mPerDegLng;
+  const ay = latA * mPerDegLat;
+  const bx = lngB * mPerDegLng;
+  const by = latB * mPerDegLat;
+  const px = lng * mPerDegLng;
+  const py = lat * mPerDegLat;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-6) return haversineM(lat, lng, latA, lngA);
+  let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const qx = ax + t * dx;
+  const qy = ay + t * dy;
+  return haversineM(lat, lng, qy / mPerDegLat, qx / mPerDegLng);
+}
+
+function pendenzaDaNumeroFrecce(n) {
+  if (n >= 3) return "forte";
+  if (n >= 2) return "media";
+  if (n >= 1) return "leggera";
+  return null;
+}
+
+/** Contesto irrigazione da zone disegnate (ombra, pendenza, posizione teste). */
+export function analizzaContestoIrrigazioneMappa(pratoZone) {
+  const { zone } = normalizePratoZone(pratoZone);
+  const ombraPolys = zone.filter((z) => z.tipo === "ombra");
+  const pendenzaSegs = zone.filter((z) => z.tipo === "pendenza");
+  const heads = zone.filter((z) => z.tipo === "irrigatore");
+
+  const areas = computeOmbraZoneAreas(pratoZone);
+  const pct_ombra_prato = areas?.pctTotal ?? 0;
+
+  const teste = heads.map((h) => {
+    const in_ombra = ombraPolys.some((poly) => pointInPolygon(h.lat, h.lng, poly.path));
+    const vicino_pendenza = pendenzaSegs.some(
+      (seg) =>
+        distanzaPuntoSegmentoM(h.lat, h.lng, seg.from.lat, seg.from.lng, seg.to.lat, seg.to.lng) <=
+        PENDENZA_VICINANZA_M,
+    );
+    return {
+      id: h.id,
+      linea: h.linea ?? 1,
+      modalita: h.modalita,
+      in_ombra,
+      vicino_pendenza,
+    };
+  });
+
+  const num_pendenza = pendenzaSegs.length;
+
+  return {
+    pct_ombra_prato,
+    ombra_zone: areas?.zones ?? [],
+    num_pendenza,
+    pendenza_da_mappa: pendenzaDaNumeroFrecce(num_pendenza),
+    teste,
+    teste_by_id: Object.fromEntries(teste.map((t) => [t.id, t])),
+    num_teste_in_ombra: teste.filter((t) => t.in_ombra).length,
+    num_teste_vicino_pendenza: teste.filter((t) => t.vicino_pendenza).length,
+    ha_zone_ombra: ombraPolys.length > 0,
+    ha_pendenza_mappa: num_pendenza > 0,
+  };
+}
+
 /** Miscela e dose seme per overseeding in ombra (g/m²). */
 export function raccomandazioneMiscelaOmbra(pctOmbra, ombraZonePct) {
   const bucket = ombraZonePct || (pctOmbra >= 60 ? "75_100" : pctOmbra >= 35 ? "50_75" : pctOmbra >= 15 ? "25_50" : "0_25");
