@@ -2,8 +2,8 @@
  * Agronomic Guardrails — anti-sovrapposizione trattamenti e output strutturato calendario.
  */
 
-import { calcolaDose, inferMacroCategoriaProdotto } from "./prodottiCatalogo.mjs";
-import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
+import { inferMacroCategoriaProdotto } from "./prodottiCatalogo.mjs";
+import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 
 export { inferMacroCategoriaProdotto };
 
@@ -268,54 +268,30 @@ const TEMPLATE_UX = {
 };
 
 /**
- * Struttura output: scienza sotto, semplicità sopra.
+ * Struttura output Educazione → Soluzione (delega alla pipeline trattamenti).
  */
-export function strutturaOutputCalendario(intervento, prodotto, profilo) {
-  const macro = prodotto ? inferMacroCategoriaProdotto(prodotto, intervento) : macroDaIntervento(intervento, new Map());
+export function strutturaOutputCalendario(intervento, _prodotto, profilo, opts = {}) {
+  if (intervento?.dettaglio_trattamento?.tipo_intervento) {
+    return {
+      ...intervento,
+      macro_categoria: intervento.macro_categoria || intervento.dettaglio_trattamento.macro_categoria,
+    };
+  }
+  const { prodotti = [], vision, weatherBundle } = opts;
+  if (prodotti.length) {
+    return arricchisciInterventoTrattamento(intervento, profilo, prodotti, vision, weatherBundle);
+  }
+  const macro = macroDaIntervento(intervento, new Map());
   const tpl = TEMPLATE_UX[macro] || TEMPLATE_UX.default;
-  const mq = superficieMqVerificata(profilo);
-  const dose = prodotto && mq ? calcolaDose(prodotto, mq) : null;
-
-  const titoloBeneficio =
-    tpl.titolo && !/concim|trattamento|applicazione/i.test(intervento.titolo || "")
-      ? tpl.titolo
-      : intervento.titolo;
-
-  const razionale =
-    tpl.razionale ||
-    intervento.descrizione?.split(/Alternative catalogo/i)[0]?.trim().slice(0, 500) ||
-    "Intervento allineato al profilo del prato e alla stagione.";
-
-  const prodottoNome = prodotto?.nome || intervento.prodotto_nome || null;
-  const marca = prodotto?.marca ? ` (${prodotto.marca})` : "";
-
-  const dosaggioCalcolato = dose
-    ? `${dose.dose_display} per ${mq} m²`
-    : intervento.dose_display
-      ? String(intervento.dose_display)
-      : null;
-
-  let messaggio = tpl.messaggio;
-  if (prodottoNome) {
-    messaggio = `${messaggio} Prodotto consigliato: ${prodottoNome}${marca}.`;
-  }
-  if (dosaggioCalcolato && !/grammi|kg|litri|ml/i.test(messaggio)) {
-    messaggio = `${messaggio} Quantità indicativa: ${dosaggioCalcolato}.`;
-  }
-
   return {
     ...intervento,
-    titolo: titoloBeneficio.slice(0, 120),
+    titolo: (tpl.titolo || intervento.titolo || "Intervento prato").slice(0, 120),
     macro_categoria: macro,
-    razionale_scientifico: razionale.slice(0, 800),
-    messaggio_ux: messaggio.slice(0, 600),
-    dosaggio_calcolato: dosaggioCalcolato,
-    prodotto_nome: prodottoNome,
-    prodotto_id: prodotto?.id ?? intervento.prodotto_id ?? null,
-    descrizione: [razionale, prodottoNome ? `Prodotto: ${prodottoNome}${marca}.` : null, dosaggioCalcolato]
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 900),
+    razionale_scientifico: (tpl.razionale || intervento.descrizione || "").slice(0, 800),
+    messaggio_ux: (tpl.messaggio || "").slice(0, 600),
+    spiegazione_semplice: (tpl.messaggio || "").slice(0, 600),
+    prodotto_id: null,
+    prodotto_nome: null,
   };
 }
 
@@ -323,7 +299,14 @@ export function strutturaOutputCalendario(intervento, prodotto, profilo) {
  * Pipeline guardrails: filtro 30gg + cap stagionale + dedupe mese/macro + output strutturato.
  */
 export async function applicaGuardrailsCalendario(interventi, opts = {}) {
-  const { storico = [], prodotti = [], profilo, oggi = new Date().toISOString().slice(0, 10) } = opts;
+  const {
+    storico = [],
+    prodotti = [],
+    profilo,
+    vision,
+    weatherBundle,
+    oggi = new Date().toISOString().slice(0, 10),
+  } = opts;
   const prodottiById = new Map(prodotti.map((p) => [p.id, p]));
 
   const trattamenti = interventi.filter((i) =>
@@ -352,11 +335,11 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
       bloccati += 1;
       continue;
     }
-    const prodotto = i.prodotto_id != null ? prodottiById.get(i.prodotto_id) : null;
     const strutturato = strutturaOutputCalendario(
-      { ...i, macro_categoria: val.macro },
-      prodotto,
+      { ...i, macro_categoria: val.macro || i.macro_categoria },
+      null,
       profilo,
+      { prodotti, vision, weatherBundle },
     );
     ctx.pianoAccettati.push(strutturato);
     accettati.push(strutturato);

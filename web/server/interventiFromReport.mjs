@@ -1,7 +1,6 @@
-import {
-  arricchisciInterventoConProdotto,
-  loadProdotti,
-} from "./prodottiCatalogo.mjs";
+import { loadProdotti } from "./prodottiCatalogo.mjs";
+import { fetchWeatherBundle } from "./weatherCore.mjs";
+import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 import { filtraInterventiFitofarmacoCurativo } from "./regoleFitofarmaci.mjs";
 import { integraFotoNelPiano } from "./aggiornaPianoDaFoto.mjs";
 import { aggiornaAnalisiFoto, uploadAnalisiFoto } from "./uploadAnalisiFoto.mjs";
@@ -81,6 +80,8 @@ function rowIntervento(userId, analisiId, i, fonte, zonaId = null) {
     messaggio_ux: i.messaggio_ux ?? null,
     macro_categoria: i.macro_categoria ?? null,
     dosaggio_calcolato: i.dosaggio_calcolato ?? null,
+    spiegazione_semplice: i.spiegazione_semplice ?? i.messaggio_ux ?? null,
+    dettaglio_trattamento: i.dettaglio_trattamento ?? null,
     manual_override: fonte === "ia_foto" ? true : !!i.manual_override,
   };
   if (i.avviso_fitofarmaco) {
@@ -96,8 +97,23 @@ async function insertInterventi(admin, rows) {
   const { data, error } = await admin.from("prato_interventi").insert(rows).select("*");
   if (!error) return data ?? [];
 
-  if (/prodotto_|dose_/.test(error.message || "")) {
-    const slim = rows.map(({ prodotto_id, prodotto_nome, dose_totale, dose_unita, dose_per_mq, ...r }) => r);
+  if (/prodotto_|dose_|dettaglio_trattamento|spiegazione_semplice/.test(error.message || "")) {
+    const slim = rows.map(
+      ({
+        prodotto_id,
+        prodotto_nome,
+        dose_totale,
+        dose_unita,
+        dose_per_mq,
+        razionale_scientifico,
+        messaggio_ux,
+        macro_categoria,
+        dosaggio_calcolato,
+        spiegazione_semplice,
+        dettaglio_trattamento,
+        ...r
+      }) => r,
+    );
     const retry = await admin.from("prato_interventi").insert(slim).select("*");
     if (retry.error) throw new Error(`Salvataggio interventi: ${retry.error.message}`);
     return retry.data ?? [];
@@ -124,8 +140,8 @@ Rispondi SOLO JSON valido:
 {
   "interventi": [
     {
-      "titolo": "breve (max 60 caratteri)",
-      "descrizione": "cosa fare e perché (1-2 frasi)",
+      "titolo": "macro-azione agronomica (max 60 caratteri, senza nomi commerciali)",
+      "descrizione": "perché serve ora e cosa fare (1-2 frasi, linguaggio semplice)",
       "priorita": "alta|media|bassa",
       "categoria": "taglio|irrigazione|concime|trattamento|pulizia|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
       "quando": "oggi|domani|settimana_1|settimana_2|settimana_3|mese_1|mese_2",
@@ -191,7 +207,7 @@ export async function persistAnalisiAndInterventi(
   admin,
   userId,
   { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType, zonaId },
-  { geminiGenerate, geminiKey, fonteInterventi = "ia_foto", integraPiano = true } = {},
+  { geminiGenerate, geminiKey, fonteInterventi = "ia_foto", integraPiano = true, openWeatherApiKey } = {},
 ) {
   const insertRow = {
     user_id: userId,
@@ -232,8 +248,16 @@ export async function persistAnalisiAndInterventi(
     .eq("stato", "pianificato");
 
   const prodotti = await loadProdotti(admin);
+  let weatherBundle = null;
+  if (profilo?.localita?.trim()) {
+    try {
+      weatherBundle = await fetchWeatherBundle(profilo.localita, openWeatherApiKey);
+    } catch {
+      /* opzionale */
+    }
+  }
   let arricchiti = rimuoviRoutineCalendario(interventi ?? []).map((i) =>
-    arricchisciInterventoConProdotto(i, profilo, prodotti, vision),
+    arricchisciInterventoTrattamento(i, profilo, prodotti, vision, weatherBundle),
   );
 
   let saved = [];
@@ -257,6 +281,7 @@ export async function persistAnalisiAndInterventi(
         interventiUrgenti: arricchiti,
         geminiGenerate,
         geminiKey,
+        openWeatherApiKey,
       });
     } catch (e) {
       console.warn("[analizza-prato] integra piano:", e.message);

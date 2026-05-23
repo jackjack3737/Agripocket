@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 import { ensurePreEmergenzaAnnuali, valutaPreEmergenzaAnnuali } from "./preEmergenzaAnnuali.mjs";
-import { arricchisciInterventoConProdotto, loadProdotti } from "./prodottiCatalogo.mjs";
+import { loadProdotti } from "./prodottiCatalogo.mjs";
 import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
-import { integraCatalogoNelPiano } from "./pianoDaCatalogo.mjs";
+import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 import { mergeControlliMensili } from "./controlliMensili.mjs";
 import { hintParassitiRegionali } from "./parassitiPrato.mjs";
 import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
@@ -214,8 +214,8 @@ Rispondi SOLO JSON:
 {
   "interventi": [
     {
-      "titolo": "max 80 caratteri, azione concreta",
-      "descrizione": "cosa fare, prodotto/dose se nota da KB, perché",
+      "titolo": "max 80 caratteri, MACRO-AZIONE agronomica (es. Concimazione potassica antistress, Trattamento funghicida preventivo) — MAI nomi commerciali",
+      "descrizione": "perché serve ora (GDD, meteo, stress), cosa fare in pratica — senza citare marchi o dosi commerciali",
       "categoria": "taglio|irrigazione|concime|trattamento|pulizia|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
       "priorita": "alta|media|bassa",
       "data_prevista": "YYYY-MM-DD"
@@ -318,6 +318,8 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
     messaggio_ux: i.messaggio_ux ?? null,
     macro_categoria: i.macro_categoria ?? null,
     dosaggio_calcolato: i.dosaggio_calcolato ?? null,
+    spiegazione_semplice: i.spiegazione_semplice ?? i.messaggio_ux ?? null,
+    dettaglio_trattamento: i.dettaglio_trattamento ?? null,
     manual_override: false,
   }));
 
@@ -328,7 +330,7 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
     let { data, error } = await admin.from("prato_interventi").insert(batch).select("*");
     if (error) {
       if (error.code === "PGRST205") return { count: 0, tablesMissing: true };
-      if (/prodotto_|dose_/.test(error.message || "")) {
+      if (/prodotto_|dose_|dettaglio_trattamento|spiegazione_semplice/.test(error.message || "")) {
         const slim = batch.map(
           ({
             prodotto_id,
@@ -340,6 +342,8 @@ export async function persistPianoStagionale(admin, userId, interventi, profilo)
             messaggio_ux,
             macro_categoria,
             dosaggio_calcolato,
+            spiegazione_semplice,
+            dettaglio_trattamento,
             ...r
           }) => r,
         );
@@ -408,22 +412,27 @@ export async function generaPianoStagionale({ authHeader, env }) {
 
   const interventiGrezzi = await buildPianoInterventi(profiloPerPrompt, env, admin, { vision });
   const prodotti = profiloPerPrompt._prodottiCatalogo;
+
+  let weatherBundle = null;
+  try {
+    weatherBundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY);
+  } catch {
+    /* meteo opzionale per pipeline */
+  }
+
   const arricchiti = interventiGrezzi.map((i) =>
-    arricchisciInterventoConProdotto(i, profilo, prodotti, vision),
+    arricchisciInterventoTrattamento(i, profilo, prodotti, vision, weatherBundle),
   );
-  const { interventi: conCatalogo, catalogoAggiunti } = integraCatalogoNelPiano(
-    arricchiti,
-    prodotti,
-    profilo,
-    oggi,
-  );
-  const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(conCatalogo, { vision, profilo });
+  const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(arricchiti, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
   const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
   const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
     storico,
     prodotti,
+    vision,
+    weatherBundle,
   });
+  const catalogoAggiunti = 0;
   const saved = await persistPianoStagionale(admin, userData.user.id, sanitizzati, profilo);
 
   return {

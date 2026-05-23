@@ -1,0 +1,195 @@
+/* TreatmentCard — stile clinico/scientifico, non e-commerce */
+
+.treatment-card {
+  margin: 0.65rem 0 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(30, 50, 38, 0.06),
+    0 6px 20px rgba(30, 50, 38, 0.08);
+  border: 1px solid rgba(61, 92, 68, 0.1);
+}
+
+.treatment-card--done {
+  opacity: 0.72;
+}
+
+.treatment-card__edu {
+  padding: 1rem 1.05rem 1.1rem;
+  background: linear-gradient(165deg, #eef7f0 0%, #e8f4f8 100%);
+}
+
+.treatment-card__edu-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 0.55rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #2d5a3d;
+}
+
+.treatment-card__icon {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.treatment-card__icon--sm {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.treatment-card__tipo {
+  margin: 0 0 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #1e3324;
+  letter-spacing: -0.01em;
+}
+
+.treatment-card__spiegazione {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #3d4a42;
+  font-weight: 450;
+}
+
+.treatment-card__divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #d8e0dc 12%, #d8e0dc 88%, transparent);
+}
+
+.treatment-card__soluzione {
+  padding: 0.95rem 1.05rem 1rem;
+  background: #fff;
+}
+
+.treatment-card__soluzione-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: #3d5c44;
+}
+
+.treatment-card__soluzione-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: #3d5c44;
+}
+
+.treatment-card__prodotti {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.treatment-card__prodotto {
+  padding: 0.65rem 0.7rem;
+  border-radius: 10px;
+  background: #f8faf9;
+  border: 1px solid #e8eeea;
+}
+
+.treatment-card__prodotto-nome {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #1e3324;
+}
+
+.treatment-card__prodotto-marca {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: #6b7a70;
+  font-weight: 500;
+}
+
+.treatment-card__dose-badge {
+  margin: 0.55rem 0 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: #e8f3eb;
+  border: 1px solid #b8d4c0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: #1a4d2e;
+  line-height: 1.35;
+}
+
+.treatment-card__dose-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #3d6b4a;
+  margin-bottom: 0.2rem;
+}
+
+.treatment-card__istruzioni-wrap {
+  margin-top: 0.45rem;
+}
+
+.treatment-card__istruzioni-toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #3d5c44;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.treatment-card__istruzioni-toggle:hover {
+  color: #2a4532;
+}
+
+.treatment-card__istruzioni {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #5a6b62;
+}
+
+.treatment-card__avviso-fito {
+  margin: 0.65rem 0 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  background: #fff8e6;
+  border: 1px solid #f0dfa8;
+  color: #6b5a20;
+}
+
+.treatment-card__cta {
+  display: block;
+  width: calc(100% - 2.1rem);
+  margin: 0 1.05rem 1rem;
+  text-align: center;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.treatment-card__cta:disabled {
+  opacity: 0.65;
+}
+
+@media (min-width: 640px) {
+  .treatment-card__tipo {
+    font-size: 1.1rem;
+  }
+}

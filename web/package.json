@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "ingest:books": "node scripts/ingest_books.mjs",
     "ingest:books:resume": "node scripts/ingest_books.mjs --no-skip-existing",
+    "ingest:books:no-sanitize": "node scripts/ingest_books.mjs --skip-sanitize",
+    "ingest:books:raw-quota": "node scripts/ingest_books.mjs --raw-on-quota",
     "cleanup:kb-libri": "node scripts/cleanup_kb_libri.mjs",
     "dedupe:kb-libri": "node scripts/dedupe_kb_libri.mjs",
     "kb:libri:prepare": "node scripts/dedupe_kb_libri.mjs && node scripts/cleanup_kb_libri.mjs"

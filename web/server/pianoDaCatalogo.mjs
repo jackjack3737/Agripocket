@@ -4,11 +4,11 @@
  */
 
 import {
-  arricchisciInterventoConProdotto,
-  filtraPoolMarca,
   inferMacroCategoriaProdotto,
+  filtraPoolMarca,
   periodoCompatibile,
 } from "./prodottiCatalogo.mjs";
+import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 import { concimeAmmessoPerProfilo } from "./livelloConcimi.mjs";
 import { configLivelloImpegno } from "./livelloImpegno.mjs";
 import { catalogoAmmessoSenzaFoto } from "./regoleFitofarmaci.mjs";
@@ -129,8 +129,21 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
   let desc = (prodotto.descrizione || prodotto.composizione || "").trim().slice(0, 280);
   if (prodotto.periodo_uso) desc = [desc, `Periodo d'uso indicato: ${prodotto.periodo_uso}.`].filter(Boolean).join(" ");
 
+  const macro = inferMacroCategoriaProdotto(prodotto);
+  const titoliMacro = {
+    K: "Concimazione potassica",
+    N: "Concimazione azotata",
+    P: "Concimazione fosforica",
+    Biostimolante: "Biostimolazione del prato",
+    Fungicida: "Trattamento funghicida",
+    Insetticida: "Trattamento insetti del tappeto",
+    Diserbante: "Diserbo del prato",
+    Semente: "Rinnovo con semina",
+    Bagnante: "Umettante per trattamenti",
+  };
+
   const base = {
-    titolo: String(prodotto.nome || "Prodotto catalogo").slice(0, 120),
+    titolo: (titoliMacro[macro] || `Intervento ${tipo.categoria}`).slice(0, 120),
     descrizione: desc || `Applicazione da catalogo (${prodotto.categoria}).`,
     categoria: tipo.categoria,
     priorita,
@@ -138,14 +151,10 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
     ordine: 5000 + (prodotto.id ?? 0),
     fonte: "calendario_stagionale",
     _catalogo: true,
+    macro_categoria: macro,
   };
 
-  return arricchisciInterventoConProdotto(
-    { ...base, prodotto_id: prodotto.id, prodotto_nome: prodotto.nome },
-    profilo,
-    [prodotto],
-    null,
-  );
+  return arricchisciInterventoTrattamento(base, profilo, [prodotto], null, null);
 }
 
 /**

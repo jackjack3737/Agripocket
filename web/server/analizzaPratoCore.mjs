@@ -512,6 +512,7 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
         geminiKey,
         fonteInterventi: isMacchia ? "ia_macchia" : "ia_foto",
         integraPiano: !isMacchia,
+        openWeatherApiKey: env.OPENWEATHER_API_KEY,
       },
     );
     analisiId = saved.analisiId;

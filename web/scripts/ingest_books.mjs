@@ -16,7 +16,8 @@
  *
  * Opzioni:
  *   --dry-run              Nessun insert Supabase
- *   --skip-sanitize        Salta Gemini (solo test PDF/chunk)
+ *   --skip-sanitize        Salta Gemini (solo test PDF/chunk) — usare se quota 429
+ *   --raw-on-quota         Su 429 usa testo PDF grezzo invece di fermarsi
  *   --book <substring>     Solo un libro
  *   --from-chunk <n>       Riprendi dal chunk n (1-based)
  *   --no-skip-existing     Non saltare chunk già in DB
@@ -49,9 +50,11 @@ const CHAT_MODEL = "gemini-2.5-flash";
 const MIN_WORDS = 600;
 const MAX_WORDS = 800;
 const OVERLAP_WORDS = 80;
-const SANITIZE_SLEEP_MS = Number(process.env.INGEST_SANITIZE_MS || 2800);
-const EMBED_SLEEP_MS = Number(process.env.INGEST_EMBED_MS || 600);
-const MAX_RETRIES = 4;
+const SANITIZE_SLEEP_MS = Number(process.env.INGEST_SANITIZE_MS || 6500);
+const EMBED_SLEEP_MS = Number(process.env.INGEST_EMBED_MS || 900);
+const MAX_RETRIES = 3;
+const QUOTA_COOLDOWN_MS = Number(process.env.INGEST_QUOTA_COOLDOWN_MS || 90_000);
+const MAX_CONSECUTIVE_429 = Number(process.env.INGEST_MAX_429 || 2);
 
 // ---------------------------------------------------------------------------
 // Env
@@ -148,7 +151,19 @@ async function geminiGenerate(apiKey, text, opts = {}) {
   return out.trim();
 }
 
-async function withRetry(fn, label) {
+function isQuotaExhausted(msg) {
+  const m = String(msg || "").toLowerCase();
+  return (
+    /429/.test(m) &&
+    (/exceeded|quota|resource_exhausted|too many requests|limit/i.test(m) || m.includes("exc"))
+  );
+}
+
+function isTransientRateLimit(msg) {
+  return /429|503|rate|timeout/i.test(String(msg || ""));
+}
+
+async function withRetry(fn, label, { allowQuotaRetry = false } = {}) {
   let lastErr;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -156,8 +171,13 @@ async function withRetry(fn, label) {
     } catch (e) {
       lastErr = e;
       const msg = String(e.message || e);
-      const backoff = attempt * 4000;
-      if (/429|503|quota|rate|timeout/i.test(msg) && attempt < MAX_RETRIES) {
+      if (isQuotaExhausted(msg)) {
+        const err = new Error(msg);
+        err.code = "QUOTA_EXCEEDED";
+        throw err;
+      }
+      const backoff = Math.min(attempt * 6000, 30_000);
+      if (isTransientRateLimit(msg) && attempt < MAX_RETRIES && allowQuotaRetry) {
         console.warn(`  [retry ${attempt}/${MAX_RETRIES}] ${label}: ${msg.slice(0, 80)} — attendo ${backoff}ms`);
         await sleep(backoff);
         continue;
@@ -354,6 +374,7 @@ async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
   const skipSanitize = args.includes("--skip-sanitize");
+  const rawOnQuota = args.includes("--raw-on-quota") || process.env.INGEST_RAW_ON_QUOTA === "1";
   const skipExisting = !args.includes("--no-skip-existing");
   const force = args.includes("--force");
   const bookFilter = argValue(args, "--book");
@@ -379,7 +400,7 @@ async function main() {
 
   console.log("=== Ingest manuali Turfgrass → tgif_knowledge_base ===");
   console.log(
-    `Libri: ${pdfs.length} | dry-run: ${dryRun} | skip-sanitize: ${skipSanitize} | skip-existing: ${skipExisting}`,
+    `Libri: ${pdfs.length} | dry-run: ${dryRun} | skip-sanitize: ${skipSanitize} | raw-on-quota: ${rawOnQuota} | skip-existing: ${skipExisting}`,
   );
   console.log(
     `Chunk: ${MIN_WORDS}-${MAX_WORDS} parole | min IT: ${MIN_WORDS_IT} | pause sanitize ${SANITIZE_SLEEP_MS}ms embed ${EMBED_SLEEP_MS}ms`,
@@ -396,11 +417,16 @@ async function main() {
     giaDb: 0,
     rifiutati: 0,
     errori: 0,
+    grezzoQuota: 0,
+    quotaStop: false,
   };
 
   let applyFromChunk = fromChunk;
+  let consecutive429 = 0;
+  let quotaPaused = false;
 
   for (let bi = 0; bi < pdfs.length; bi++) {
+    if (stats.quotaStop) break;
     const pdfPath = pdfs[bi];
     const libro = titoloLibro(basename(pdfPath));
     console.log(`\n[${bi + 1}/${pdfs.length}] ${libro}`);
@@ -426,6 +452,7 @@ async function main() {
     stats.libri += 1;
 
     for (let ci = 0; ci < chunks.length; ci++) {
+      if (stats.quotaStop) break;
       const chunkIndex = ci + 1;
       if (bi === 0 && chunkIndex < applyFromChunk) continue;
 
@@ -442,7 +469,7 @@ async function main() {
       }
 
       let testoPulito = chunkRaw;
-      if (!skipSanitize) {
+      if (!skipSanitize && !quotaPaused) {
         process.stdout.write(`${progress} sanitizzazione Gemini... `);
         try {
           const prompt = buildSanitizePrompt(chunkRaw);
@@ -450,8 +477,10 @@ async function main() {
             await withRetry(
               () => geminiGenerate(geminiKey, prompt, { maxTokens: 3072, temperature: 0.2 }),
               "sanitize",
+              { allowQuotaRetry: true },
             )
           ).trim();
+          consecutive429 = 0;
 
           if (isGeminiRifiutoAgronomia(testoPulito)) {
             console.log("SKIP — meta-commento o senza agronomia utile");
@@ -463,11 +492,37 @@ async function main() {
           console.log(`OK (${testoPulito.split(/\s+/).length} parole IT)`);
           await sleep(SANITIZE_SLEEP_MS);
         } catch (e) {
-          console.log(`FALLITO: ${e.message}`);
-          stats.errori += 1;
-          continue;
+          const msg = String(e.message || e);
+          if (e.code === "QUOTA_EXCEEDED" || isQuotaExhausted(msg)) {
+            consecutive429 += 1;
+            if (rawOnQuota && consecutive429 <= MAX_CONSECUTIVE_429) {
+              console.log(`QUOTA — testo PDF grezzo (senza traduzione IT)`);
+              testoPulito = chunkRaw;
+              stats.grezzoQuota += 1;
+              consecutive429 = 0;
+            } else if (rawOnQuota) {
+              console.log(`QUOTA — pausa ${QUOTA_COOLDOWN_MS / 1000}s prima di riprovare...`);
+              await sleep(QUOTA_COOLDOWN_MS);
+              consecutive429 = 0;
+              ci -= 1;
+              continue;
+            } else {
+              console.log(
+                `\n⚠️  Quota Gemini esaurita (429). Interrompo ingest.\n` +
+                  `   Riprendi con: npm run ingest:books -- --skip-sanitize\n` +
+                  `   oppure: npm run ingest:books -- --raw-on-quota\n`,
+              );
+              stats.quotaStop = true;
+              stats.errori += 1;
+              break;
+            }
+          } else {
+            console.log(`FALLITO: ${msg.slice(0, 120)}`);
+            stats.errori += 1;
+            continue;
+          }
         }
-      } else {
+      } else if (skipSanitize || quotaPaused) {
         console.log(`${progress} (skip sanitize) ${chunkRaw.slice(0, 60)}...`);
       }
 
@@ -506,12 +561,21 @@ async function main() {
       process.stdout.write(`${progress} embedding... `);
       let embedding;
       try {
-        embedding = await withRetry(() => geminiEmbed(soluzione, geminiKey), "embed");
+        embedding = await withRetry(() => geminiEmbed(soluzione, geminiKey), "embed", {
+          allowQuotaRetry: true,
+        });
         console.log(`dim ${embedding.length}`);
         await sleep(EMBED_SLEEP_MS);
       } catch (e) {
-        console.log(`FALLITO: ${e.message}`);
+        const msg = String(e.message || e);
+        if (e.code === "QUOTA_EXCEEDED" || isQuotaExhausted(msg)) {
+          console.log(`\n⚠️  Quota embedding esaurita. Stop ingest.`);
+          stats.quotaStop = true;
+        } else {
+          console.log(`FALLITO: ${msg.slice(0, 120)}`);
+        }
         stats.errori += 1;
+        if (stats.quotaStop) break;
         continue;
       }
 
@@ -546,6 +610,10 @@ async function main() {
   console.log(`Già in DB:        ${stats.giaDb}`);
   console.log(`Saltati:          ${stats.saltati}`);
   console.log(`Rifiutati (IA):   ${stats.rifiutati}`);
+  console.log(`Grezzo (quota):   ${stats.grezzoQuota}`);
+  if (stats.quotaStop) {
+    console.log("\n⚠️  Ingest interrotto per quota API. Usa --skip-sanitize per continuare senza Gemini Flash.");
+  }
   console.log(`Errori:           ${stats.errori}`);
   if (dryRun) console.log("\n(dry-run: nessuna riga scritta su Supabase)");
 }

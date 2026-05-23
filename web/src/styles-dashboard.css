@@ -1225,6 +1225,55 @@
   font-weight: 450;
 }
 
+.intervento-row__ux-label {
+  font-weight: 600;
+  color: #3d5c44;
+}
+
+.intervento-row__soluzione {
+  margin: 0.5rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(61, 92, 68, 0.06);
+  border: 1px solid rgba(61, 92, 68, 0.12);
+}
+
+.intervento-row__soluzione-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #3d5c44;
+}
+
+.intervento-row__prodotti {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.intervento-row__prodotto-card {
+  padding: 0.4rem 0.45rem;
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+
+.intervento-row__prodotto-marca {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.intervento-row__istruzioni {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 .intervento-row__razionale {
   margin: 0.35rem 0 0;
   font-size: 0.78rem;

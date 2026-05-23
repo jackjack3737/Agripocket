@@ -9,6 +9,7 @@ import {
   CALENDARIO_TIPO_FILTRI,
 } from "../../lib/dashboard";
 import { AVVISO_FITOFARMACO, isInterventoFitofarmaco } from "../../lib/sicurezzaClient";
+import { TreatmentCard, treatmentFromIntervento } from "./TreatmentCard";
 
 function formattaDoseIntervento(totale, unita, perMq) {
   const u = (unita || "g").toLowerCase();
@@ -52,7 +53,11 @@ function ImportanzaIndicatore({ priorita }) {
 export function InterventoRow({ item, onToggle, onPin }) {
   const done = item.stato === "completato";
   const fito = isInterventoFitofarmaco(item);
-  const mostraDose = !fito && item.dose_totale != null && item.dose_unita;
+  const treatment = treatmentFromIntervento(item);
+  const mostraTreatmentCard = !!treatment;
+  const titolo = treatment?.tipo_intervento || item.titolo;
+  const mostraDose =
+    !fito && !mostraTreatmentCard && item.dose_totale != null && item.dose_unita;
   const controlloMensile = item.fonte === "controllo_mensile";
   const inRitardo = !!item.isRitardo;
   return (
@@ -90,33 +95,41 @@ export function InterventoRow({ item, onToggle, onPin }) {
             </span>
           ) : null}
         </div>
-        <p className="intervento-row__title">{item.titolo}</p>
-        {item.messaggio_ux ? (
-          <p className="intervento-row__ux">{item.messaggio_ux}</p>
-        ) : null}
-        {fito ? (
-          <p className="intervento-row__avviso intervento-row__avviso--fito" role="note">
-            {AVVISO_FITOFARMACO}
-          </p>
-        ) : null}
-        {item.prodotto_nome ? (
-          <p className="intervento-row__prodotto">
-            <span className="intervento-row__prodotto-nome">
-              {fito ? "Riferimento catalogo: " : ""}
-              {item.prodotto_nome !== item.titolo ? "Principale: " : ""}
-              {item.prodotto_nome}
-            </span>
-            {mostraDose || item.dosaggio_calcolato ? (
-              <span className="intervento-row__dose">
-                {item.dosaggio_calcolato ||
-                  formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
-              </span>
+        {!mostraTreatmentCard ? <p className="intervento-row__title">{titolo}</p> : null}
+        {mostraTreatmentCard ? (
+          <TreatmentCard
+            treatment={treatment}
+            done={done}
+            showFitofarmacoAvviso={fito}
+            onComplete={!done && onToggle ? () => onToggle(item.id, true) : undefined}
+          />
+        ) : (
+          <>
+            {fito ? (
+              <p className="intervento-row__avviso intervento-row__avviso--fito" role="note">
+                {AVVISO_FITOFARMACO}
+              </p>
             ) : null}
-          </p>
-        ) : null}
+            {item.prodotto_nome ? (
+              <p className="intervento-row__prodotto">
+                <span className="intervento-row__prodotto-nome">
+                  {fito ? "Riferimento catalogo: " : ""}
+                  {item.prodotto_nome !== titolo ? "Principale: " : ""}
+                  {item.prodotto_nome}
+                </span>
+                {mostraDose || item.dosaggio_calcolato ? (
+                  <span className="intervento-row__dose">
+                    {item.dosaggio_calcolato ||
+                      formattaDoseIntervento(item.dose_totale, item.dose_unita, item.dose_per_mq)}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+          </>
+        )}
         {item.razionale_scientifico ? (
           <p className="intervento-row__razionale">
-            <span className="intervento-row__razionale-label">Perché ora: </span>
+            <span className="intervento-row__razionale-label">La scienza: </span>
             {item.razionale_scientifico}
           </p>
         ) : null}

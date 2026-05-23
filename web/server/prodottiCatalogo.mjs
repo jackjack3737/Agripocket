@@ -164,8 +164,12 @@ export function calcolaDose(prodotto, superficieMq) {
   if (isProdottoFitofarmaco(prodotto)) return null;
 
   const unit = (prodotto?.unita_misura || "g").toLowerCase();
-  let perMq = Number(prodotto?.dose_fogliare) || 0;
-  let via = "fogliare";
+  let perMq = Number(prodotto?.dosaggio_standard_mq) || 0;
+  let via = "standard";
+  if (perMq <= 0) {
+    perMq = Number(prodotto?.dose_fogliare) || 0;
+    via = "fogliare";
+  }
   if (perMq <= 0) {
     perMq = Number(prodotto?.dose_radicale) || 0;
     via = "radicale";

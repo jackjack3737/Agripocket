@@ -1,10 +1,11 @@
 import {
-  arricchisciInterventoConProdotto,
   catalogoCompattoPerPrompt,
   consenteTutteMarche,
   loadProdotti,
   mqPrato,
 } from "./prodottiCatalogo.mjs";
+import { fetchWeatherBundle } from "./weatherCore.mjs";
+import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 import {
   filtraInterventiFitofarmacoCurativo,
   isInterventoFitofarmacoCurativo,
@@ -43,6 +44,12 @@ function rowFromIntervento(userId, analisiId, i, fonte) {
     dose_totale: i.dose_totale ?? null,
     dose_unita: i.dose_unita ?? null,
     dose_per_mq: i.dose_per_mq ?? null,
+    razionale_scientifico: i.razionale_scientifico ?? null,
+    messaggio_ux: i.messaggio_ux ?? null,
+    macro_categoria: i.macro_categoria ?? null,
+    dosaggio_calcolato: i.dosaggio_calcolato ?? null,
+    spiegazione_semplice: i.spiegazione_semplice ?? i.messaggio_ux ?? null,
+    dettaglio_trattamento: i.dettaglio_trattamento ?? null,
     manual_override: i.manual_override ?? fonte === "ia_foto",
   };
 }
@@ -148,6 +155,7 @@ export async function integraFotoNelPiano({
   interventiUrgenti,
   geminiGenerate,
   geminiKey,
+  openWeatherApiKey,
 }) {
   const { data: calendario } = await admin
     .from("prato_interventi")
@@ -159,6 +167,17 @@ export async function integraFotoNelPiano({
     .order("data_prevista");
 
   const prodotti = await loadProdotti(admin);
+  let weatherBundle = null;
+  if (profilo?.localita?.trim()) {
+    try {
+      weatherBundle = await fetchWeatherBundle(profilo.localita, openWeatherApiKey);
+    } catch {
+      /* opzionale */
+    }
+  }
+  const arricchisci = (item) =>
+    arricchisciInterventoTrattamento(item, profilo, prodotti, vision, weatherBundle);
+
   const piano = await pianificaAggiornamentiDaFoto({
     profilo,
     vision,
@@ -203,7 +222,7 @@ export async function integraFotoNelPiano({
     }
 
     for (const raw of emergenza.aggiunti) {
-      let item = arricchisciInterventoConProdotto(raw, profilo, prodotti, vision);
+      let item = arricchisci(raw);
       item = bloccoTermicoEstivo([item])[0];
       const { data, error } = await admin
         .from("prato_interventi")
@@ -278,10 +297,10 @@ export async function integraFotoNelPiano({
       if (p && !consenteTutteMarche(p) && String(p.marca || "").toUpperCase() !== "BOTTOS") {
         p = null;
       }
-      if (p) item = arricchisciInterventoConProdotto(item, profilo, [p], vision);
-      else item = arricchisciInterventoConProdotto(item, profilo, prodotti, vision);
+      if (p) item = arricchisciInterventoTrattamento(item, profilo, [p, ...prodotti], vision, weatherBundle);
+      else item = arricchisci(item);
     } else {
-      item = arricchisciInterventoConProdotto(item, profilo, prodotti, vision);
+      item = arricchisci(item);
     }
 
     const { data, error } = await admin

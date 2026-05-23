@@ -31,6 +31,9 @@ export function bloccoTermicoEstivo(interventi) {
       dose_totale: null,
       dose_unita: null,
       dose_per_mq: null,
+      dettaglio_trattamento: null,
+      spiegazione_semplice: null,
+      dosaggio_calcolato: null,
       descrizione:
         "Sostituzione di sicurezza: vietato azoto nei mesi caldi per evitare patogeni. Convertito in biostimolante antistress. " +
         (i.descrizione || "").slice(0, 400),
@@ -110,11 +113,13 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
   list = applicaTankMix(list);
   list = capInterventiPerLivello(list, profilo);
 
-  const { storico = [], prodotti = [] } = opts;
+  const { storico = [], prodotti = [], vision, weatherBundle } = opts;
   const { interventi: conGuardrails, bloccati, deduped } = await applicaGuardrailsCalendario(list, {
     storico,
     prodotti,
     profilo,
+    vision,
+    weatherBundle,
     oggi: oggi || new Date().toISOString().slice(0, 10),
   });
   if (bloccati > 0 || deduped > 0) {
