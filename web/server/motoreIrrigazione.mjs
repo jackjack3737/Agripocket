@@ -136,12 +136,44 @@ export function simulaBilancioIdricoSettimana({
   const fabbisogno_oggi_mm = oggi?.irriga ? oggi.mm_necessari : 0;
   const saturazione = (oggi?.precip_mm ?? 0) >= 8 || (oggi && !oggi.irriga && oggi.stato_suolo_mm >= cap * 0.9);
 
+  const statoSuoloMm = oggi
+    ? oggi.irriga
+      ? Math.max(0, Math.round((oggi.stato_suolo_mm - oggi.mm_necessari) * 10) / 10)
+      : oggi.stato_suolo_mm
+    : cap * 0.75;
+  const livelloPct = Math.min(100, Math.max(0, Math.round((statoSuoloMm / cap) * 100)));
+  const mmMancanti =
+    fabbisogno_oggi_mm > 0
+      ? fabbisogno_oggi_mm
+      : Math.max(0, Math.round((mad - statoSuoloMm) * 10) / 10);
+
   return {
     fabbisogno_oggi_mm,
     saturazione_suolo: saturazione,
     capacita_campo_mm: cap,
+    mad_mm: Math.round(mad * 10) / 10,
+    stato_suolo_mm: statoSuoloMm,
+    livello_serbatoio_pct: livelloPct,
+    mm_mancanti_oggi: Math.round(mmMancanti * 10) / 10,
     schema_giorni: schemaGiorni,
   };
+}
+
+/** Etichetta UX per dashboard (serbatoio % e mm da reintegrare). */
+export function riepilogoSerbatoioUx(bilancio) {
+  if (!bilancio) return null;
+  const pct = bilancio.livello_serbatoio_pct ?? 0;
+  const mm = bilancio.mm_mancanti_oggi ?? 0;
+  const sat = bilancio.saturazione_suolo;
+  let stato = `Serbatoio al ${pct}%`;
+  if (sat) {
+    stato += " · suolo saturo (pioggia)";
+  } else if (mm > 0) {
+    stato += ` · mancano ${mm} mm`;
+  } else {
+    stato += " · nessun deficit oggi";
+  }
+  return { stato, pct, mm, sat };
 }
 
 function forecast7Giorni(weatherBundle, meteo) {
@@ -441,7 +473,12 @@ export function calcolaSchemaSettimanale({
     oggi_irriga: schemaGiorni[0]?.irriga ?? false,
     bilancio_serbatoio: {
       capacita_campo_mm: bilancio.capacita_campo_mm,
+      mad_mm: bilancio.mad_mm,
+      stato_suolo_mm: bilancio.stato_suolo_mm,
+      livello_serbatoio_pct: bilancio.livello_serbatoio_pct,
+      mm_mancanti_oggi: bilancio.mm_mancanti_oggi,
       fabbisogno_oggi_mm: bilancio.fabbisogno_oggi_mm,
+      saturazione_suolo: bilancio.saturazione_suolo,
     },
     meteo_fonte: meteo.fonte || weatherBundle?.provider || "open-meteo",
   };
@@ -674,8 +711,20 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     bilancio,
   });
 
+  const bilancio_serbatoio = {
+    capacita_campo_mm: bilancio.capacita_campo_mm,
+    mad_mm: bilancio.mad_mm,
+    stato_suolo_mm: bilancio.stato_suolo_mm,
+    livello_serbatoio_pct: bilancio.livello_serbatoio_pct,
+    mm_mancanti_oggi: bilancio.mm_mancanti_oggi,
+    fabbisogno_oggi_mm: bilancio.fabbisogno_oggi_mm,
+    saturazione_suolo: bilancio.saturazione_suolo,
+    riepilogo: riepilogoSerbatoioUx(bilancio)?.stato,
+  };
+
   return {
     azione_irrigazione: azione,
+    bilancio_serbatoio,
     dati_tecnici: {
       fabbisogno_calcolato_mm: fabbisogno_mm,
       minuti_totali_consigliati: minuti_totali,

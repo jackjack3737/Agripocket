@@ -142,6 +142,35 @@ function IconDroplet() {
   );
 }
 
+function IrrigationSerbatoioBar({ bilancio }) {
+  const b = bilancio;
+  if (b?.livello_serbatoio_pct == null) return null;
+
+  const pct = Math.min(100, Math.max(0, Number(b.livello_serbatoio_pct) || 0));
+  const mm = Number(b.mm_mancanti_oggi) || 0;
+  const sat = b.saturazione_suolo;
+
+  let hint = "Nessun deficit oggi";
+  if (sat) hint = "Suolo saturo (pioggia recente)";
+  else if (mm > 0) hint = `Mancano ${mm} mm da reintegrare`;
+
+  return (
+    <div className="irrigation-widget__serbatoio" role="status" aria-label={`Serbatoio idrico al ${pct} per cento`}>
+      <div className="irrigation-widget__serbatoio-head">
+        <span className="irrigation-widget__serbatoio-label">Serbatoio</span>
+        <strong className="irrigation-widget__serbatoio-pct">{pct}%</strong>
+        <span className="irrigation-widget__serbatoio-mm">{hint}</span>
+      </div>
+      <div className="irrigation-widget__serbatoio-track" aria-hidden>
+        <span
+          className={`irrigation-widget__serbatoio-fill${pct < 50 ? " irrigation-widget__serbatoio-fill--low" : ""}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function IconChevron({ open }) {
   return (
     <svg
@@ -262,12 +291,17 @@ export default function IrrigationWidget({ profile, enabled = true }) {
             {loading ? (
               <span className="irrigation-widget__loading-inline">Calcolo…</span>
             ) : hasData ? (
-              <IrrigationProgramCompact
-                programma={programmaZone}
-                centralina={centralina}
-                tecnici={tecnici}
-                azione={azione}
-              />
+              <>
+                <IrrigationSerbatoioBar
+                  bilancio={data.bilancio_serbatoio ?? schema?.bilancio_serbatoio}
+                />
+                <IrrigationProgramCompact
+                  programma={programmaZone}
+                  centralina={centralina}
+                  tecnici={tecnici}
+                  azione={azione}
+                />
+              </>
             ) : error ? (
               <span className="irrigation-widget__error-inline">{error}</span>
             ) : null}
