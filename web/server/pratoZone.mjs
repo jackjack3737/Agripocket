@@ -577,7 +577,7 @@ export function countZonesByType(pratoZone) {
 export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month = new Date().getMonth() + 1 }) {
   const { zone } = normalizePratoZone(pratoZone);
   const heads = zone.filter((z) => z.tipo === "irrigatore");
-  const counts = countZonesByType(pratoZone);
+  const zoneCounts = countZonesByType(pratoZone);
   const estate = month >= 5 && month <= 9;
   const primavera = month >= 3 && month <= 4;
 
@@ -643,9 +643,9 @@ export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month
   if (estate && superficie_mq && superficie_mq > 200 && nStatic >= 3) {
     suggerimenti.push("Superficie ampia: considera irrigazione a zone alternate (metà teste per giorno).");
   }
-  if (counts.esposizione) {
+  if (zoneCounts.esposizione) {
     suggerimenti.push(
-      `Esposizione in mappa: ${counts.esposizione_sole} sole, ${counts.esposizione_mezzombra} mezz'ombra, ${counts.esposizione_ombra} ombra.`,
+      `Esposizione in mappa: ${zoneCounts.esposizione_sole} sole, ${zoneCounts.esposizione_mezzombra} mezz'ombra, ${zoneCounts.esposizione_ombra} ombra.`,
     );
   }
 
