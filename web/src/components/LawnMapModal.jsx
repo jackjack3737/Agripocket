@@ -6,6 +6,7 @@ import { calculatePolygonAreaSqm } from "../lib/polygonArea";
 import {
   computeOmbraZonePct,
   IRRIGATOR_MODES,
+  LINEA_CENTRALINA_MAX,
   mergePratoZoneUpdate,
   normalizePratoZone,
   ZONE_TYPES,
@@ -130,6 +131,8 @@ export default function LawnMapModal({
   const [draftTipo, setDraftTipo] = useState("ombra");
   const [pendenzaFrom, setPendenzaFrom] = useState(null);
   const [irrigatorPick, setIrrigatorPick] = useState(null);
+  const [pickLinea, setPickLinea] = useState(1);
+  const [lastLinea, setLastLinea] = useState(1);
   const [loadError, setLoadError] = useState(null);
   const [mapTick, setMapTick] = useState(0);
   const [address, setAddress] = useState("");
@@ -288,6 +291,7 @@ export default function LawnMapModal({
     if (iz) {
       if (tool === "pan") return;
       if (tool === "irrigatore") {
+        setPickLinea(lastLinea);
         setIrrigatorPick({ lat, lng });
         return;
       }
@@ -328,14 +332,25 @@ export default function LawnMapModal({
 
   function confirmIrrigator(modalita) {
     if (!irrigatorPick) return;
+    const linea = Math.min(Math.max(1, pickLinea), LINEA_CENTRALINA_MAX);
     addZone({
       id: `z_${Date.now()}`,
       tipo: "irrigatore",
       lat: irrigatorPick.lat,
       lng: irrigatorPick.lng,
       modalita,
+      linea,
     });
+    setLastLinea(linea);
     setIrrigatorPick(null);
+  }
+
+  function updateIrrigatorLinea(zoneId, linea) {
+    const n = Math.min(Math.max(1, Math.round(Number(linea))), LINEA_CENTRALINA_MAX);
+    setZones((prev) =>
+      prev.map((z) => (z.id === zoneId && z.tipo === "irrigatore" ? { ...z, linea: n } : z)),
+    );
+    setLastLinea(n);
   }
 
   function closeDraftPolygon() {
@@ -757,11 +772,30 @@ export default function LawnMapModal({
         {zones.length > 0 && inZones && isZoneEdit && !irrigatorPick && (
           <ul className="map-zone-list">
             {zones.map((z) => (
-              <li key={z.id}>
+              <li key={z.id} className="map-zone-list__row">
                 <span className="map-zone-list__dot" style={{ background: ZONE_TYPES[z.tipo]?.color }} />
-                {z.tipo === "irrigatore"
-                  ? `Irrigatore ${IRRIGATOR_MODES[z.modalita]?.label || z.modalita}`
-                  : ZONE_TYPES[z.tipo]?.label}
+                {z.tipo === "irrigatore" ? (
+                  <>
+                    <span className="map-zone-list__label">
+                      Linea {z.linea ?? 1} · {IRRIGATOR_MODES[z.modalita]?.label || z.modalita}
+                    </span>
+                    <label className="map-zone-list__linea">
+                      <select
+                        value={z.linea ?? 1}
+                        onChange={(e) => updateIrrigatorLinea(z.id, e.target.value)}
+                        aria-label={`Linea centralina per ${IRRIGATOR_MODES[z.modalita]?.label}`}
+                      >
+                        {Array.from({ length: LINEA_CENTRALINA_MAX }, (_, i) => i + 1).map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  ZONE_TYPES[z.tipo]?.label
+                )}
                 <button type="button" className="map-zone-list__del" onClick={() => removeZone(z.id)} aria-label="Rimuovi">
                   ×
                 </button>
@@ -775,8 +809,25 @@ export default function LawnMapModal({
           <div ref={mapElRef} className="map-modal-map" />
 
           {irrigatorPick ? (
-            <div className="map-irrigator-pick map-irrigator-pick--sheet" role="dialog" aria-label="Tipo irrigatore">
-              <p>Che tipo di irrigatore è qui?</p>
+            <div className="map-irrigator-pick map-irrigator-pick--sheet" role="dialog" aria-label="Irrigatore in mappa">
+              <p className="map-irrigator-pick__heading">Uscita centralina (linea)</p>
+              <p className="map-irrigator-pick__hint">
+                Puoi avere più linee tutte statiche: scegli l’uscita della centralina (1, 2, …), non il tipo di getto.
+              </p>
+              <div className="map-irrigator-pick__linee" role="group" aria-label="Numero linea">
+                {Array.from({ length: LINEA_CENTRALINA_MAX }, (_, i) => i + 1).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className={`map-irrigator-pick__line-btn${pickLinea === n ? " map-irrigator-pick__line-btn--on" : ""}`}
+                    onClick={() => setPickLinea(n)}
+                    aria-pressed={pickLinea === n}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="map-irrigator-pick__heading">Tipo irrigatore</p>
               <div className="map-irrigator-pick__actions">
                 <button type="button" className="btn btn-primary btn-sm" onClick={() => confirmIrrigator("statico")}>
                   {IRRIGATOR_MODES.statico.label}

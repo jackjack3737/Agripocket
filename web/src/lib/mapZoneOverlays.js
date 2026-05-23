@@ -25,10 +25,10 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
         map,
         title: `Irrigatore ${mode.label}`,
         label: {
-          text: mode.short,
+          text: z.linea ? `${z.linea}${mode.short}` : mode.short,
           color: "#fff",
           fontWeight: "700",
-          fontSize: "11px",
+          fontSize: z.linea ? "10px" : "11px",
         },
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,

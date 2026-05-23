@@ -494,10 +494,65 @@
   padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
-.map-irrigator-pick p {
+.map-irrigator-pick p,
+.map-irrigator-pick__heading {
   margin: 0 0 10px;
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.map-irrigator-pick__heading + .map-irrigator-pick__heading {
+  margin-top: 4px;
+}
+
+.map-irrigator-pick__hint {
+  margin: -4px 0 10px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text-muted, #5a6b5e);
+}
+
+.map-irrigator-pick__linee {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.map-irrigator-pick__line-btn {
+  min-width: 44px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f5f7f5;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.map-irrigator-pick__line-btn--on {
+  border-color: #1565c0;
+  background: #1565c0;
+  color: #fff;
+}
+
+.map-zone-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.map-zone-list__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.map-zone-list__linea select {
+  font-size: 0.8rem;
+  padding: 2px 4px;
+  max-width: 4.5rem;
 }
 
 .map-irrigator-pick__actions {

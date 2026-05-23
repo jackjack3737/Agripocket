@@ -3,10 +3,13 @@
  */
 
 import { normalizzaInputIrrigazione } from "./irrigazioneInput.mjs";
-import { IRRIGATOR_MODES, normalizeIrrigatorModalita, normalizePratoZone } from "./pratoZone.mjs";
+import {
+  IRRIGATOR_MODES,
+  normalizeIrrigatorModalita,
+  normalizeLineaCentralina,
+  normalizePratoZone,
+} from "./pratoZone.mjs";
 import { kcPerData, recuperaParametriRag } from "./ragParametriAgronomici.mjs";
-
-const ORDINE_MODALITA = { statico: 0, rotator: 1, dinamico: 2 };
 
 function modalitaToTipoCentralina(modalita) {
   if (modalita === "rotator") return "testine_rotator";
@@ -394,17 +397,39 @@ export function calcolaSchemaSettimanale({
   };
 }
 
-/** Raggruppa teste mappa per linea idraulica (stesso tipo = stessa elettrovalvola tipica). */
-function raggruppaLineeIdrauliche(heads) {
-  const map = new Map();
-  for (const h of heads) {
-    const m = h.modalita;
-    if (!map.has(m)) map.set(m, []);
-    map.get(m).push(h);
+/** Una riga programma centralina per uscita (`linea`), anche se più uscite sono tutte statiche. */
+function modalitaProgrammaLinea(teste) {
+  const counts = new Map();
+  for (const t of teste) {
+    const m = t.modalita || "statico";
+    counts.set(m, (counts.get(m) || 0) + 1);
   }
-  return [...map.entries()]
-    .sort((a, b) => (ORDINE_MODALITA[a[0]] ?? 9) - (ORDINE_MODALITA[b[0]] ?? 9))
-    .map(([modalita, teste], idx) => ({ modalita, teste, linea_numero: idx + 1 }));
+  let best = "statico";
+  let max = 0;
+  for (const [m, n] of counts) {
+    if (n > max) {
+      max = n;
+      best = m;
+    }
+  }
+  return best;
+}
+
+function raggruppaLineeIdrauliche(heads) {
+  const byLinea = new Map();
+  for (const h of heads) {
+    const n = normalizeLineaCentralina(h.linea) ?? 1;
+    if (!byLinea.has(n)) byLinea.set(n, []);
+    byLinea.get(n).push(h);
+  }
+  return [...byLinea.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([linea_numero, teste]) => ({
+      linea_numero,
+      modalita: modalitaProgrammaLinea(teste),
+      teste,
+      tipi_misti: new Set(teste.map((t) => t.modalita)).size > 1,
+    }));
 }
 
 /**
@@ -484,10 +509,17 @@ export function calcolaProgrammaZoneCentralina(
       orario_consigliato: orario,
       attiva_oggi: oggiIrriga && minutiTotaliLinea > 0,
       impostazione,
-      nota:
+      nota: [
         nTeste > 1
-          ? "Più teste sulla stessa linea: un solo programma in centralina, minuti per l'intera elettrovalvola."
+          ? "Più teste sulla stessa uscita: un solo programma in centralina, minuti per l'intera elettrovalvola."
           : null,
+        linea.tipi_misti
+          ? "Tipi diversi sulla stessa uscita: minuti calcolati sul tipo più frequente in mappa."
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        || null,
     };
   });
 
@@ -499,7 +531,7 @@ export function calcolaProgrammaZoneCentralina(
     sintesi:
       linee.length === 1
         ? "Una linea in mappa: imposta un solo programma in centralina con i minuti sotto."
-        : `${linee.length} linee idrauliche (${linee.map((l) => IRRIGATOR_MODES[l.modalita]?.label).join(", ")}): ogni uscita centralina = una linea, con ${mm} mm da reintegrare quando irrighi (non divisi per testa).`,
+        : `${linee.length} uscite centralina (linee ${linee.map((l) => l.linea_numero).join(", ")}): ognuna con i propri minuti per reintegrare ${mm} mm (anche se più linee sono tutte statiche).`,
     ordine_centralina: zoneOut.map((z) => ({
       uscita: z.zona_numero,
       etichetta: z.etichetta,

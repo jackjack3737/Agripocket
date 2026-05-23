@@ -20,6 +20,14 @@ export function normalizeIrrigatorModalita(raw) {
   return "statico";
 }
 
+export const LINEA_CENTRALINA_MAX = 8;
+
+export function normalizeLineaCentralina(raw) {
+  const n = Math.round(Number(raw));
+  if (n >= 1 && n <= LINEA_CENTRALINA_MAX) return n;
+  return null;
+}
+
 function uid() {
   return `z_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -44,7 +52,8 @@ function normalizeZone(z) {
     const lng = Number(z.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     const modalita = normalizeIrrigatorModalita(z.modalita);
-    return { id, tipo: "irrigatore", lat, lng, modalita };
+    const linea = normalizeLineaCentralina(z.linea) ?? 1;
+    return { id, tipo: "irrigatore", lat, lng, modalita, linea };
   }
   if (z.tipo === "ombra" || z.tipo === "muschio") {
     const path = (z.path || [])
@@ -376,8 +385,21 @@ export function formatZonesForPrompt(pratoZone) {
   const lines = [];
   const counts = countZonesByType(pratoZone);
   if (counts.irrigatore) {
+    const heads = zone.filter((z) => z.tipo === "irrigatore");
+    const perLinea = new Map();
+    for (const h of heads) {
+      const L = h.linea ?? 1;
+      if (!perLinea.has(L)) perLinea.set(L, []);
+      perLinea.get(L).push(h);
+    }
+    const uscite = [...perLinea.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([L, teste]) => {
+        const tipi = [...new Set(teste.map((t) => IRRIGATOR_MODES[t.modalita]?.label || t.modalita))];
+        return `uscita ${L} (${teste.length} teste, ${tipi.join(" + ")})`;
+      });
     lines.push(
-      `Irrigatori in mappa: ${counts.statico} statici, ${counts.dinamico} dinamici (rotativi/oscillanti).`,
+      `Irrigatori: ${counts.statico} statici, ${counts.rotator} rotator, ${counts.dinamico} oscillanti; centralina: ${uscite.join("; ")}.`,
     );
   }
   if (counts.ombra) {
