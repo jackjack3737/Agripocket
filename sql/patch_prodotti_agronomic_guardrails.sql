@@ -34,9 +34,20 @@ update public."Prodotti" p set
   end
 where p.macro_categoria is null;
 
+-- dose_fogliare / dose_radicale possono essere text nel catalogo: cast sicuro a numeric
 update public."Prodotti" set
-  dosaggio_standard_mq = coalesce(dosaggio_standard_mq, dose_fogliare, dose_radicale),
-  periodo_ideale = coalesce(periodo_ideale, periodo_uso)
+  dosaggio_standard_mq = coalesce(
+    dosaggio_standard_mq,
+    case
+      when nullif(trim(coalesce(dose_fogliare::text, '')), '') ~ '^[0-9]+([.,][0-9]+)?$'
+        then replace(trim(dose_fogliare::text), ',', '.')::numeric
+    end,
+    case
+      when nullif(trim(coalesce(dose_radicale::text, '')), '') ~ '^[0-9]+([.,][0-9]+)?$'
+        then replace(trim(dose_radicale::text), ',', '.')::numeric
+    end
+  ),
+  periodo_ideale = coalesce(periodo_ideale, periodo_uso::text)
 where dosaggio_standard_mq is null or periodo_ideale is null;
 
 update public."Prodotti" set salt_index = case
