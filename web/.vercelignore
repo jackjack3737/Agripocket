@@ -3,3 +3,6 @@ dist
 .env
 .env.local
 *.log
+scripts/libri/**
+scripts/ingest_books_run.log
+scripts/.ingest_books.lock
