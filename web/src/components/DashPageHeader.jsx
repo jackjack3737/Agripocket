@@ -34,7 +34,7 @@ export default function DashPageHeader({
                 alt="Solum"
                 className="dash-header__logo"
                 width={320}
-                height={126}
+                height={165}
                 decoding="async"
               />
             </Link>
