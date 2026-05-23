@@ -68,6 +68,28 @@ function ProdottoMicroCard({ prodotto, index }) {
   );
 }
 
+function MeteoCalcoloBadge({ contestoMeteo }) {
+  const nota =
+    contestoMeteo?.nota_utente ||
+    (contestoMeteo?.utilizzato_nel_calcolo || contestoMeteo?.et0_mm != null
+      ? "Questo consiglio tiene conto del meteo della tua località (evaporazione, umidità, temperatura suolo)."
+      : null);
+
+  if (!nota) return null;
+
+  return (
+    <aside className="treatment-card__meteo" role="note" aria-label="Meteo usato nel consiglio">
+      <span className="treatment-card__meteo-icon" aria-hidden>
+        ☁
+      </span>
+      <div>
+        <p className="treatment-card__meteo-title">Meteo nel calcolo</p>
+        <p className="treatment-card__meteo-testo">{nota}</p>
+      </div>
+    </aside>
+  );
+}
+
 function SpiegazioneBlocchi({ testo }) {
   if (!testo?.trim()) return null;
   const paragrafi = testo.split(/\n\n+/).filter(Boolean);
@@ -113,6 +135,7 @@ export function TreatmentCard({
         <h3 id="treatment-edu-title" className="treatment-card__tipo">
           {treatment.tipo_intervento}
         </h3>
+        <MeteoCalcoloBadge contestoMeteo={treatment.contesto_meteo} />
         <SpiegazioneBlocchi testo={treatment.spiegazione_semplice} />
       </section>
 
@@ -170,6 +193,7 @@ export function treatmentFromIntervento(item) {
       spiegazione_semplice: det.spiegazione_semplice || item.spiegazione_semplice || item.messaggio_ux,
       nota_scelta_prodotti: det.nota_scelta_prodotti ?? null,
       prodotti_consigliati: det.prodotti_consigliati ?? [],
+      contesto_meteo: det.contesto_meteo ?? null,
     };
   }
   if (item?.spiegazione_semplice || item?.messaggio_ux) {

@@ -150,6 +150,7 @@ import {
   spiegazioneProdottoPerUtente,
 } from "../src/lib/prodottiEducazione.js";
 import { arricchisciRinnovoConSemina } from "./raccomandazioneSementi.mjs";
+import { buildNotaMeteoTrattamento, meteoDisponibilePerCalcolo } from "./meteoConsiglio.mjs";
 
 export { NOTA_SCELTA_PRODOTTI };
 
@@ -301,9 +302,20 @@ export function identificaMacroAzione(intervento, { profilo, vision, weatherBund
 /**
  * Fase 2: testo educativo per l'utente finale.
  */
-export function generaSpiegazioneSemplice(azione, ctx) {
+function prefissoMeteoCalcolo(ctx, weatherBundle) {
+  if (!meteoDisponibilePerCalcolo(weatherBundle)) return "";
+  const pezzi = ["Abbiamo incrociato data e stagione con il meteo attuale della tua zona"];
+  if (ctx.et0 != null) pezzi.push(`(evaporazione ~${ctx.et0} mm/g)`);
+  else if (ctx.umiditaAlta) pezzi.push("(umidità elevata)");
+  else if (ctx.tSuolo != null) pezzi.push(`(suolo ~${Math.round(ctx.tSuolo)} °C)`);
+  return `${pezzi.join(" ")}.\n\n`;
+}
+
+export function generaSpiegazioneSemplice(azione, ctx, weatherBundle = null) {
   const fn = SPIEGAZIONI[azione.macro] || SPIEGAZIONI.Altro;
-  return fn(ctx).slice(0, 950);
+  const corpo = fn(ctx);
+  const prefisso = prefissoMeteoCalcolo(ctx, weatherBundle);
+  return `${prefisso}${corpo}`.slice(0, 950);
 }
 
 const MAX_PRODOTTI_CONSIGLIATI = 2;
@@ -373,7 +385,9 @@ export function buildDettaglioTrattamento(
   const ctx = { ...meteo, intervento, profilo, vision };
 
   const azione = identificaMacroAzione(intervento, { profilo, vision, weatherBundle });
-  const spiegazione_semplice = generaSpiegazioneSemplice(azione, ctx);
+  const spiegazione_semplice = generaSpiegazioneSemplice(azione, ctx, weatherBundle);
+  const meteoUsato = meteoDisponibilePerCalcolo(weatherBundle);
+  const nota_meteo_utente = meteoUsato ? buildNotaMeteoTrattamento(meteo, weatherBundle, profilo) : null;
   const prodotti_consigliati = includeProdotti
     ? suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision)
     : [];
@@ -396,6 +410,9 @@ export function buildDettaglioTrattamento(
       et0_mm: meteo.et0,
       temperatura_suolo_c: meteo.tSuolo,
       gdd_30g: meteo.gdd30,
+      umidita_alta: meteo.umiditaAlta,
+      utilizzato_nel_calcolo: meteoUsato,
+      nota_utente: nota_meteo_utente,
     },
   };
 }

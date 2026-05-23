@@ -192,6 +192,40 @@
   cursor: not-allowed;
 }
 
+.map-modal-geo-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.35rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.map-modal-geo-btn:hover:not(:disabled) {
+  border-color: var(--text);
+  background: #f4f7f5;
+}
+
+.map-modal-geo-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.map-modal-geo-btn__icon {
+  display: block;
+}
+
+.map-modal-geo-btn__busy {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .map-modal-place-preview {
   margin: 0 1rem 0.5rem;
   font-size: 0.85rem;

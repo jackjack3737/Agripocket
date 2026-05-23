@@ -135,6 +135,7 @@ export default function LawnMapModal({
   const [address, setAddress] = useState("");
   const [addressHint, setAddressHint] = useState(null);
   const [geocodeBusy, setGeocodeBusy] = useState(false);
+  const [geoBusy, setGeoBusy] = useState(false);
   const [applyBusy, setApplyBusy] = useState(false);
 
   const areaSqm = useMemo(() => calculatePolygonAreaSqm(vertices), [vertices]);
@@ -200,6 +201,70 @@ export default function LawnMapModal({
   function handleGeocodeAddress(e) {
     e?.preventDefault?.();
     runGeocode(address);
+  }
+
+  function geocodeLatLng(lat, lng) {
+    return new Promise((resolve) => {
+      if (!window.google?.maps?.Geocoder) {
+        resolve(null);
+        return;
+      }
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        resolve(status === "OK" && results?.[0] ? results[0] : null);
+      });
+    });
+  }
+
+  function centerMapOnLatLng(lat, lng, zoom = 19) {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setCenter({ lat, lng });
+    map.setZoom(zoom);
+    if (!isZoneEdit) setPanMode(false);
+  }
+
+  function handleGeolocate() {
+    if (!mapRef.current || geoBusy || geocodeBusy) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setAddressHint("Geolocalizzazione non disponibile su questo dispositivo.");
+      return;
+    }
+
+    setGeoBusy(true);
+    setAddressHint(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (!mapRef.current) {
+          setGeoBusy(false);
+          return;
+        }
+
+        centerMapOnLatLng(lat, lng);
+        const result = await geocodeLatLng(lat, lng);
+        if (result) {
+          lastGeocodeRef.current = result;
+          const label = localityFromGeocodeResult(result);
+          setAddressHint(label ? `Posizione GPS: ${label}` : "Centrato sulla tua posizione.");
+        } else {
+          setAddressHint("Centrato sulla tua posizione.");
+        }
+        setGeoBusy(false);
+      },
+      (err) => {
+        setGeoBusy(false);
+        const msgs = {
+          1: "Permesso posizione negato. Abilita il GPS nelle impostazioni del browser o del telefono.",
+          2: "Posizione non disponibile. Verifica che il GPS sia attivo.",
+          3: "Timeout GPS. Riprova all'aperto o vicino a una finestra.",
+        };
+        setAddressHint(msgs[err?.code] || "Impossibile ottenere la posizione.");
+      },
+      { enableHighAccuracy: true, timeout: 18000, maximumAge: 45000 },
+    );
   }
 
   function resetDraft() {
@@ -551,8 +616,8 @@ export default function LawnMapModal({
 
         {!missingKey && !loadError && !isZoneEdit && !inZones && (
           <p className="map-modal-hint">
-            Cerca l&apos;indirizzo, poi <strong>Disegna prato</strong> e tocca la mappa (almeno 3 punti). Zone e
-            irrigatori si segnano in Dashboard.
+            Cerca l&apos;indirizzo o usa <strong>GPS</strong>, poi <strong>Disegna prato</strong> e tocca la mappa (almeno
+            3 punti). Zone e irrigatori si segnano in Dashboard.
           </p>
         )}
         {!missingKey && !loadError && !isZoneEdit && !inZones && panMode && (
@@ -573,10 +638,33 @@ export default function LawnMapModal({
                 setAddress(e.target.value);
                 if (addressHint) setAddressHint(null);
               }}
-              disabled={!mapReady || geocodeBusy}
+              disabled={!mapReady || geocodeBusy || geoBusy}
               autoComplete="street-address"
             />
-            <button type="submit" className="map-modal-search-btn" disabled={!mapReady || geocodeBusy}>
+            <button
+              type="button"
+              className="map-modal-geo-btn"
+              onClick={handleGeolocate}
+              disabled={!mapReady || geocodeBusy || geoBusy}
+              aria-label="Usa la mia posizione GPS"
+              title="La mia posizione"
+            >
+              {geoBusy ? (
+                <span className="map-modal-geo-btn__busy">…</span>
+              ) : (
+                <svg className="map-modal-geo-btn__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3.5" fill="currentColor" />
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    d="M12 2v4M12 18v4M2 12h4M18 12h4"
+                  />
+                </svg>
+              )}
+            </button>
+            <button type="submit" className="map-modal-search-btn" disabled={!mapReady || geocodeBusy || geoBusy}>
               {geocodeBusy ? "…" : "Cerca"}
             </button>
           </form>
@@ -625,6 +713,15 @@ export default function LawnMapModal({
             ) : (
               <>
                 <span className="map-zone-tool map-zone-tool--on">{ZONE_TYPES[zoneToolProp]?.label}</span>
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={handleGeolocate}
+                  disabled={!mapReady || geoBusy}
+                  title="La mia posizione GPS"
+                >
+                  {geoBusy ? "GPS…" : "GPS"}
+                </button>
                 <button
                   type="button"
                   className="btn-outline-sm"

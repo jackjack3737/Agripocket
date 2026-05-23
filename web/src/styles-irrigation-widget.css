@@ -179,3 +179,238 @@
 .irrigation-widget__refresh {
   width: 100%;
 }
+
+.irrigation-widget__zone-prog {
+  margin-bottom: 0.75rem;
+}
+
+.irrigation-widget__zone-prog-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0d47a1;
+}
+
+.irrigation-widget__zone-prog-sintesi {
+  margin: 0 0 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #3d4f58;
+}
+
+.irrigation-widget__zone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.irrigation-widget__zone-card {
+  padding: 0.6rem 0.65rem;
+  border-radius: 10px;
+  background: #f8fbfd;
+  border: 1px solid #cfe3ef;
+}
+
+.irrigation-widget__zone-card--off {
+  background: #f4f6f7;
+  border-color: #dfe5e8;
+  opacity: 0.88;
+}
+
+.irrigation-widget__zone-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.irrigation-widget__zone-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.irrigation-widget__zone-badge--statico {
+  background: #1565c0;
+}
+
+.irrigation-widget__zone-badge--rotator {
+  background: #6a1b9a;
+}
+
+.irrigation-widget__zone-badge--dinamico {
+  background: #00838f;
+}
+
+.irrigation-widget__zone-name {
+  font-size: 0.9rem;
+  color: #1a2e3a;
+}
+
+.irrigation-widget__zone-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: #37474f;
+}
+
+.irrigation-widget__zone-stats em {
+  font-style: normal;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #78909c;
+  display: block;
+}
+
+.irrigation-widget__zone-off {
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  color: #78909c;
+}
+
+.irrigation-widget__zone-giorni {
+  margin: 0 0 0.3rem;
+  font-size: 0.76rem;
+  color: #546e7a;
+}
+
+.irrigation-widget__zone-impostazione {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #2f4048;
+}
+
+.irrigation-widget__zone-totale {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #1565c0;
+}
+
+.irrigation-widget__settimana {
+  margin-bottom: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #cfe3ef;
+}
+
+.irrigation-widget__settimana-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1565c0;
+}
+
+.irrigation-widget__settimana-freq {
+  margin: 0 0 0.55rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: #2f4048;
+}
+
+.irrigation-widget__settimana-freq strong {
+  color: #0d47a1;
+}
+
+.irrigation-widget__griglia {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 0.55rem;
+}
+
+.irrigation-widget__giorno {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.35rem 0.15rem;
+  border-radius: 8px;
+  background: #f0f4f6;
+  border: 1px solid #e0e8ec;
+  min-height: 3.4rem;
+  text-align: center;
+}
+
+.irrigation-widget__giorno--on {
+  background: #e3f2fd;
+  border-color: #90caf9;
+}
+
+.irrigation-widget__giorno--oggi-off {
+  outline: 2px solid #ffb74d;
+  outline-offset: -1px;
+}
+
+.irrigation-widget__giorno-nome {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #607d8b;
+}
+
+.irrigation-widget__giorno-stato {
+  font-size: 0.58rem;
+  font-weight: 650;
+  color: #1565c0;
+  line-height: 1.2;
+}
+
+.irrigation-widget__giorno-stato--off {
+  color: #78909c;
+  font-weight: 500;
+}
+
+.irrigation-widget__giorno-min {
+  font-size: 0.58rem;
+  color: #37474f;
+  line-height: 1.15;
+}
+
+.irrigation-widget__settimana-riepilogo,
+.irrigation-widget__settimana-centralina,
+.irrigation-widget__settimana-oggi {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #3d4f58;
+}
+
+.irrigation-widget__settimana-centralina-label {
+  font-weight: 650;
+  color: #1565c0;
+}
+
+.irrigation-widget__meteo-badge {
+  margin: 0 0 0.55rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #455a64;
+  background: #eceff1;
+  border-radius: 8px;
+  border-left: 3px solid #42a5f5;
+}
+
+@media (max-width: 380px) {
+  .irrigation-widget__griglia {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
