@@ -1,4 +1,4 @@
-import { normalizePratoZone } from "../lib/pratoZone";
+import { hasLawnContour } from "../lib/pratoZone";
 
 /**
  * Evidenzia il disegno del prato su Google Maps (profilo / onboarding).
@@ -11,8 +11,7 @@ export default function LawnMapProfileCard({
   apiKeyMissing = false,
   compact = false,
 }) {
-  const { poligono } = normalizePratoZone(pratoZone);
-  const hasContorno = poligono.length >= 3;
+  const hasContorno = hasLawnContour(pratoZone);
   const mqNum = Number(String(superficie_mq).replace(",", "."));
   const hasMq = Number.isFinite(mqNum) && mqNum > 0;
 

@@ -25,12 +25,6 @@ function IrrigationProgramCompact({ programma, centralina, tecnici, azione }) {
             <strong className="irrigation-widget__line-v">{formatMinutiLinea(z)}</strong>
           </li>
         ))}
-        {programma.minuti_totali_zone > 0 ? (
-          <li className="irrigation-widget__line irrigation-widget__line--tot">
-            <span className="irrigation-widget__line-n">Totale</span>
-            <strong className="irrigation-widget__line-v">{programma.minuti_totali_zone} min</strong>
-          </li>
-        ) : null}
       </ul>
     );
   }

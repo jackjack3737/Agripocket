@@ -6,6 +6,7 @@ import { calculatePolygonAreaSqm } from "../lib/polygonArea";
 import {
   computeOmbraZonePct,
   ESPOSIZIONE_LIVELLI,
+  getLawnPolygons,
   IRRIGATOR_MODES,
   LINEA_CENTRALINA_MAX,
   mergePratoZoneUpdate,
@@ -82,6 +83,12 @@ function fitMapToPolygon(map, vertices) {
   });
 }
 
+function fitMapToAllPolygons(map, lawnPolygons) {
+  const flat = (lawnPolygons || []).flat();
+  if (!flat.length) return;
+  fitMapToPolygon(map, flat);
+}
+
 function reverseLocality(lat, lng) {
   return new Promise((resolve) => {
     if (!window.google?.maps?.Geocoder) {
@@ -112,7 +119,7 @@ export default function LawnMapModal({
   const isZoneEdit = purpose === "zone";
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
-  const polyRef = useRef(null);
+  const polyRefs = useRef([]);
   const markersRef = useRef([]);
   const clickListenerRef = useRef(null);
   const lastGeocodeRef = useRef(null);
@@ -127,7 +134,8 @@ export default function LawnMapModal({
   const [mapStep, setMapStep] = useState("boundary");
   const [panMode, setPanMode] = useState(true);
   const [zoneTool, setZoneTool] = useState("pan");
-  const [vertices, setVertices] = useState([]);
+  const [lawnPolygons, setLawnPolygons] = useState([[]]);
+  const [activePolyIndex, setActivePolyIndex] = useState(0);
   const [zones, setZones] = useState([]);
   const [draftPath, setDraftPath] = useState([]);
   const [draftTipo, setDraftTipo] = useState("esposizione");
@@ -144,9 +152,50 @@ export default function LawnMapModal({
   const [geoBusy, setGeoBusy] = useState(false);
   const [applyBusy, setApplyBusy] = useState(false);
 
-  const areaSqm = useMemo(() => calculatePolygonAreaSqm(vertices), [vertices]);
+  const vertices = lawnPolygons[activePolyIndex] ?? [];
+
+  const setVertices = (updater) => {
+    setLawnPolygons((prev) => {
+      const next = prev.map((ring) => [...ring]);
+      while (next.length <= activePolyIndex) next.push([]);
+      const cur = next[activePolyIndex] ?? [];
+      next[activePolyIndex] = typeof updater === "function" ? updater(cur) : updater;
+      return next;
+    });
+  };
+
+  const areaSqm = useMemo(
+    () =>
+      lawnPolygons.reduce(
+        (s, ring) => (ring.length >= 3 ? s + calculatePolygonAreaSqm(ring) : s),
+        0,
+      ),
+    [lawnPolygons],
+  );
+  const validPolygons = useMemo(
+    () => lawnPolygons.filter((ring) => ring.length >= 3),
+    [lawnPolygons],
+  );
   const mapReady = mapTick > 0 && !!mapRef.current;
   const inZones = isZoneEdit || mapStep === "zones";
+
+  function addAnotherLawnArea() {
+    setLawnPolygons((prev) => {
+      setActivePolyIndex(prev.length);
+      return [...prev, []];
+    });
+    setPanMode(false);
+  }
+
+  function removeActiveLawnArea() {
+    if (lawnPolygons.length <= 1) {
+      setLawnPolygons([[]]);
+      setActivePolyIndex(0);
+      return;
+    }
+    setLawnPolygons((prev) => prev.filter((_, i) => i !== activePolyIndex));
+    setActivePolyIndex((i) => Math.max(0, i - 1));
+  }
 
   /** In modifica zona: solo il layer attivo (irrigatori OR ombra OR …), mai sovrapposti. */
   const zonesOnMap = useMemo(() => {
@@ -393,14 +442,17 @@ export default function LawnMapModal({
   useEffect(() => {
     if (!open) return;
     const normalized = normalizePratoZone(initialPratoZone);
+    const polys = getLawnPolygons(normalized);
     if (isZoneEdit) {
-      setVertices(normalized.poligono);
+      setLawnPolygons(polys.length ? polys : [[]]);
+      setActivePolyIndex(0);
       setZones(normalized.zone.filter((z) => z.tipo === zoneToolProp));
       setMapStep("zones");
       setZoneTool(zoneToolProp);
       setPanMode(false);
     } else {
-      setVertices(normalized.poligono.length >= 3 ? normalized.poligono : []);
+      setLawnPolygons(polys.length ? polys : [[]]);
+      setActivePolyIndex(0);
       setZones([]);
       setMapStep("boundary");
       setPanMode(false);
@@ -439,19 +491,6 @@ export default function LawnMapModal({
         });
         mapRef.current = map;
 
-        const poly = new window.google.maps.Polygon({
-          paths: [],
-          strokeColor: "#1a3d2e",
-          strokeOpacity: 0.9,
-          strokeWeight: 3,
-          fillColor: "#1a3d2e",
-          fillOpacity: 0.12,
-          map,
-          geodesic: true,
-          clickable: false,
-        });
-        polyRef.current = poly;
-
         setMapTick((t) => t + 1);
       } catch (e) {
         if (!cancelled) setLoadError(e?.message ?? "Errore mappe");
@@ -470,8 +509,8 @@ export default function LawnMapModal({
       zoneOverlayRefs.current.polygons.forEach((p) => p.setMap(null));
       zoneOverlayRefs.current.polylines.forEach((l) => l.setMap(null));
       zoneOverlayRefs.current = { markers: [], polygons: [], polylines: [] };
-      polyRef.current?.setMap(null);
-      polyRef.current = null;
+      polyRefs.current.forEach((p) => p?.setMap(null));
+      polyRefs.current = [];
       mapRef.current = null;
     };
   }, [open, apiKey]);
@@ -482,19 +521,34 @@ export default function LawnMapModal({
   }, [open, mapReady, initialLocalita, isZoneEdit]);
 
   useEffect(() => {
-    if (!open || !mapReady || !isZoneEdit || vertices.length < 3) return;
+    if (!open || !mapReady || !isZoneEdit || !validPolygons.length) return;
     const map = mapRef.current;
     if (!map) return;
-    const t = window.setTimeout(() => fitMapToPolygon(map, vertices), 120);
+    const t = window.setTimeout(() => fitMapToAllPolygons(map, lawnPolygons), 120);
     return () => window.clearTimeout(t);
-  }, [open, mapReady, isZoneEdit, zoneToolProp, vertices]);
+  }, [open, mapReady, isZoneEdit, zoneToolProp, lawnPolygons, validPolygons.length]);
 
   useEffect(() => {
-    if (!open) return;
-    const poly = polyRef.current;
-    if (!poly) return;
-    poly.setPath(vertices);
-  }, [vertices, open, mapTick]);
+    if (!open || inZones || !mapRef.current) return;
+    const map = mapRef.current;
+    polyRefs.current.forEach((p) => p?.setMap(null));
+    polyRefs.current = lawnPolygons.map((ring, idx) => {
+      if (ring.length < 2) return null;
+      const active = idx === activePolyIndex;
+      return new window.google.maps.Polygon({
+        paths: ring,
+        strokeColor: active ? "#1a3d2e" : "#4caf50",
+        strokeOpacity: active ? 0.95 : 0.75,
+        strokeWeight: active ? 3 : 2,
+        fillColor: active ? "#1a3d2e" : "#4caf50",
+        fillOpacity: active ? 0.14 : 0.08,
+        map,
+        geodesic: true,
+        clickable: false,
+        zIndex: active ? 2 : 1,
+      });
+    }).filter(Boolean);
+  }, [lawnPolygons, activePolyIndex, open, mapTick, inZones]);
 
   useEffect(() => {
     if (!open || inZones) return;
@@ -572,26 +626,27 @@ export default function LawnMapModal({
   }, [panMode, zoneTool, inZones, open, mapTick]);
 
   async function handleApply() {
-    if (vertices.length < 3 || areaSqm <= 0) return;
+    if (!validPolygons.length || areaSqm <= 0) return;
     setApplyBusy(true);
 
     let localita;
     let superficie_mq;
     let prato_zone;
+    const poligoni = validPolygons.map((ring) => ring.map((p) => ({ lat: p.lat, lng: p.lng })));
 
     if (isZoneEdit) {
       const replaceTypes =
         zoneToolProp === "esposizione" ? ["esposizione", "ombra"] : [zoneToolProp];
       prato_zone = mergePratoZoneUpdate(initialPratoZone, {
-        poligono: vertices,
+        poligoni,
         zones,
         replaceTypes,
       });
     } else {
-      prato_zone = mergePratoZoneUpdate(initialPratoZone, { poligono: vertices });
+      prato_zone = mergePratoZoneUpdate(initialPratoZone, { poligoni });
       localita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
       if (!localita) {
-        const center = polygonCentroid(vertices);
+        const center = polygonCentroid(poligoni.flat());
         if (center) localita = await reverseLocality(center.lat, center.lng);
       }
       superficie_mq = Math.round(areaSqm);
@@ -612,7 +667,7 @@ export default function LawnMapModal({
   if (!open) return null;
 
   const missingKey = !apiKey?.trim();
-  const canBoundary = vertices.length >= 3 && areaSqm > 0;
+  const canBoundary = validPolygons.length > 0 && areaSqm > 0;
   const previewLocalita = lastGeocodeRef.current ? localityFromGeocodeResult(lastGeocodeRef.current) : "";
   const irrCount = zones.filter((z) => z.tipo === "irrigatore").length;
 
@@ -740,8 +795,33 @@ export default function LawnMapModal({
               </button>
             </div>
             <button type="button" className="btn-outline-sm" onClick={() => setVertices([])} disabled={vertices.length === 0}>
-              Azzera contorno
+              Azzera area {activePolyIndex + 1}
             </button>
+            {lawnPolygons.length > 1 ? (
+              <button type="button" className="btn-outline-sm" onClick={removeActiveLawnArea}>
+                Rimuovi area {activePolyIndex + 1}
+              </button>
+            ) : null}
+            <button type="button" className="btn-outline-sm map-modal-add-area" onClick={addAnotherLawnArea}>
+              + Aggiungi un&apos;altra area di prato (es. retro casa)
+            </button>
+            {lawnPolygons.length > 1 ? (
+              <div className="map-poly-tabs" role="tablist" aria-label="Aree di prato">
+                {lawnPolygons.map((ring, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === activePolyIndex}
+                    className={`map-poly-tabs__btn${i === activePolyIndex ? " map-poly-tabs__btn--on" : ""}`}
+                    onClick={() => setActivePolyIndex(i)}
+                  >
+                    Area {i + 1}
+                    {ring.length >= 3 ? ` (${Math.round(calculatePolygonAreaSqm(ring))} m²)` : ""}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : inZones ? (
           <div className="map-zone-toolbar">
@@ -774,7 +854,7 @@ export default function LawnMapModal({
                 <button
                   type="button"
                   className="btn-outline-sm"
-                  onClick={() => fitMapToPolygon(mapRef.current, vertices)}
+                  onClick={() => fitMapToAllPolygons(mapRef.current, lawnPolygons)}
                 >
                   Centra sul prato
                 </button>
@@ -944,11 +1024,23 @@ export default function LawnMapModal({
 
         <div className="map-modal-footer map-modal-footer--sticky">
           <div className="map-modal-area">
-            {vertices.length < 3 ? (
-              <span className="map-area-muted">Area: — (almeno 3 punti)</span>
+            {!validPolygons.length ? (
+              <span className="map-area-muted">Area: — (almeno 3 punti per area)</span>
             ) : (
               <span>
-                Area: <strong>{formatMqInput(areaSqm)} m²</strong>
+                Area totale: <strong>{formatMqInput(areaSqm)} m²</strong>
+                {validPolygons.length > 1 ? (
+                  <>
+                    {" "}
+                    · <strong>{validPolygons.length}</strong> aree
+                  </>
+                ) : null}
+                {!inZones && lawnPolygons.length > 1 ? (
+                  <>
+                    {" "}
+                    · stai disegnando <strong>area {activePolyIndex + 1}</strong>
+                  </>
+                ) : null}
                 {inZones && irrCount > 0 ? (
                   <>
                     {" "}

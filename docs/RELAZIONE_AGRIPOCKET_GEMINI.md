@@ -1,7 +1,7 @@
 # Relazione tecnico-funzionale — AgriPocket
 ## Documento per valutazione critica (Gemini / revisore esterno)
 
-> **Aggiornamento maggio 2026:** per revisione critica aggiornata usa **`docs/RELAZIONE_CRITICA_GEMINI.md`** + prompt in **`docs/PROMPT_GEMINI_REVISIONE.txt`**.
+> **Aggiornamento maggio 2026:** documento master → **`docs/RELAZIONE_COMPLETA_GEMINI.md`**. Per revisione critica severa: **`docs/RELAZIONE_CRITICA_GEMINI.md`** + **`docs/PROMPT_GEMINI_REVISIONE.txt`**.
 
 **Versione:** maggio 2026 (archivio; vedi relazione critica per stato corrente)  
 **Repository:** https://github.com/jackjack3737/Agripocket  

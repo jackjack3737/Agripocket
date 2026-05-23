@@ -6,6 +6,7 @@ import { registraFocolaiDaVision } from "./focolaiRegionali.mjs";
 import { testoAlertAnalisiSuolo } from "./laboratoriSuolo.mjs";
 import { loadZonaIdForUser } from "./zoneMeteo.mjs";
 import { queryKnowledgeBasePrioritizedWithRetry } from "./kbQuery.mjs";
+import { applicaDeclassamentoFunginoMeteo, NOTA_DECLASS } from "./visionMeteoDeclass.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -348,6 +349,15 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
   }
   vision = normalizeVisionGeometria(vision);
 
+  let notaDeclassamentoMeteo = "";
+  if (!isMacchia) {
+    const declass = await applicaDeclassamentoFunginoMeteo(vision, profilo);
+    if (declass.declassato) {
+      vision = declass.vision;
+      notaDeclassamentoMeteo = declass.notaReport || NOTA_DECLASS;
+    }
+  }
+
   if (vision.richiede_analisi_suolo == null) {
     const ph = String(profilo?.ph_terreno || "").toLowerCase();
     const squilibrio =
@@ -453,6 +463,14 @@ Fitofarmaci (fungicidi/insetticidi): SOLO se la foto mostra malattie, parassiti 
 Se serve un trattamento, preferisci prodotti BOTTOS in catalogo: Fly (larve/popillia), Trichoderma (problemi fungini), senza dose automatica.
 Nella sezione Specie: nomi latini, confidenza, differenza tra specie simili se utile. Collega diagnosi + meteo.
 ${
+  notaDeclassamentoMeteo
+    ? `
+IMPORTANTE — Diagnosi rivista con meteo locale:
+${notaDeclassamentoMeteo}
+Inserisci in Diagnosi e problemi una nota esplicita che NON si tratta di fungo attivo ma di sospetto stress idrico (dry spot); NON consigliare fungicidi curativi.
+`
+    : ""
+}${
   vision.richiede_analisi_suolo
     ? `
 OBBLIGO ANALISI SUOLO (richiede_analisi_suolo=true):

@@ -4,7 +4,7 @@ import LawnMapModal from "./LawnMapModal";
 import OmbraSeedHint from "./zoneMapHints/OmbraSeedHint";
 import IrrigatoriHint from "./zoneMapHints/IrrigatoriHint";
 import PendenzaHint from "./zoneMapHints/PendenzaHint";
-import { countZonesByType, normalizePratoZone, ZONE_TYPES } from "../lib/pratoZone";
+import { countZonesByType, hasLawnContour, normalizePratoZone, ZONE_TYPES } from "../lib/pratoZone";
 import { updatePratoZoneMappa } from "../lib/supabase";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
@@ -42,7 +42,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
   const [error, setError] = useState("");
 
   const normalized = normalizePratoZone(profile?.prato_zone);
-  const hasPoligono = normalized.poligono.length >= 3;
+  const hasPoligono = hasLawnContour(profile?.prato_zone);
   const counts = countZonesByType(profile?.prato_zone);
 
   function openTool(tool) {

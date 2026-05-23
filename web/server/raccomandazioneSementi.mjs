@@ -3,7 +3,7 @@
  */
 
 import { fetchWeatherBundle } from "./weatherCore.mjs";
-import { normalizePratoZone, computeOmbraZonePct } from "./pratoZone.mjs";
+import { normalizePratoZone, computeOmbraZonePct, lawnCentroid } from "./pratoZone.mjs";
 import { calcolaDose, rankProdotti } from "./prodottiCatalogo.mjs";
 import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
 import { filtraPoolSementiPerColore } from "./colorMatchingSementi.mjs";
@@ -165,13 +165,9 @@ export function calcolaEssenzaIdeale(temperaturaSuolo, opts = {}) {
 }
 
 export async function resolveCoordsProfilo(profilo) {
-  const zone = normalizePratoZone(profilo?.prato_zone);
-  if (zone.poligono?.length >= 3) {
-    const lat =
-      zone.poligono.reduce((s, p) => s + Number(p.lat), 0) / zone.poligono.length;
-    const lon =
-      zone.poligono.reduce((s, p) => s + Number(p.lng ?? p.lon), 0) / zone.poligono.length;
-    if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon, fonte: "mappa" };
+  const c = lawnCentroid(profilo?.prato_zone);
+  if (c && Number.isFinite(c.lat) && Number.isFinite(c.lng)) {
+    return { lat: c.lat, lon: c.lng, fonte: "mappa" };
   }
 
   if (profilo?.localita?.trim()) {

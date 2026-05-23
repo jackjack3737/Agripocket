@@ -11,6 +11,7 @@ import {
   formatIrrigationForPrompt,
   formatOmbraSeedForPrompt,
   normalizePratoZone,
+  hasLawnContour,
 } from "./pratoZone.mjs";
 import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
 
@@ -149,8 +150,8 @@ function formatStoricoAnalisi(storico, { visionNotaZona } = {}) {
 
 function haMappaUtile(profilo, zona) {
   const pz = pratoZoneEffettivo(profilo, zona);
-  const { poligono, zone } = normalizePratoZone(pz);
-  return poligono.length >= 3 || zone.length > 0;
+  const { zone } = normalizePratoZone(pz);
+  return hasLawnContour(pz) || zone.length > 0;
 }
 
 /** Profilo + meteo/mappa bastano per rispondere senza foto. */

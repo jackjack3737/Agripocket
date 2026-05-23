@@ -21,6 +21,10 @@ import {
   isInterventoFitofarmaco,
   isProdottoFitofarmaco,
   filtraProdottiConsumer,
+  filtraProdottiConsumerStrict,
+  isProfiloUsoConsumer,
+  messaggioPrincipioAttivoProfessionale,
+  isProdottoPFNPO,
   inferCategoriaLegale,
   AVVISO_PRODOTTO_PROFESSIONALE,
   superficieMqVerificata,
@@ -283,9 +287,10 @@ function restringiPoolDiserbo(pool, intervento) {
 function restringiPoolTrattamento(pool, vision, intervento, profilo) {
   const ctx = contestoVision(vision, intervento);
   const parassiti = analizzaParassiti({ vision, intervento, localita: profilo?.localita });
+  const filtraFito = (list) => filtraProdottiConsumerStrict(list, profilo);
 
   if (/fungh|marcium|patogen|oidio|fusarium|rhizoctonia|microdochium/.test(ctx) && !parassiti.larveSottoprato) {
-    const fung = filtraProdottiConsumer(
+    const fung = filtraFito(
       pool.filter((p) => /^FUNGICIDA/.test(String(p.categoria || "").toUpperCase())),
     );
     if (fung.length) return preferisciPoolBottos(fung, "funghi");
@@ -293,7 +298,7 @@ function restringiPoolTrattamento(pool, vision, intervento, profilo) {
 
   if (/insett|afid|larv|trip|coleotter|popillia|maggiolino|otiorrinco|bruco|sottoprato/.test(ctx)) {
     let ins = pool.filter((p) => /^INSETTICIDA/.test(String(p.categoria || "").toUpperCase()));
-    ins = filtraProdottiConsumer(ins);
+    ins = filtraFito(ins);
     ins = filtraInsetticidaPerParassita(ins, parassiti);
     if (ins.length) return preferisciPoolBottos(ins, parassiti.larveSottoprato ? "larve" : "insetti");
   }
@@ -318,7 +323,7 @@ export function rankProdotti(prodotti, opts) {
   if (opts.categoriaIntervento === "rinnovo") {
     grezzo = filtraPoolSementiPerColore(grezzo, opts.vision);
   }
-  let pool = filtraProdottiConsumer(filtraPoolMarca(grezzo));
+  let pool = filtraProdottiConsumerStrict(filtraPoolMarca(grezzo), opts.profilo);
   pool = filtraPoolPerLivelloImpegno(pool, opts.profilo);
   return pool
     .map((p) => ({ p, score: scoreProdotto(p, opts) }))
@@ -408,13 +413,29 @@ export function arricchisciInterventoConProdotto(intervento, profilo, prodotti, 
   }
 
   if (fito) {
-    const hint = prodotto
-      ? `Riferimento catalogo PFNPO/uso domestico (non prescrizione): ${prodotto.nome} — ${prodotto.composizione || prodotto.categoria}.`
-      : "Nessun prodotto fitosanitico idoneo al consumatore in catalogo per questo caso: valuta intervento non chimico o agronomo.";
+    const problema =
+      vision?.malattie_sospette?.[0]?.nome ||
+      vision?.problemi_rilevati?.[0]?.problema ||
+      intervento.titolo;
+    let hint;
+    if (prodotto && isProdottoPFNPO(prodotto)) {
+      hint = `Riferimento catalogo PFNPO (non prescrizione): ${prodotto.nome} - ${prodotto.composizione || prodotto.categoria}.`;
+    } else if (isProfiloUsoConsumer(profilo)) {
+      const rankedPro = rankProdotti(
+        prodotti.filter((p) => isProdottoFitofarmaco(p)),
+        opts,
+      );
+      const proOnly = rankedPro.find((r) => !isProdottoPFNPO(r.p))?.p;
+      hint = messaggioPrincipioAttivoProfessionale(proOnly || prodotto, problema);
+    } else {
+      hint = prodotto
+        ? `Riferimento catalogo: ${prodotto.nome} - ${prodotto.composizione || prodotto.categoria}.`
+        : "Nessun prodotto fitosanitario idoneo in catalogo: valuta intervento non chimico o agronomo.";
+    }
     return {
       ...intervento,
-      prodotto_id: prodotto?.id ?? null,
-      prodotto_nome: prodotto?.nome ?? null,
+      prodotto_id: prodotto && isProdottoPFNPO(prodotto) ? prodotto.id : null,
+      prodotto_nome: prodotto && isProdottoPFNPO(prodotto) ? prodotto.nome : null,
       dose_totale: null,
       dose_unita: null,
       dose_per_mq: null,

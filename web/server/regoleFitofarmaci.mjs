@@ -5,6 +5,13 @@
  */
 
 import { PREFERENZA_BOTTOS_FITO } from "./bottosFitofarmaci.mjs";
+import {
+  isProfiloUsoConsumer,
+  filtraProdottiConsumerStrict,
+  messaggioPrincipioAttivoProfessionale,
+} from "./sicurezzaProdotti.mjs";
+
+export { isProfiloUsoConsumer, filtraProdottiConsumerStrict, messaggioPrincipioAttivoProfessionale };
 
 const PROBLEMI_FITO = new Set(["funghi", "larve_parassiti", "erbacee", "muschio"]);
 
@@ -90,6 +97,11 @@ export function catalogoAmmessoSenzaFoto(prodotto) {
   if (cat === "DISERBANTE" || cat === "DISERBANTE SELETTIVO") return false;
   if (cat === "DISERBANTE PRE-EMERGENZA" || cat === "DISERBANTE PFnPE") return true;
   return true;
+}
+
+/** Pool catalogo ammesso in base al profilo (consumer = solo PFNPO). */
+export function poolProdottiPerProfiloFitofarmaci(prodotti, profilo) {
+  return filtraProdottiConsumerStrict(prodotti, profilo);
 }
 
 export const REGOLE_FITOFARMACI_PROMPT = `REGOLE FITOFARMACI (obbligatorie):

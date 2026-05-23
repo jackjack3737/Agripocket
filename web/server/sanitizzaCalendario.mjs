@@ -3,7 +3,7 @@
  */
 
 import { configLivelloImpegno, normalizzaLivelloImpegno } from "./livelloImpegno.mjs";
-import { applicaGuardrailsCalendario } from "./agronomicGuardrails.mjs";
+import { applicaGuardrailsCalendario, macroDaIntervento } from "./agronomicGuardrails.mjs";
 
 const ROUTINE_CATEGORIE = new Set(["taglio", "irrigazione"]);
 const LIQUID_HINT = /liquid|liquido|umett|biostim|tryko|vigor|pre-stress|always|surfact/i;
@@ -105,12 +105,74 @@ export function capInterventiPerLivello(interventi, profilo) {
   return sorted.slice(0, cfg.maxInterventi);
 }
 
+function interventoHaMacroN(i, prodottiById) {
+  const macro = macroDaIntervento(i, prodottiById);
+  if (macro === "N") return true;
+  const blob = `${i.titolo} ${i.descrizione}`.toLowerCase();
+  return /azot|nitrogen|npk.*\bn\b|concim.*azot|rinverd|spinta vegetativa/i.test(blob);
+}
+
+function prossimaDataStagionale(mese, giorno, oggi) {
+  const from = new Date(`${oggi}T12:00:00`);
+  let d = new Date(from.getFullYear(), mese - 1, giorno);
+  if (d <= from) d = new Date(from.getFullYear() + 1, mese - 1, giorno);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Inietta N autunnale/primaverile se l'LLM li ha omessi (P0 revisione Gemini). */
+export function ensureMatriceNPKObbligatoria(interventi, oggi, prodottiById = new Map()) {
+  const list = [...interventi];
+
+  const haNAutunno = list.some((i) => {
+    const m = new Date(`${i.data_prevista}T12:00:00`).getMonth() + 1;
+    return (m >= 9 && m <= 11) && interventoHaMacroN(i, prodottiById);
+  });
+  const haNPrimavera = list.some((i) => {
+    const m = new Date(`${i.data_prevista}T12:00:00`).getMonth() + 1;
+    return (m >= 3 && m <= 5) && interventoHaMacroN(i, prodottiById);
+  });
+
+  if (!haNAutunno) {
+    list.push({
+      titolo: "Concimazione azotata autunnale (ripresa vegetativa)",
+      descrizione:
+        "Apporto di azoto per densità e colore dopo l'estate. Inserito automaticamente dal motore fisiologico Solum perché mancava nel piano generato.",
+      categoria: "concime",
+      priorita: "alta",
+      data_prevista: prossimaDataStagionale(9, 25, oggi),
+      ordine: 4100,
+      fonte: "calendario_stagionale",
+      macro_categoria: "N",
+    });
+  }
+
+  if (!haNPrimavera) {
+    list.push({
+      titolo: "Concimazione azotata primaverile",
+      descrizione:
+        "Spinta vegetativa di ripresa dopo l'inverno. Inserito automaticamente dal motore fisiologico Solum se assente nel piano LLM.",
+      categoria: "concime",
+      priorita: "alta",
+      data_prevista: prossimaDataStagionale(4, 5, oggi),
+      ordine: 1200,
+      fonte: "calendario_stagionale",
+      macro_categoria: "N",
+    });
+  }
+
+  return list.sort(
+    (a, b) => (a.data_prevista || "").localeCompare(b.data_prevista || "") || (a.ordine ?? 0) - (b.ordine ?? 0),
+  );
+}
+
 /** Pipeline post-generazione Gemini + catalogo + guardrails agronomici. */
 export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {}) {
+  const prodottiById = new Map((opts.prodotti || []).map((p) => [p.id, p]));
   let list = [...interventi];
   list = rimuoviRoutineCalendario(list);
   list = bloccoTermicoEstivo(list);
   list = applicaTankMix(list);
+  list = ensureMatriceNPKObbligatoria(list, oggi, prodottiById);
   list = capInterventiPerLivello(list, profilo);
 
   const { storico = [], prodotti = [], vision, weatherBundle } = opts;

@@ -205,6 +205,16 @@ export function groupInterventi(list) {
   return { completati, pianificati, daFoto, daCalendario, senzaData };
 }
 
+/** Interventi strategici con data passata (per sezione dedicata in calendario). */
+export function interventiInRitardo(list) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  return sortInterventiCronologico(
+    filtraCalendarioStrategico(
+      list.filter((i) => i.stato === "pianificato" && i.data_prevista && i.data_prevista < oggi),
+    ),
+  ).map((i) => ({ ...i, isRitardo: true, data_originale: i.data_prevista }));
+}
+
 /** Raggruppa interventi pianificati per data_prevista (giorno per giorno). */
 export function groupInterventiPerGiorno(list, { maxGiorni = 365 } = {}) {
   const oggi = new Date().toISOString().slice(0, 10);

@@ -91,3 +91,54 @@ export function filtraProdottiConsumer(pool) {
 
 export const AVVISO_PRODOTTO_PROFESSIONALE =
   "Prodotto fitosanitario da uso professionale (PAN): non suggerito in app. Consulta un agronomo o rivenditore abilitato.";
+
+export const AVVISO_PRINCIPIO_ATTIVO_PROFESSIONALE =
+  "Per questo problema servono fitofarmaci da uso professionale (patentino). Ti indichiamo il principio attivo da citare in garden center o da un agronomo abilitato — senza dosaggio automatico.";
+
+export function isProfiloUsoConsumer(profilo) {
+  const uso = String(profilo?.uso || "giardino").toLowerCase();
+  return uso === "giardino" || uso === "ornamentale";
+}
+
+export function isProdottoPFNPO(prodotto) {
+  const legale = String(prodotto?.categoria_legale || inferCategoriaLegale(prodotto)).toUpperCase();
+  if (legale === "PFNPO") return true;
+  const cat = String(prodotto?.categoria || "").toUpperCase();
+  if (
+    cat.includes("PFNPO") ||
+    cat.includes("PFnPE") ||
+    cat === "FUNGICIDA BIO" ||
+    cat === "INSETTICIDA BIO" ||
+    cat === "DISERBANTE PRE-EMERGENZA" ||
+    cat === "DISERBANTE PFnPE" ||
+    cat === "INSETTICIDA PFnPE"
+  ) {
+    return true;
+  }
+  const blob = `${prodotto?.nome || ""} ${prodotto?.descrizione || ""} ${prodotto?.composizione || ""}`.toLowerCase();
+  return /pfnp|pfnpe|libera vendita|uso domestico|piante ornamentali/.test(blob);
+}
+
+export function estraiPrincipioAttivo(prodotto) {
+  const comp = String(prodotto?.composizione || prodotto?.descrizione || "").trim();
+  if (!comp) return null;
+  const m = comp.match(/([A-Za-zÀ-ÿ][\w\-àèéìòù]+(?:\s+[A-Za-zÀ-ÿ][\w\-àèéìòù]+){0,3})\s*[\d,.]+\s*%/);
+  if (m) return m[1].trim();
+  const short = comp.split(/[,;]/)[0]?.trim();
+  return short && short.length >= 4 && short.length <= 80 ? short : null;
+}
+
+export function messaggioPrincipioAttivoProfessionale(prodotto, problema) {
+  const pa = estraiPrincipioAttivo(prodotto) || "principio attivo idoneo alla patologia";
+  const prob = problema ? ` per «${problema}»` : "";
+  return `${AVVISO_PRINCIPIO_ATTIVO_PROFESSIONALE} Principio attivo di riferimento${prob}: ${pa}. Rivolgiti a un garden center o agronomo abilitato.`;
+}
+
+export function filtraProdottiConsumerStrict(pool, profilo) {
+  const list = pool || [];
+  if (!isProfiloUsoConsumer(profilo)) return list;
+  return list.filter((p) => {
+    if (!isProdottoFitofarmaco(p)) return true;
+    return isProdottoPFNPO(p) && isProdottoAmmessoConsumer(p);
+  });
+}

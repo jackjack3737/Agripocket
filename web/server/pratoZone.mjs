@@ -62,16 +62,77 @@ function uid() {
   return `z_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function normalizePolygonRing(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng ?? p.lon) }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+}
+
+export function getLawnPolygons(pratoZone) {
+  const z = normalizePratoZone(pratoZone);
+  if (z.poligoni?.length) {
+    return z.poligoni.filter((ring) => ring.length >= 3);
+  }
+  if (z.poligono.length >= 3) return [z.poligono];
+  return [];
+}
+
+export function lawnAreaSqm(pratoZone) {
+  return getLawnPolygons(pratoZone).reduce((s, ring) => s + calculatePolygonAreaSqm(ring), 0);
+}
+
+export function lawnCentroid(pratoZone) {
+  const polys = getLawnPolygons(pratoZone);
+  if (!polys.length) return null;
+  let tLat = 0;
+  let tLng = 0;
+  let tArea = 0;
+  for (const ring of polys) {
+    const a = calculatePolygonAreaSqm(ring);
+    if (a <= 0) continue;
+    let lat = 0;
+    let lng = 0;
+    ring.forEach((p) => {
+      lat += p.lat;
+      lng += p.lng;
+    });
+    lat /= ring.length;
+    lng /= ring.length;
+    tLat += lat * a;
+    tLng += lng * a;
+    tArea += a;
+  }
+  if (tArea > 0) return { lat: tLat / tArea, lng: tLng / tArea };
+  const flat = polys.flat();
+  return {
+    lat: flat.reduce((s, p) => s + p.lat, 0) / flat.length,
+    lng: flat.reduce((s, p) => s + p.lng, 0) / flat.length,
+  };
+}
+
+export function hasLawnContour(pratoZone) {
+  return getLawnPolygons(pratoZone).length > 0;
+}
+
 /** @param {unknown} raw */
 export function normalizePratoZone(raw) {
-  if (!raw || typeof raw !== "object") return { version: 1, poligono: [], zone: [] };
-  const poligono = Array.isArray(raw.poligono)
-    ? raw.poligono
-        .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
-        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
-    : [];
+  if (!raw || typeof raw !== "object") {
+    return { version: 2, poligono: [], poligoni: [], zone: [] };
+  }
   const zone = Array.isArray(raw.zone) ? raw.zone.map(normalizeZone).filter(Boolean) : [];
-  return { version: 1, poligono, zone };
+
+  let poligoni = [];
+  if (Array.isArray(raw.poligoni)) {
+    poligoni = raw.poligoni.map(normalizePolygonRing).filter((ring) => ring.length >= 3);
+  }
+  const legacy = normalizePolygonRing(raw.poligono);
+  if (!poligoni.length && legacy.length >= 3) {
+    poligoni = [legacy];
+  }
+  const poligono = poligoni[0] || legacy || [];
+
+  return { version: 2, poligono, poligoni, zone };
 }
 
 function normalizeZone(z) {
@@ -115,10 +176,17 @@ function normalizeZone(z) {
   return null;
 }
 
-export function buildPratoZonePayload(poligono, zone) {
+export function buildPratoZonePayload(poligono, zone, poligoni = null) {
+  const rings =
+    poligoni?.length > 0
+      ? poligoni.map((r) => r.map((p) => ({ lat: p.lat, lng: p.lng })))
+      : poligono?.length >= 3
+        ? [poligono.map((p) => ({ lat: p.lat, lng: p.lng }))]
+        : [];
   return {
-    version: 1,
-    poligono: poligono.map((p) => ({ lat: p.lat, lng: p.lng })),
+    version: 2,
+    poligono: rings[0] || [],
+    poligoni: rings,
     zone: zone.map((z) => ({ ...z })),
   };
 }
@@ -128,7 +196,7 @@ export function buildPratoZonePayload(poligono, zone) {
  * @param {unknown} existing
  * @param {{ poligono?: {lat,lng}[], zones?: object[], replaceTypes?: string[] }} patch
  */
-export function mergePratoZoneUpdate(existing, { poligono, zones, replaceTypes = [] }) {
+export function mergePratoZoneUpdate(existing, { poligono, poligoni, zones, replaceTypes = [] }) {
   const base = normalizePratoZone(existing);
   const types = new Set(replaceTypes);
   let merged = types.size
@@ -139,19 +207,27 @@ export function mergePratoZoneUpdate(existing, { poligono, zones, replaceTypes =
       })
     : [...base.zone];
   if (zones?.length) merged = [...merged, ...zones.map((z) => ({ ...z }))];
+
+  let nextPoligoni;
+  if (Array.isArray(poligoni) && poligoni.length) {
+    nextPoligoni = poligoni.map(normalizePolygonRing).filter((ring) => ring.length >= 3);
+  } else if (poligono?.length >= 3) {
+    nextPoligoni = [normalizePolygonRing(poligono)];
+  } else {
+    nextPoligoni = getLawnPolygons(base);
+  }
+
   return {
-    version: 1,
-    poligono: (poligono?.length ? poligono : base.poligono).map((p) => ({
-      lat: p.lat,
-      lng: p.lng,
-    })),
+    version: 2,
+    poligono: (nextPoligoni[0] || []).map((p) => ({ lat: p.lat, lng: p.lng })),
+    poligoni: nextPoligoni.map((ring) => ring.map((p) => ({ lat: p.lat, lng: p.lng }))),
     zone: merged,
   };
 }
 
 export function computeEsposizioneWeightedPct(pratoZone) {
-  const { poligono, zone } = normalizePratoZone(pratoZone);
-  const lawnMq = calculatePolygonAreaSqm(poligono);
+  const { zone } = normalizePratoZone(pratoZone);
+  const lawnMq = lawnAreaSqm(pratoZone);
   if (lawnMq <= 0) return 0;
   let weighted = 0;
   for (const e of zoneEsposizioneEntries(zone)) {
@@ -170,8 +246,8 @@ export function computeOmbraZonePct(pratoZone) {
 }
 
 export function computeOmbraZoneAreas(pratoZone) {
-  const { poligono, zone } = normalizePratoZone(pratoZone);
-  const lawnMq = calculatePolygonAreaSqm(poligono);
+  const { zone } = normalizePratoZone(pratoZone);
+  const lawnMq = lawnAreaSqm(pratoZone);
   if (lawnMq <= 0) return null;
 
   const zones = [];

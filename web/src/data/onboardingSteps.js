@@ -48,6 +48,39 @@ export const ONBOARDING_STEPS = [
     ],
   },
   {
+    id: "esposizione",
+    field: "esposizione",
+    backgroundImage: IMG("opt-esp-mezzombra.png"),
+    title: "Quanto sole ha il prato?",
+    intro: "Serve come base per irrigazione e calendario se non disegni subito le zone in mappa.",
+    whatToDo:
+      "Scegli l'opzione che descrive meglio l'intera superficie. Potrai affinare con poligoni sole/ombra in Dashboard.",
+    hint: "Se hai zone molto diverse, scegli quella che copre più metri quadri.",
+    options: [
+      {
+        value: "sole_pieno",
+        label: "Sole per quasi tutto il giorno",
+        desc: "Più di 6 ore di sole diretto",
+        help: "Prato esposto, poca ombra da alberi alti.",
+        image: IMG("opt-esp-sole.png"),
+      },
+      {
+        value: "mezzombra",
+        label: "Metà giornata",
+        desc: "Circa 3–6 ore, o sole solo al mattino",
+        help: "Ombra di casa, siepe o alberi per parte del giorno.",
+        image: IMG("opt-esp-mezzombra.png"),
+      },
+      {
+        value: "ombra",
+        label: "Poca luce",
+        desc: "Meno di 3 ore di sole diretto",
+        help: "Sotto alberi fitti, tra case strette, lato nord.",
+        image: IMG("opt-esp-ombra.png"),
+      },
+    ],
+  },
+  {
     id: "tipo_terreno",
     field: "tipo_terreno",
     backgroundImage: IMG("opt-ter-medio.png"),
@@ -526,6 +559,7 @@ export function profileSummary(profile) {
   if (!profile) return "";
   const parts = [
     "uso",
+    "esposizione",
     "tipo_terreno",
     "irrigazione",
     "eta_prato",

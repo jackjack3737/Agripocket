@@ -251,6 +251,36 @@
   padding: 0 16px 12px;
 }
 
+.map-poly-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.map-poly-tabs__btn {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.map-poly-tabs__btn--on {
+  border-color: #1a3d2e;
+  color: #1a3d2e;
+  font-weight: 600;
+  background: #e8f5e9;
+}
+
+.map-modal-add-area {
+  width: 100%;
+  text-align: left;
+}
+
 .map-modal-toggle {
   display: inline-flex;
   border: 1px solid var(--border);

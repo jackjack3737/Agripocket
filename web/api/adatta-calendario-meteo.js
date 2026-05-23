@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { loadServerEnv } from "../server/serverEnv.mjs";
 import { fetchWeatherBundle } from "../server/weatherCore.mjs";
 import { adattaDateCalendarioPerSuolo } from "../server/pianoAdattivo.mjs";
+import { lawnCentroid } from "../server/pratoZone.mjs";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -54,14 +55,8 @@ export default async function handler(req, res) {
         pratoZone = null;
       }
     }
-    const poligono = pratoZone?.poligono;
-    const gps =
-      Array.isArray(poligono) && poligono.length >= 3
-        ? {
-            lat: poligono.reduce((s, p) => s + Number(p.lat), 0) / poligono.length,
-            lon: poligono.reduce((s, p) => s + Number(p.lng ?? p.lon), 0) / poligono.length,
-          }
-        : null;
+    const c = lawnCentroid(pratoZone);
+    const gps = c ? { lat: c.lat, lon: c.lng } : null;
 
     const weatherBundle = await fetchWeatherBundle(profilo.localita, null, {
       lat: gps?.lat,

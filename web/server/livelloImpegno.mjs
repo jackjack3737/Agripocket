@@ -3,7 +3,7 @@
 export const LIVELLI_IMPEGNO = {
   base: {
     label: "Base",
-    maxInterventi: 20,
+    maxInterventi: 15,
     maxCatalogo: 4,
     liquidiMensili: false,
   },

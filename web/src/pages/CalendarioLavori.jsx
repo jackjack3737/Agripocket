@@ -12,6 +12,7 @@ import {
   contaLavoriPianificatiFiltrati,
   filtraInterventiPerCalendario,
   groupInterventi,
+  interventiInRitardo,
   formatMeseIt,
   groupInterventiPerMese,
   haCalendarioStagionale,
@@ -97,6 +98,7 @@ export default function CalendarioLavori({ profile, session }) {
   const groups = useMemo(() => groupInterventi(interventiCalendario), [interventiCalendario]);
   const mesi = useMemo(() => groupInterventiPerMese(interventiCalendario), [interventiCalendario]);
   const prossimi = useMemo(() => prossimiInterventi(interventiCalendario), [interventiCalendario]);
+  const inRitardo = useMemo(() => interventiInRitardo(interventiCalendario), [interventiCalendario]);
 
   const conteggiFiltri = useMemo(() => {
     const base = { tipo: calTipo, meseCorrente };
@@ -290,6 +292,17 @@ export default function CalendarioLavori({ profile, session }) {
           </p>
         ) : (
           <>
+            {inRitardo.length ? (
+              <InterventoSection
+                title="Interventi in sospeso / in ritardo"
+                hint="Date passate: completa o aggiorna il piano. Il Radar tiene conto di questi lavori."
+                items={inRitardo}
+                superficieMq={superficieMq}
+                onToggle={toggleIntervento}
+                onPin={togglePinIntervento}
+              />
+            ) : null}
+
             {groups.daFoto.length && calTipo === "tutti" ? (
               <InterventoSection
                 title="Urgenti dall'analisi foto"

@@ -237,11 +237,12 @@
   gap: 0.38em;
   margin: 0;
   padding: 0.1em 0;
-  font-size: clamp(1.15rem, 3.6vw, 1.65rem);
-  font-weight: 500;
-  font-style: normal;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-family: "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: clamp(1.2rem, 3.8vw, 1.75rem);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.12;
+  letter-spacing: 0.03em;
   color: #4a4a48;
   white-space: nowrap;
   overflow: hidden;
@@ -273,6 +274,7 @@
 .dash-header__tagline-word--accent {
   color: #2e7d32;
   font-weight: 600;
+  font-style: italic;
 }
 
 @media (prefers-reduced-motion: reduce) {
