@@ -14,8 +14,8 @@ export default function DashPageHeader({ active, onLogout, profile }) {
               src="/brand/solum-mark.png"
               alt="Solum"
               className="dash-header__logo"
-              width={512}
-              height={284}
+              width={1024}
+              height={568}
               decoding="async"
             />
           </Link>
