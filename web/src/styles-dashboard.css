@@ -192,8 +192,8 @@
 .dash-header__logo {
   display: block;
   width: auto;
-  height: clamp(4.5rem, 20vw, 7rem);
-  max-width: min(55vw, 18rem);
+  height: clamp(3.5rem, 16vw, 5.5rem);
+  max-width: min(62vw, 22rem);
   object-fit: contain;
   object-position: left center;
 }
@@ -239,8 +239,8 @@
   padding: 0.1em 0;
   font-family: "Cormorant Garamond", "Palatino Linotype", Palatino, Georgia, serif;
   font-size: clamp(1.2rem, 3.8vw, 1.75rem);
-  font-weight: 400;
-  font-style: italic;
+  font-weight: 500;
+  font-style: normal;
   line-height: 1.12;
   letter-spacing: 0.03em;
   color: #4a4a48;
@@ -274,7 +274,7 @@
 .dash-header__tagline-word--accent {
   color: #2e7d32;
   font-weight: 600;
-  font-style: italic;
+  font-style: normal;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -491,8 +491,8 @@
   }
 
   .dash-header__logo {
-    max-width: min(40vw, 11.5rem);
-    height: clamp(3.35rem, 22vw, 4.6rem);
+    max-width: min(48vw, 14rem);
+    height: clamp(2.75rem, 18vw, 4rem);
   }
 
   .dash-header__tagline {
@@ -523,8 +523,8 @@
   }
 
   .dash-header__logo {
-    max-width: min(36vw, 10rem);
-    height: clamp(3rem, 20vw, 4.1rem);
+    max-width: min(44vw, 12rem);
+    height: clamp(2.5rem, 16vw, 3.5rem);
   }
 
   .dash-header__tagline {

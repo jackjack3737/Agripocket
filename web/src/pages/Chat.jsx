@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashPageHeader from "../components/DashPageHeader";
-import { profileSummary } from "../data/onboardingSteps";
 import { analizzaPratoFoto } from "../lib/analizzaPrato";
 import { setInterventoCompletato } from "../lib/dashboard";
 import { fileToCompressedBase64 } from "../lib/photoCompress";
@@ -37,7 +36,6 @@ export default function Chat({ profile, session, onProfileUpdate }) {
   const [searchParams] = useSearchParams();
   const controlloId = searchParams.get("controllo");
   const userId = session?.user?.id;
-  const summary = profileSummary(profile);
   const inputRef = useRef(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -144,15 +142,7 @@ export default function Chat({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page chat chat--photo">
-      <DashPageHeader
-        active="chat"
-        kicker="Solum · vision AI"
-        title="Analisi"
-        titleAccent="foto"
-        techTitle
-        summary={summary}
-        onLogout={logout}
-      />
+      <DashPageHeader active="chat" profile={profile} onLogout={logout} />
 
       <section className="weather-setup">
         <form className="weather-setup__form" onSubmit={saveCity}>

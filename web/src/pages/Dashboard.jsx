@@ -122,7 +122,7 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <DashPageHeader active="dashboard" heroBrand profile={profile} onLogout={logout} />
+      <DashPageHeader active="dashboard" profile={profile} onLogout={logout} />
 
       <ConsulenteZonaFoto
         variant="google"

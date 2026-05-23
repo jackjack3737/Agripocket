@@ -6,7 +6,6 @@ import {
   InterventoSection,
   MeseAccordion,
 } from "../components/calendario/CalendarioInterventi";
-import { profileSummary } from "../data/onboardingSteps";
 import { abitudiniDaProfilo } from "../lib/abitudiniPrato.js";
 import {
   contaLavoriPianificatiFiltrati,
@@ -55,7 +54,6 @@ function AbitudiniPratoCard({ profile }) {
 
 export default function CalendarioLavori({ profile, session }) {
   const location = useLocation();
-  const summary = profileSummary(profile);
   const userId = session?.user?.id;
 
   const [interventi, setInterventi] = useState([]);
@@ -220,15 +218,7 @@ export default function CalendarioLavori({ profile, session }) {
 
   return (
     <div className="page dashboard dashboard--calendario">
-      <DashPageHeader
-        active="calendario"
-        kicker="Solum · planning"
-        title="Calendario"
-        titleAccent="lavori"
-        techTitle
-        summary={summary}
-        onLogout={logout}
-      />
+      <DashPageHeader active="calendario" profile={profile} onLogout={logout} />
 
       {banner ? (
         <p className="dash-banner">
