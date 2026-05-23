@@ -93,6 +93,7 @@ export default async function handler(req, res) {
 
     const risultato = await calcolaIrrigazioneGiornalieraAsync(profilo, weatherBundle, {
       admin,
+      geminiKey,
       geminiEmbed: embedFn,
       queryKnowledgeBasePrioritized: geminiKey ? queryKnowledgeBasePrioritized : null,
     });

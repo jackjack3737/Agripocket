@@ -52,7 +52,7 @@ function isFrazionamentoEsplicito(intervento) {
   return /frazionat|micro.?dos|seconda passata|ripasso|split|metà dose|meta dose/i.test(t);
 }
 
-function macroDaIntervento(intervento, prodottiById) {
+export function macroDaIntervento(intervento, prodottiById) {
   const det = intervento?.dettaglio_trattamento;
   const macroDet =
     typeof det === "object" && det?.macro_categoria

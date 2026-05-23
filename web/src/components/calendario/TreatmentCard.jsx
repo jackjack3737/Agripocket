@@ -68,6 +68,45 @@ function ProdottoMicroCard({ prodotto, index }) {
   );
 }
 
+function AdattamentoDinamicoBadge({ adattamento, sospeso }) {
+  if (sospeso) {
+    return (
+      <aside className="treatment-card__adattamento treatment-card__adattamento--stop" role="note">
+        <span aria-hidden>🛑</span>
+        <div>
+          <p className="treatment-card__adattamento-title">Sospeso</p>
+          <p className="treatment-card__adattamento-testo">
+            {adattamento?.motivo ||
+              "Sospeso: l'azoto o il concime rischierebbero di aggravare il problema fungino rilevato nell'ultima foto."}
+          </p>
+        </div>
+      </aside>
+    );
+  }
+  if (!adattamento?.tipo) return null;
+
+  const isMeteo = adattamento.tipo.includes("meteo");
+  return (
+    <aside
+      className={`treatment-card__adattamento${isMeteo ? " treatment-card__adattamento--meteo" : ""}`}
+      role="note"
+    >
+      <span aria-hidden>{isMeteo ? "⚠️" : "ℹ️"}</span>
+      <div>
+        <p className="treatment-card__adattamento-title">
+          {isMeteo ? "Modificato in base al meteo" : "Adattato dall'IA"}
+        </p>
+        <p className="treatment-card__adattamento-testo">
+          {adattamento.motivo}
+          {adattamento.data_originale && adattamento.data_originale !== adattamento.data_nuova
+            ? ` (data originale: ${adattamento.data_originale})`
+            : ""}
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 function MeteoCalcoloBadge({ contestoMeteo }) {
   const nota =
     contestoMeteo?.nota_utente ||
@@ -114,8 +153,12 @@ export function TreatmentCard({
   completing = false,
   done = false,
   showFitofarmacoAvviso = false,
+  sospeso = false,
 }) {
   if (!treatment?.tipo_intervento && !treatment?.spiegazione_semplice) return null;
+
+  const adattamento = treatment.adattamento_dinamico;
+  const isSospeso = sospeso || treatment.stato === "sospeso" || adattamento?.tipo === "sospeso_fungo";
 
   const prodotti = treatment.prodotti_consigliati ?? [];
   const n = prodotti.length;
@@ -126,7 +169,10 @@ export function TreatmentCard({
     (n > 1 ? NOTA_SCELTA_PRODOTTI : null);
 
   return (
-    <article className={`treatment-card${done ? " treatment-card--done" : ""}`}>
+    <article
+      className={`treatment-card${done ? " treatment-card--done" : ""}${isSospeso ? " treatment-card--sospeso" : ""}`}
+    >
+      <AdattamentoDinamicoBadge adattamento={adattamento} sospeso={isSospeso} />
       <section className="treatment-card__edu" aria-labelledby="treatment-edu-title">
         <div className="treatment-card__edu-icon-wrap">
           <IconLeaf />
@@ -162,7 +208,7 @@ export function TreatmentCard({
         </section>
       ) : null}
 
-      {onComplete && !done ? (
+      {onComplete && !done && !isSospeso ? (
         <button
           type="button"
           className="treatment-card__cta btn btn-primary"
@@ -187,6 +233,11 @@ export function treatmentFromIntervento(item) {
       det = null;
     }
   }
+  const adattamento =
+    det?.adattamento_dinamico ||
+    (typeof det === "object" && det?.adattamento_dinamico) ||
+    null;
+
   if (det?.tipo_intervento || det?.spiegazione_semplice) {
     return {
       tipo_intervento: det.tipo_intervento || item.titolo,
@@ -194,6 +245,8 @@ export function treatmentFromIntervento(item) {
       nota_scelta_prodotti: det.nota_scelta_prodotti ?? null,
       prodotti_consigliati: det.prodotti_consigliati ?? [],
       contesto_meteo: det.contesto_meteo ?? null,
+      adattamento_dinamico: adattamento,
+      stato: item.stato,
     };
   }
   if (item?.spiegazione_semplice || item?.messaggio_ux) {

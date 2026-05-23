@@ -90,6 +90,52 @@
   color: #2f4a5c;
 }
 
+.treatment-card--sospeso {
+  opacity: 0.92;
+}
+
+.treatment-card__adattamento {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0 0 0.65rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.treatment-card__adattamento--meteo {
+  background: #fff8e1;
+  border: 1px solid #ffcc80;
+}
+
+.treatment-card__adattamento--stop {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+}
+
+.treatment-card__adattamento-title {
+  margin: 0 0 0.15rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.treatment-card__adattamento--meteo .treatment-card__adattamento-title {
+  color: #e65100;
+}
+
+.treatment-card__adattamento--stop .treatment-card__adattamento-title {
+  color: #c62828;
+}
+
+.treatment-card__adattamento-testo {
+  margin: 0;
+  color: #37474f;
+}
+
 .treatment-card__spiegazione-blocchi {
   display: flex;
   flex-direction: column;

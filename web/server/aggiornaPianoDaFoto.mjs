@@ -16,6 +16,10 @@ import {
   rimuoviRoutineCalendario,
 } from "./sanitizzaCalendario.mjs";
 import { estraiPatologieConfermate, registraStoricoPatologie } from "./storicoPatologie.mjs";
+import {
+  applicaSospensioneAzotoPerFungo,
+  rilevaPatogenoFungino,
+} from "./pianoAdattivo.mjs";
 
 function oggiIso() {
   return new Date().toISOString().slice(0, 10);
@@ -204,23 +208,15 @@ export async function integraFotoNelPiano({
     }
   }
 
+  const prodottiById = new Map(prodotti.map((p) => [p.id, p]));
+  let sospensioneFungo = { sospesi: 0 };
+  if (rilevaPatogenoFungino(vision)) {
+    sospensioneFungo = await applicaSospensioneAzotoPerFungo(admin, userId, vision, prodottiById);
+    concimiRimossi = sospensioneFungo.sospesi;
+  }
+
   const emergenza = buildInterventiPatologiaEmergenza(vision, profilo, oggi);
   if (emergenza.aggiunti.length) {
-    const fine = addDaysIso(oggi, emergenza.finestraGiorni ?? 21);
-    const { data: concimiFuturi } = await admin
-      .from("prato_interventi")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("categoria", "concime")
-      .eq("stato", "pianificato")
-      .gt("data_prevista", oggi)
-      .lte("data_prevista", fine);
-
-    for (const row of concimiFuturi || []) {
-      const { error } = await admin.from("prato_interventi").delete().eq("id", row.id).eq("user_id", userId);
-      if (!error) concimiRimossi += 1;
-    }
-
     for (const raw of emergenza.aggiunti) {
       let item = await arricchisci(raw);
       item = bloccoTermicoEstivo([item])[0];
@@ -321,6 +317,7 @@ export async function integraFotoNelPiano({
     aggiornatiCalendario: aggiornati.length,
     annullatiCalendario: annullati,
     concimiRimossiPatologia: concimiRimossi,
+    azotoSospesoFungo: sospensioneFungo.sospesi,
     storicoPatologie,
     inseriti,
     aggiornati,

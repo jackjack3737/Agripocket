@@ -16,6 +16,8 @@ import {
 } from "./regoleFitofarmaci.mjs";
 import { buildFocolaiPromptBlock } from "./focolaiRegionali.mjs";
 import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
+import { recuperaParametriRag } from "./ragParametriAgronomici.mjs";
+import { pipelineAdattamentiPostPiano } from "./pianoAdattivo.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -113,7 +115,7 @@ function addDays(iso, n) {
   return d.toISOString().slice(0, 10);
 }
 
-export async function buildPianoInterventi(profilo, env, admin, { vision = null } = {}) {
+export async function buildPianoInterventi(profilo, env, admin, { vision = null, parametriRag = null } = {}) {
   const geminiKey = env.GEMINI_API_KEY?.trim();
   if (!geminiKey) throw new Error("Manca GEMINI_API_KEY");
 
@@ -148,6 +150,10 @@ export async function buildPianoInterventi(profilo, env, admin, { vision = null 
   ]
     .filter(Boolean)
     .join("\n");
+
+  const ragParams =
+    parametriRag ||
+    (await recuperaParametriRag("calendario", { admin, geminiKey, profilo }));
 
   const emb = await geminiEmbed(searchText.slice(0, 6000), geminiKey);
   const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
@@ -196,6 +202,15 @@ ${focolaiBlock}
 
 Knowledge base (priorità: manuali universitari > Calendario Verde Bottos > schede prodotto; i tag [N|libro] indicano la fonte):
 ${kb || "(usa best practice italiane per prato da giardino)"}
+
+Parametri RAG estratti (fonte: ${ragParams.fonte}): Kc mensili disponibili; rispetta finestre fisiologiche da manuali.
+
+## MATRICE N-P-K STAGIONALE OBBLIGATORIA (corsetto fisiologico)
+Distribuisci i macro-elementi su tutto l'anno — non concentrare tutto in una stagione:
+- **Primavera (mar–mag) e Autunno (set–ott):** concimazioni con **Azoto (N)** per spinta vegetativa, ripresa e densità (titoli tipo «Concimazione azotata primaverile/autunnale»).
+- **Estate (giu–lug) e Inverno (nov–dic):** **Potassio (K)** antistress / rinforzo (titoli tipo «Concimazione potassica antistress»). In giu–lug **VIETATO** concime azotato classico.
+- **Autunno (set–nov):** anche **Fosforo (P)** per radici e riserve pre-inverno.
+- Non programmare due interventi della stessa famiglia NPK (es. due potassici) a meno di 30 giorni di distanza salvo frazionamento esplicito in descrizione.
 
 Per le macro-azioni usa soprattutto i manuali universitari; Calendario Verde per stagionalità; le schede prodotto solo come riferimento commerciale Bottos (non elencare tutti i prodotti nel piano).
 
@@ -411,7 +426,16 @@ export async function generaPianoStagionale({ authHeader, env }) {
     _prodottiCatalogo: await loadProdotti(admin),
   };
 
-  const interventiGrezzi = await buildPianoInterventi(profiloPerPrompt, env, admin, { vision });
+  const parametriRag = await recuperaParametriRag("calendario", {
+    admin,
+    geminiKey: env.GEMINI_API_KEY?.trim(),
+    profilo,
+  });
+
+  const interventiGrezzi = await buildPianoInterventi(profiloPerPrompt, env, admin, {
+    vision,
+    parametriRag,
+  });
   const prodotti = profiloPerPrompt._prodottiCatalogo;
 
   let weatherBundle = null;
@@ -433,10 +457,25 @@ export async function generaPianoStagionale({ authHeader, env }) {
   const catalogoAggiunti = 0;
   const saved = await persistPianoStagionale(admin, userData.user.id, sanitizzati, profilo);
 
+  let adattamenti = null;
+  try {
+    adattamenti = await pipelineAdattamentiPostPiano({
+      admin,
+      userId: userData.user.id,
+      profilo,
+      weatherBundle,
+      vision,
+    });
+  } catch (e) {
+    console.warn("[piano] adattamenti dinamici:", e.message);
+  }
+
   return {
     count: saved.count,
     interventi: saved.interventi ?? [],
     tablesMissing: saved.tablesMissing,
     catalogoAggiunti,
+    adattamenti,
+    parametri_rag_fonte: parametriRag?.fonte,
   };
 }

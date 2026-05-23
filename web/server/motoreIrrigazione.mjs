@@ -4,6 +4,7 @@
 
 import { normalizzaInputIrrigazione } from "./irrigazioneInput.mjs";
 import { IRRIGATOR_MODES, normalizeIrrigatorModalita, normalizePratoZone } from "./pratoZone.mjs";
+import { kcPerData, recuperaParametriRag } from "./ragParametriAgronomici.mjs";
 
 const ORDINE_MODALITA = { statico: 0, rotator: 1, dinamico: 2 };
 
@@ -625,12 +626,24 @@ export async function kcDaKnowledgeBase(admin, geminiEmbed, queryKnowledgeBasePr
 
 export async function calcolaIrrigazioneGiornalieraAsync(profilo, weatherBundle, opts = {}) {
   let kc = kcStagionale();
-  if (opts.admin && opts.geminiEmbed && opts.queryKnowledgeBasePrioritized) {
-    kc = await kcDaKnowledgeBase(
-      opts.admin,
-      opts.geminiEmbed,
-      opts.queryKnowledgeBasePrioritized,
-    );
+  let parametriRag = null;
+
+  if (opts.admin && opts.geminiKey) {
+    parametriRag = await recuperaParametriRag("irrigazione", {
+      admin: opts.admin,
+      geminiKey: opts.geminiKey,
+      profilo,
+    });
+    kc = kcPerData(parametriRag);
+  } else if (opts.admin && opts.geminiEmbed && opts.queryKnowledgeBasePrioritized) {
+    kc = await kcDaKnowledgeBase(opts.admin, opts.geminiEmbed, opts.queryKnowledgeBasePrioritized);
   }
-  return calcolaIrrigazioneGiornaliera(profilo, weatherBundle, { ...opts, kc });
+
+  const out = calcolaIrrigazioneGiornaliera(profilo, weatherBundle, { ...opts, kc });
+  return {
+    ...out,
+    parametri_rag: parametriRag
+      ? { fonte: parametriRag.fonte, kc_applicato: kc, kc_mensile: parametriRag.kc_mensile }
+      : null,
+  };
 }

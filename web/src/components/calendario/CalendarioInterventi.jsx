@@ -52,6 +52,7 @@ function ImportanzaIndicatore({ priorita }) {
 
 export function InterventoRow({ item, onToggle, onPin, superficieMq }) {
   const done = item.stato === "completato";
+  const sospeso = item.stato === "sospeso";
   const fito = isInterventoFitofarmaco(item);
   const treatment = treatmentFromIntervento(item);
   const mostraTreatmentCard = !!treatment;
@@ -62,12 +63,13 @@ export function InterventoRow({ item, onToggle, onPin, superficieMq }) {
   const inRitardo = !!item.isRitardo;
   return (
     <li
-      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${item.manual_override ? " intervento-row--pinned" : ""}${controlloMensile ? " intervento-row--controllo" : ""}${inRitardo ? " intervento-row--ritardo" : ""}`}
+      className={`intervento-row intervento-row--${item.priorita}${done ? " intervento-row--done" : ""}${sospeso ? " intervento-row--sospeso" : ""}${item.manual_override ? " intervento-row--pinned" : ""}${controlloMensile ? " intervento-row--controllo" : ""}${inRitardo ? " intervento-row--ritardo" : ""}`}
     >
       <label className="intervento-row__check">
         <input
           type="checkbox"
           checked={done}
+          disabled={sospeso}
           onChange={(e) => onToggle(item.id, e.target.checked)}
         />
         <span className="intervento-row__box" aria-hidden />
@@ -101,8 +103,9 @@ export function InterventoRow({ item, onToggle, onPin, superficieMq }) {
             treatment={treatment}
             superficieMq={superficieMq}
             done={done}
+            sospeso={sospeso}
             showFitofarmacoAvviso={fito}
-            onComplete={!done && onToggle ? () => onToggle(item.id, true) : undefined}
+            onComplete={!done && !sospeso && onToggle ? () => onToggle(item.id, true) : undefined}
           />
         ) : (
           <>
