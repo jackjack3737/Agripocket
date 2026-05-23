@@ -511,8 +511,12 @@ export function calcolaProgrammaZoneCentralina(
     const modeLabel = IRRIGATOR_MODES[linea.modalita]?.label || linea.modalita;
     const nTeste = linea.teste.length;
 
-    const inOmbra = linea.teste.filter((t) => testeById[t.id]?.in_ombra).length;
-    const fracOmbra = nTeste > 0 ? inOmbra / nTeste : 0;
+    const fracOmbra =
+      nTeste > 0
+        ? linea.teste.reduce((s, t) => s + (testeById[t.id]?.peso_ombra ?? 0), 0) / nTeste
+        : 0;
+    const inOmbra = linea.teste.filter((t) => (testeById[t.id]?.peso_ombra ?? 0) >= 0.99).length;
+    const inMezzombra = linea.teste.filter((t) => testeById[t.id]?.in_mezzombra).length;
     const modLinea = modificatoreMmLinea(fracOmbra);
     const mmLinea = Math.round(mm * modLinea * 10) / 10;
 
@@ -581,8 +585,10 @@ export function calcolaProgrammaZoneCentralina(
           ? "Tipi diversi sulla stessa uscita: minuti calcolati sul tipo più frequente in mappa."
           : null,
         inOmbra > 0
-          ? `${inOmbra}/${nTeste} teste in zona ombra: mm ridotti rispetto al sole.`
-          : null,
+          ? `${inOmbra}/${nTeste} teste in piena ombra: mm ridotti.`
+          : inMezzombra > 0
+            ? `${inMezzombra}/${nTeste} teste in mezz'ombra: mm leggermente ridotti.`
+            : null,
         vicinoPendenza ? "Vicino a pendenza in mappa: cicli brevi con pausa consigliati." : null,
       ]
         .filter(Boolean)

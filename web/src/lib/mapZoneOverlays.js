@@ -1,4 +1,4 @@
-import { IRRIGATOR_MODES, ZONE_TYPES } from "./pratoZone";
+import { ESPOSIZIONE_LIVELLI, IRRIGATOR_MODES, ZONE_TYPES } from "./pratoZone";
 
 /**
  * @param {google.maps.Map} map
@@ -40,14 +40,26 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
         },
       });
       refs.markers.push(m);
-    } else if (z.tipo === "ombra" || z.tipo === "muschio") {
+    } else if (z.tipo === "esposizione") {
+      const exp = ESPOSIZIONE_LIVELLI[z.livello] || ESPOSIZIONE_LIVELLI.mezzombra;
+      const poly = new window.google.maps.Polygon({
+        paths: z.path,
+        map,
+        strokeColor: exp.color,
+        strokeWeight: 2,
+        fillColor: exp.fill,
+        fillOpacity: z.livello === "sole" ? 0.22 : z.livello === "ombra" ? 0.4 : 0.32,
+        clickable: false,
+      });
+      refs.polygons.push(poly);
+    } else if (z.tipo === "muschio") {
       const poly = new window.google.maps.Polygon({
         paths: z.path,
         map,
         strokeColor: style.color,
         strokeWeight: 2,
         fillColor: style.fill,
-        fillOpacity: z.tipo === "ombra" ? 0.35 : 0.45,
+        fillOpacity: 0.45,
         clickable: false,
       });
       refs.polygons.push(poly);
@@ -76,8 +88,9 @@ export function renderZoneOverlays(map, refs, zones, draft = null) {
   }
 
   if (draft?.path?.length) {
-    const tipo = draft.tipo || "ombra";
-    const style = ZONE_TYPES[tipo];
+    const tipo = draft.tipo || "esposizione";
+    const exp = draft.livello ? ESPOSIZIONE_LIVELLI[draft.livello] : null;
+    const style = exp || ZONE_TYPES[tipo] || ZONE_TYPES.esposizione;
     const poly = new window.google.maps.Polygon({
       paths: draft.path,
       map,

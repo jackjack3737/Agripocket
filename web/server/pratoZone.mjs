@@ -2,10 +2,40 @@ import { calculatePolygonAreaSqm } from "./polygonArea.mjs";
 
 export const ZONE_TYPES = {
   irrigatore: { label: "Irrigatore", color: "#1565c0", fill: "#1565c0" },
-  ombra: { label: "Ombra", color: "#455a64", fill: "#455a64" },
+  esposizione: { label: "Esposizione", color: "#f9a825", fill: "#ffee58" },
   muschio: { label: "Muschio", color: "#6d4c41", fill: "#6d4c41" },
   pendenza: { label: "Pendenza", color: "#ef6c00", fill: "#ef6c00" },
 };
+
+export const ESPOSIZIONE_LIVELLI = {
+  sole: { label: "Sole", short: "S", color: "#f9a825", fill: "#fff59d", peso_ombra: 0 },
+  mezzombra: { label: "Mezz'ombra", short: "M", color: "#607d8b", fill: "#b0bec5", peso_ombra: 0.5 },
+  ombra: { label: "Ombra", short: "O", color: "#455a64", fill: "#455a64", peso_ombra: 1 },
+};
+
+export function normalizeEsposizioneLivello(raw) {
+  const v = String(raw || "mezzombra").toLowerCase();
+  if (v === "ombra" || v === "full") return "ombra";
+  if (v === "sole" || v === "pieno" || v === "sun") return "sole";
+  if (v === "mezzombra" || v === "mezzo" || v === "half") return "mezzombra";
+  return "mezzombra";
+}
+
+export function pesoOmbraLivello(livello) {
+  return ESPOSIZIONE_LIVELLI[normalizeEsposizioneLivello(livello)]?.peso_ombra ?? 0;
+}
+
+export function zoneEsposizioneEntries(zoneList) {
+  const out = [];
+  for (const z of zoneList || []) {
+    if (z.tipo === "esposizione") {
+      out.push({ id: z.id, path: z.path, livello: normalizeEsposizioneLivello(z.livello) });
+    } else if (z.tipo === "ombra") {
+      out.push({ id: z.id, path: z.path, livello: "ombra" });
+    }
+  }
+  return out;
+}
 
 export const IRRIGATOR_MODES = {
   statico: { label: "Statico", short: "S", desc: "Getti fissi / pop-up" },
@@ -45,7 +75,9 @@ export function normalizePratoZone(raw) {
 }
 
 function normalizeZone(z) {
-  if (!z?.tipo || !ZONE_TYPES[z.tipo]) return null;
+  if (!z?.tipo) return null;
+  if (z.tipo === "ombra") z = { ...z, tipo: "esposizione", livello: "ombra" };
+  if (!ZONE_TYPES[z.tipo]) return null;
   const id = z.id || uid();
   if (z.tipo === "irrigatore") {
     const lat = Number(z.lat);
@@ -55,12 +87,19 @@ function normalizeZone(z) {
     const linea = normalizeLineaCentralina(z.linea) ?? 1;
     return { id, tipo: "irrigatore", lat, lng, modalita, linea };
   }
-  if (z.tipo === "ombra" || z.tipo === "muschio") {
+  if (z.tipo === "esposizione") {
     const path = (z.path || [])
       .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
     if (path.length < 3) return null;
-    return { id, tipo: z.tipo, path };
+    return { id, tipo: "esposizione", livello: normalizeEsposizioneLivello(z.livello), path };
+  }
+  if (z.tipo === "muschio") {
+    const path = (z.path || [])
+      .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+    if (path.length < 3) return null;
+    return { id, tipo: "muschio", path };
   }
   if (z.tipo === "pendenza") {
     const from = z.from;
@@ -92,7 +131,13 @@ export function buildPratoZonePayload(poligono, zone) {
 export function mergePratoZoneUpdate(existing, { poligono, zones, replaceTypes = [] }) {
   const base = normalizePratoZone(existing);
   const types = new Set(replaceTypes);
-  let merged = types.size ? base.zone.filter((z) => !types.has(z.tipo)) : [...base.zone];
+  let merged = types.size
+    ? base.zone.filter((z) => {
+        if (types.has(z.tipo)) return false;
+        if (types.has("esposizione") && z.tipo === "ombra") return false;
+        return true;
+      })
+    : [...base.zone];
   if (zones?.length) merged = [...merged, ...zones.map((z) => ({ ...z }))];
   return {
     version: 1,
@@ -104,17 +149,20 @@ export function mergePratoZoneUpdate(existing, { poligono, zones, replaceTypes =
   };
 }
 
-/** Stima % ombra sul prato (somma aree zone ombra / area prato, cap 100). */
-export function computeOmbraZonePct(pratoZone) {
+export function computeEsposizioneWeightedPct(pratoZone) {
   const { poligono, zone } = normalizePratoZone(pratoZone);
   const lawnMq = calculatePolygonAreaSqm(poligono);
-  if (lawnMq <= 0) return null;
-  let ombraMq = 0;
-  for (const z of zone) {
-    if (z.tipo === "ombra") ombraMq += calculatePolygonAreaSqm(z.path);
+  if (lawnMq <= 0) return 0;
+  let weighted = 0;
+  for (const e of zoneEsposizioneEntries(zone)) {
+    weighted += calculatePolygonAreaSqm(e.path) * pesoOmbraLivello(e.livello);
   }
-  if (ombraMq <= 0) return null;
-  const pct = Math.min(100, Math.round((ombraMq / lawnMq) * 100));
+  return Math.min(100, Math.round((weighted / lawnMq) * 100));
+}
+
+export function computeOmbraZonePct(pratoZone) {
+  const pct = computeEsposizioneWeightedPct(pratoZone);
+  if (pct <= 0) return null;
   if (pct <= 12) return "0_25";
   if (pct <= 37) return "25_50";
   if (pct <= 62) return "50_75";
@@ -128,16 +176,16 @@ export function computeOmbraZoneAreas(pratoZone) {
 
   const zones = [];
   let totalMq = 0;
-  let idx = 0;
-  for (const z of zone) {
-    if (z.tipo !== "ombra") continue;
-    const mq = calculatePolygonAreaSqm(z.path);
+  for (const e of zoneEsposizioneEntries(zone)) {
+    if (e.livello === "sole") continue;
+    const mq = calculatePolygonAreaSqm(e.path);
     if (mq < 0.5) continue;
-    idx += 1;
+    const info = ESPOSIZIONE_LIVELLI[e.livello];
     totalMq += mq;
     zones.push({
-      id: z.id,
-      label: `Zona ombra ${idx}`,
+      id: e.id,
+      label: info?.label || e.livello,
+      livello: e.livello,
       mq: Math.round(mq * 10) / 10,
       pctOfLawn: Math.round((mq / lawnMq) * 100),
     });
@@ -148,13 +196,13 @@ export function computeOmbraZoneAreas(pratoZone) {
     lawnMq: Math.round(lawnMq * 10) / 10,
     totalMq: Math.round(totalMq * 10) / 10,
     pctTotal: Math.min(100, Math.round((totalMq / lawnMq) * 100)),
+    pctOmbraPesata: computeEsposizioneWeightedPct(pratoZone),
     zones,
   };
 }
 
-/** % ombra numerica (0–100) sul prato da poligoni disegnati. */
 export function computeOmbraZonePctNumeric(pratoZone) {
-  return computeOmbraZoneAreas(pratoZone)?.pctTotal ?? 0;
+  return computeEsposizioneWeightedPct(pratoZone);
 }
 
 const PENDENZA_VICINANZA_M = 12;
@@ -206,6 +254,13 @@ function distanzaPuntoSegmentoM(lat, lng, latA, lngA, latB, lngB) {
   return haversineM(lat, lng, qy / mPerDegLat, qx / mPerDegLng);
 }
 
+export function livelloEsposizioneAtPoint(lat, lng, zoneList) {
+  for (const e of zoneEsposizioneEntries(zoneList)) {
+    if (pointInPolygon(lat, lng, e.path)) return e.livello;
+  }
+  return null;
+}
+
 function pendenzaDaNumeroFrecce(n) {
   if (n >= 3) return "forte";
   if (n >= 2) return "media";
@@ -216,15 +271,16 @@ function pendenzaDaNumeroFrecce(n) {
 /** Contesto irrigazione da zone disegnate (ombra, pendenza, posizione teste). */
 export function analizzaContestoIrrigazioneMappa(pratoZone) {
   const { zone } = normalizePratoZone(pratoZone);
-  const ombraPolys = zone.filter((z) => z.tipo === "ombra");
+  const esposizione = zoneEsposizioneEntries(zone);
   const pendenzaSegs = zone.filter((z) => z.tipo === "pendenza");
   const heads = zone.filter((z) => z.tipo === "irrigatore");
 
   const areas = computeOmbraZoneAreas(pratoZone);
-  const pct_ombra_prato = areas?.pctTotal ?? 0;
+  const pct_ombra_prato = computeEsposizioneWeightedPct(pratoZone);
 
   const teste = heads.map((h) => {
-    const in_ombra = ombraPolys.some((poly) => pointInPolygon(h.lat, h.lng, poly.path));
+    const livello = livelloEsposizioneAtPoint(h.lat, h.lng, zone);
+    const peso_ombra = livello != null ? pesoOmbraLivello(livello) : 0;
     const vicino_pendenza = pendenzaSegs.some(
       (seg) =>
         distanzaPuntoSegmentoM(h.lat, h.lng, seg.from.lat, seg.from.lng, seg.to.lat, seg.to.lng) <=
@@ -234,7 +290,10 @@ export function analizzaContestoIrrigazioneMappa(pratoZone) {
       id: h.id,
       linea: h.linea ?? 1,
       modalita: h.modalita,
-      in_ombra,
+      livello_esposizione: livello,
+      peso_ombra,
+      in_ombra: livello === "ombra",
+      in_mezzombra: livello === "mezzombra",
       vicino_pendenza,
     };
   });
@@ -244,13 +303,19 @@ export function analizzaContestoIrrigazioneMappa(pratoZone) {
   return {
     pct_ombra_prato,
     ombra_zone: areas?.zones ?? [],
+    esposizione_zone: esposizione.map((e) => ({
+      id: e.id,
+      livello: e.livello,
+      label: ESPOSIZIONE_LIVELLI[e.livello]?.label,
+    })),
     num_pendenza,
     pendenza_da_mappa: pendenzaDaNumeroFrecce(num_pendenza),
     teste,
     teste_by_id: Object.fromEntries(teste.map((t) => [t.id, t])),
     num_teste_in_ombra: teste.filter((t) => t.in_ombra).length,
+    num_teste_in_mezzombra: teste.filter((t) => t.in_mezzombra).length,
     num_teste_vicino_pendenza: teste.filter((t) => t.vicino_pendenza).length,
-    ha_zone_ombra: ombraPolys.length > 0,
+    ha_zone_ombra: esposizione.length > 0,
     ha_pendenza_mappa: num_pendenza > 0,
   };
 }
@@ -386,9 +451,25 @@ export function ensureOmbraOverseedInterventi(interventi, pratoZone, profilo, og
 
 export function countZonesByType(pratoZone) {
   const { zone } = normalizePratoZone(pratoZone);
-  const out = { irrigatore: 0, ombra: 0, muschio: 0, pendenza: 0, statico: 0, rotator: 0, dinamico: 0 };
+  const out = {
+    irrigatore: 0,
+    esposizione: 0,
+    esposizione_sole: 0,
+    esposizione_mezzombra: 0,
+    esposizione_ombra: 0,
+    muschio: 0,
+    pendenza: 0,
+    statico: 0,
+    rotator: 0,
+    dinamico: 0,
+  };
   for (const z of zone) {
-    if (out[z.tipo] != null) out[z.tipo] += 1;
+    if (z.tipo === "esposizione") {
+      out.esposizione += 1;
+      if (z.livello === "sole") out.esposizione_sole += 1;
+      else if (z.livello === "ombra") out.esposizione_ombra += 1;
+      else out.esposizione_mezzombra += 1;
+    } else if (out[z.tipo] != null) out[z.tipo] += 1;
     if (z.tipo === "irrigatore") {
       if (z.modalita === "rotator") out.rotator += 1;
       else if (z.modalita === "dinamico") out.dinamico += 1;
@@ -470,8 +551,10 @@ export function suggestIrrigation({ pratoZone, superficie_mq, irrigazione, month
   if (estate && superficie_mq && superficie_mq > 200 && nStatic >= 3) {
     suggerimenti.push("Superficie ampia: considera irrigazione a zone alternate (metà teste per giorno).");
   }
-  if (zone.some((z) => z.tipo === "ombra")) {
-    suggerimenti.push("Zone in ombra segnate: riduci del 30–40% i minuti sui getti che le bagnano.");
+  if (counts.esposizione) {
+    suggerimenti.push(
+      `Esposizione in mappa: ${counts.esposizione_sole} sole, ${counts.esposizione_mezzombra} mezz'ombra, ${counts.esposizione_ombra} ombra.`,
+    );
   }
 
   const programmaSintesi =
@@ -505,12 +588,13 @@ export function formatZonesForPrompt(pratoZone) {
       `Irrigatori: ${counts.statico} statici, ${counts.rotator} rotator, ${counts.dinamico} oscillanti; centralina: ${uscite.join("; ")}.`,
     );
   }
-  if (counts.ombra) {
+  if (counts.esposizione) {
     const areas = computeOmbraZoneAreas(pratoZone);
+    const pesata = computeEsposizioneWeightedPct(pratoZone);
     lines.push(
       areas
-        ? `Zone ombra: ${counts.ombra} poligoni, ${areas.totalMq} m² (${areas.pctTotal}% prato).`
-        : `Zone ombra disegnate: ${counts.ombra}.`,
+        ? `Esposizione: ${counts.esposizione} aree (sole ${counts.esposizione_sole}, mezz'ombra ${counts.esposizione_mezzombra}, ombra ${counts.esposizione_ombra}); ombra pesata ~${pesata}%.`
+        : `Esposizione: ${counts.esposizione} aree disegnate.`,
     );
   }
   if (counts.muschio) lines.push(`Zone muschio/problema: ${counts.muschio}.`);

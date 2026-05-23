@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import LawnMapModal from "./LawnMapModal";
-import IrrigationZoneCard from "./IrrigationZoneCard";
 import OmbraSeedCard from "./OmbraSeedCard";
 import { countZonesByType, normalizePratoZone, ZONE_TYPES } from "../lib/pratoZone";
 import { updatePratoZoneMappa } from "../lib/supabase";
@@ -10,7 +9,7 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 const ZONE_BUTTONS = [
   { tool: "irrigatore", label: "Irrigatori", desc: "Statico, rotator o oscillante" },
-  { tool: "ombra", label: "Ombra", desc: "Siepi, alberi, zone poco sole" },
+  { tool: "esposizione", label: "Sole / ombra", desc: "Disegna un'area e indica sole, mezz'ombra o ombra" },
   { tool: "muschio", label: "Muschio", desc: "Zone con muschio o problemi" },
   { tool: "pendenza", label: "Pendenza", desc: "Direzione in cui scende l'acqua" },
 ];
@@ -94,7 +93,6 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       {saving ? <p className="dash-card__loading">Salvataggio mappa…</p> : null}
 
       <OmbraSeedCard profile={profile} />
-      <IrrigationZoneCard profile={profile} />
 
       <LawnMapModal
         key={activeTool || "zone-map"}

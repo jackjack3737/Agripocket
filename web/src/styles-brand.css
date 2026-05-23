@@ -1,0 +1,27 @@
+:root {
+  --font-brand: "Instrument Serif", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.solum-wordmark {
+  display: block;
+  width: auto;
+  height: clamp(4.5rem, 20vw, 7rem);
+  max-width: min(55vw, 18rem);
+  overflow: visible;
+}
+
+.solum-wordmark__text {
+  font-family: var(--font-brand);
+  font-size: 46px;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  fill: #2f6844;
+}
+
+.dash-header__tagline {
+  font-family: var(--font-brand);
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}

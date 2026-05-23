@@ -5,9 +5,11 @@ import { formatMqInput } from "../lib/parseMq";
 import { calculatePolygonAreaSqm } from "../lib/polygonArea";
 import {
   computeOmbraZonePct,
+  ESPOSIZIONE_LIVELLI,
   IRRIGATOR_MODES,
   LINEA_CENTRALINA_MAX,
   mergePratoZoneUpdate,
+  normalizeEsposizioneLivello,
   normalizePratoZone,
   ZONE_TYPES,
 } from "../lib/pratoZone";
@@ -128,9 +130,10 @@ export default function LawnMapModal({
   const [vertices, setVertices] = useState([]);
   const [zones, setZones] = useState([]);
   const [draftPath, setDraftPath] = useState([]);
-  const [draftTipo, setDraftTipo] = useState("ombra");
+  const [draftTipo, setDraftTipo] = useState("esposizione");
   const [pendenzaFrom, setPendenzaFrom] = useState(null);
   const [irrigatorPick, setIrrigatorPick] = useState(null);
+  const [esposizionePick, setEsposizionePick] = useState(null);
   const [pickLinea, setPickLinea] = useState(1);
   const [lastLinea, setLastLinea] = useState(1);
   const [loadError, setLoadError] = useState(null);
@@ -274,6 +277,7 @@ export default function LawnMapModal({
     setDraftPath([]);
     setPendenzaFrom(null);
     setIrrigatorPick(null);
+    setEsposizionePick(null);
   }
 
   function addZone(zone) {
@@ -295,7 +299,7 @@ export default function LawnMapModal({
         setIrrigatorPick({ lat, lng });
         return;
       }
-      if (tool === "ombra" || tool === "muschio") {
+      if (tool === "esposizione" || tool === "muschio") {
         setDraftTipo(tool);
         setDraftPath((prev) => [...prev, { lat, lng }]);
         return;
@@ -355,11 +359,35 @@ export default function LawnMapModal({
 
   function closeDraftPolygon() {
     if (draftPath.length < 3) return;
+    if (draftTipo === "esposizione") {
+      setEsposizionePick({ path: [...draftPath] });
+      setDraftPath([]);
+      return;
+    }
     addZone({
       id: `z_${Date.now()}`,
       tipo: draftTipo,
       path: [...draftPath],
     });
+    setDraftPath([]);
+  }
+
+  function confirmEsposizione(livello) {
+    if (!esposizionePick?.path?.length) return;
+    addZone({
+      id: `z_${Date.now()}`,
+      tipo: "esposizione",
+      livello: normalizeEsposizioneLivello(livello),
+      path: esposizionePick.path,
+    });
+    setEsposizionePick(null);
+  }
+
+  function updateEsposizioneLivello(zoneId, livello) {
+    const L = normalizeEsposizioneLivello(livello);
+    setZones((prev) =>
+      prev.map((z) => (z.id === zoneId && z.tipo === "esposizione" ? { ...z, livello: L } : z)),
+    );
   }
 
   useEffect(() => {
@@ -496,11 +524,13 @@ export default function LawnMapModal({
     if (!map) return;
 
     const draft =
-      draftPath.length > 0
-        ? { path: draftPath, tipo: draftTipo }
-        : pendenzaFrom
-          ? { from: pendenzaFrom, to: null }
-          : null;
+      esposizionePick?.path?.length
+        ? { path: esposizionePick.path, tipo: "esposizione", livello: "mezzombra" }
+        : draftPath.length > 0
+          ? { path: draftPath, tipo: draftTipo }
+          : pendenzaFrom
+            ? { from: pendenzaFrom, to: null }
+            : null;
 
     if (inZones) {
       renderZoneOverlays(map, zoneOverlayRefs.current, zonesOnMap, draft);
@@ -510,7 +540,7 @@ export default function LawnMapModal({
       zoneOverlayRefs.current.polylines.forEach((l) => l.setMap(null));
       zoneOverlayRefs.current = { markers: [], polygons: [], polylines: [] };
     }
-  }, [zonesOnMap, draftPath, draftTipo, pendenzaFrom, open, mapTick, mapReady, inZones]);
+  }, [zonesOnMap, draftPath, draftTipo, pendenzaFrom, esposizionePick, open, mapTick, mapReady, inZones]);
 
   useEffect(() => {
     if (!open || !mapRef.current || !mapTick) return undefined;
@@ -550,10 +580,12 @@ export default function LawnMapModal({
     let prato_zone;
 
     if (isZoneEdit) {
+      const replaceTypes =
+        zoneToolProp === "esposizione" ? ["esposizione", "ombra"] : [zoneToolProp];
       prato_zone = mergePratoZoneUpdate(initialPratoZone, {
         poligono: vertices,
         zones,
-        replaceTypes: [zoneToolProp],
+        replaceTypes,
       });
     } else {
       prato_zone = mergePratoZoneUpdate(initialPratoZone, { poligono: vertices });
@@ -623,7 +655,9 @@ export default function LawnMapModal({
               ? "Tocca la mappa per ogni irrigatore, poi scegli il tipo (statico, rotator o oscillante)."
               : zoneToolProp === "pendenza"
                 ? "Due tap: inizio e fine della freccia (verso dove scende l'acqua)."
-                : "Tocca i vertici dell'area, poi «Chiudi area»."}{" "}
+                : zoneToolProp === "esposizione"
+                  ? "Disegna un'area (vertici), chiudi il poligono, poi indica se è sole, mezz'ombra o ombra."
+                  : "Tocca i vertici dell'area, poi «Chiudi area»."}{" "}
             <strong>Solo {ZONE_TYPES[zoneToolProp]?.label?.toLowerCase()}</strong> su questa mappa (gli altri
             li segni con i pulsanti separati in Dashboard). Rotella/pinch per zoom, trascina per spostare.
           </p>
@@ -712,7 +746,7 @@ export default function LawnMapModal({
         ) : inZones ? (
           <div className="map-zone-toolbar">
             {!isZoneEdit ? (
-              ["pan", "irrigatore", "ombra", "muschio", "pendenza"].map((tool) => (
+              ["pan", "irrigatore", "esposizione", "muschio", "pendenza"].map((tool) => (
                 <button
                   key={tool}
                   type="button"
@@ -761,19 +795,27 @@ export default function LawnMapModal({
                 Annulla disegno
               </button>
             )}
-            {draftPath.length >= 3 && (
+            {draftPath.length >= 3 && !esposizionePick && (
               <button type="button" className="btn-outline-sm map-zone-tool-confirm" onClick={closeDraftPolygon}>
-                Chiudi area {ZONE_TYPES[draftTipo]?.label}
+                {draftTipo === "esposizione" ? "Chiudi area e scegli esposizione" : `Chiudi area ${ZONE_TYPES[draftTipo]?.label}`}
               </button>
             )}
           </div>
         ) : null}
 
-        {zones.length > 0 && inZones && isZoneEdit && !irrigatorPick && (
+        {zones.length > 0 && inZones && isZoneEdit && !irrigatorPick && !esposizionePick && (
           <ul className="map-zone-list">
             {zones.map((z) => (
               <li key={z.id} className="map-zone-list__row">
-                <span className="map-zone-list__dot" style={{ background: ZONE_TYPES[z.tipo]?.color }} />
+                <span
+                  className="map-zone-list__dot"
+                  style={{
+                    background:
+                      z.tipo === "esposizione"
+                        ? ESPOSIZIONE_LIVELLI[z.livello]?.color
+                        : ZONE_TYPES[z.tipo]?.color,
+                  }}
+                />
                 {z.tipo === "irrigatore" ? (
                   <>
                     <span className="map-zone-list__label">
@@ -788,6 +830,25 @@ export default function LawnMapModal({
                         {Array.from({ length: LINEA_CENTRALINA_MAX }, (_, i) => i + 1).map((n) => (
                           <option key={n} value={n}>
                             {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : z.tipo === "esposizione" ? (
+                  <>
+                    <span className="map-zone-list__label">
+                      {ESPOSIZIONE_LIVELLI[z.livello]?.label || z.livello}
+                    </span>
+                    <label className="map-zone-list__linea">
+                      <select
+                        value={z.livello ?? "mezzombra"}
+                        onChange={(e) => updateEsposizioneLivello(z.id, e.target.value)}
+                        aria-label="Livello esposizione"
+                      >
+                        {Object.entries(ESPOSIZIONE_LIVELLI).map(([k, info]) => (
+                          <option key={k} value={k}>
+                            {info.label}
                           </option>
                         ))}
                       </select>
@@ -842,6 +903,38 @@ export default function LawnMapModal({
                   <span className="map-irrigator-pick__sub">{IRRIGATOR_MODES.dinamico.desc}</span>
                 </button>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIrrigatorPick(null)}>
+                  Annulla
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {esposizionePick ? (
+            <div className="map-irrigator-pick map-irrigator-pick--sheet" role="dialog" aria-label="Esposizione area">
+              <p className="map-irrigator-pick__heading">Che esposizione ha quest&apos;area?</p>
+              <p className="map-irrigator-pick__hint">
+                Puoi disegnare più aree: una sotto l&apos;albero (ombra), una al sole, ecc.
+              </p>
+              <div className="map-irrigator-pick__actions">
+                {(["sole", "mezzombra", "ombra"]).map((liv) => {
+                  const info = ESPOSIZIONE_LIVELLI[liv];
+                  return (
+                    <button
+                      key={liv}
+                      type="button"
+                      className={`btn btn-sm${liv === "mezzombra" ? " btn-primary" : " btn-outline"}`}
+                      onClick={() => confirmEsposizione(liv)}
+                    >
+                      <span
+                        className="map-esposizione-swatch"
+                        style={{ background: info.fill, borderColor: info.color }}
+                        aria-hidden
+                      />
+                      {info.label}
+                    </button>
+                  );
+                })}
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEsposizionePick(null)}>
                   Annulla
                 </button>
               </div>

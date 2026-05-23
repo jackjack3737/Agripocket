@@ -6,7 +6,7 @@
   --accent: #1a3d2e;
   --border: #e4e2dc;
   --radius: 2px;
-  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-display: "Instrument Serif", Georgia, serif;
   font-family: "Inter", system-ui, sans-serif;
   font-size: 15px;
   font-weight: 400;
@@ -111,7 +111,7 @@ body {
 }
 
 h1 {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-display);
   font-weight: 500;
   font-size: 2rem;
   line-height: 1.15;

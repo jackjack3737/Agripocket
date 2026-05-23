@@ -1,9 +1,11 @@
 /** Frasi brevi (2–3 parole) per il rotatore impostazioni in header. */
 
+import { countZonesByType, normalizePratoZone } from "./pratoZone.js";
+
 const FALLBACK = [
   "Taglio · settimanale",
   "Irrigazione · manuale",
-  "Esposizione · sole",
+  "Terreno · medio",
 ];
 
 const TAGLIO = {
@@ -74,7 +76,12 @@ export function frasiImpostazioniRotanti(profile) {
   push(frasi, "Taglio", TAGLIO[profile.frequenza_taglio]);
   push(frasi, "Altezza", ALTEZZA[profile.altezza_taglio_cm]);
   push(frasi, "Irrigazione", IRRIGAZIONE[profile.irrigazione]);
-  push(frasi, "Esposizione", ESPOSIZIONE[profile.esposizione]);
+  const zoneCounts = countZonesByType(normalizePratoZone(profile.prato_zone));
+  if (zoneCounts.esposizione > 0) {
+    push(frasi, "Esposizione", "in mappa");
+  } else {
+    push(frasi, "Esposizione", ESPOSIZIONE[profile.esposizione]);
+  }
   push(frasi, "Terreno", TERRENO[profile.tipo_terreno]);
   push(frasi, "Età prato", ETA[profile.eta_prato]);
   push(frasi, "Obiettivo", OBIETTIVO[profile.obiettivo]);

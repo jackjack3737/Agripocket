@@ -48,39 +48,6 @@ export const ONBOARDING_STEPS = [
     ],
   },
   {
-    id: "esposizione",
-    field: "esposizione",
-    backgroundImage: IMG("opt-esp-sole.png"),
-    title: "Quanto sole ha il prato?",
-    intro: "Il sole decide molto su quali malattie compaiono e quanto va irrigato.",
-    whatToDo:
-      "Immagina un giorno di luglio tra le 10 e le 16: quante ore il prato resta al sole diretto, senza ombra di alberi o muri?",
-    hint: "Se hai zone diverse (metà sole, metà ombra), scegli quella che copre più superficie.",
-    options: [
-      {
-        value: "sole_pieno",
-        label: "Sole per quasi tutto il giorno",
-        desc: "Più di 6 ore di sole diretto",
-        help: "Prato esposto a sud, poca ombra da alberi alti.",
-        image: IMG("opt-esp-sole.png"),
-      },
-      {
-        value: "mezzombra",
-        label: "Metà giornata",
-        desc: "Circa 3–6 ore, o sole solo al mattino",
-        help: "Ombra di casa, siepe o alberi per parte del giorno.",
-        image: IMG("opt-esp-mezzombra.png"),
-      },
-      {
-        value: "ombra",
-        label: "Poca luce",
-        desc: "Meno di 3 ore di sole diretto",
-        help: "Sotto alberi fitti, tra case strette, lato nord.",
-        image: IMG("opt-esp-ombra.png"),
-      },
-    ],
-  },
-  {
     id: "tipo_terreno",
     field: "tipo_terreno",
     backgroundImage: IMG("opt-ter-medio.png"),
@@ -435,17 +402,6 @@ export const ADVANCED_FIELDS = {
       { value: "non_so", label: "Non lo so" },
     ],
   },
-  ombra_zone_pct: {
-    label: "Quanta superficie è spesso in ombra?",
-    hint: "Alberi, muri, siepi — stima sulla superficie totale del prato.",
-    options: [
-      { value: "0_25", label: "0–25%" },
-      { value: "25_50", label: "25–50%" },
-      { value: "50_75", label: "50–75%" },
-      { value: "75_100", label: "Oltre 75%" },
-      { value: "non_so", label: "Non lo so" },
-    ],
-  },
   ph_terreno: {
     label: "pH del terreno (se lo conosci)",
     options: [
@@ -467,10 +423,10 @@ export const EXTRA_STEP = {
   localitaHint: "Città o CAP — es. Bologna, 40100",
   mqHint: "Obbligatorio — es. 120 oppure 125,5 m² (virgola per i decimali)",
   mqMapHint:
-    "Apri mappa: indirizzo e contorno del prato. Irrigatori, ombra e pendenza si segnano dopo in Dashboard.",
+    "Apri mappa: indirizzo e contorno del prato. Sole, ombra, irrigatori e pendenza si disegnano dopo in Dashboard.",
   advancedTitle: "Approfondisci il terreno (opzionale)",
   advancedIntro:
-    "Questi dati migliorano concimi, drenaggio e gestione ombra. Puoi saltarli e completarli dopo da «Aggiorna profilo».",
+    "Questi dati migliorano concimi e drenaggio. Puoi saltarli e completarli dopo da «Aggiorna profilo».",
   phValoreHint: "Se hai un valore da analisi (es. 6,5), inseriscilo qui.",
   noteTerrenoHint: "Es. carenze NPK, salinità, % sabbia/argilla da laboratorio.",
 };
@@ -570,7 +526,6 @@ export function profileSummary(profile) {
   if (!profile) return "";
   const parts = [
     "uso",
-    "esposizione",
     "tipo_terreno",
     "irrigazione",
     "eta_prato",
