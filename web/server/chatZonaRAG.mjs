@@ -14,6 +14,11 @@ import {
   hasLawnContour,
 } from "./pratoZone.mjs";
 import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
+import {
+  domandaRichiedeSpiegazione,
+  domandaSuIrrigazioneCalcolata,
+  formatIrrigazioneOggiForPrompt,
+} from "./irrigazionePrompt.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -221,7 +226,7 @@ ${bozza}
 Rispondi SOLO con JSON valido:
 {
   "ok": true,
-  "risposta_finale": "testo in italiano per il giardiniere, max 12 righe, concreto"
+  "risposta_finale": "testo in italiano per il giardiniere, chiaro e concreto (fino a ~250 parole se serve spiegare un calcolo)"
 }
 
 oppure se la bozza inventa dati, è fuori tema o nessuna fonte supporta la risposta:
@@ -230,7 +235,8 @@ oppure se la bozza inventa dati, è fuori tema o nessuna fonte supporta la rispo
   "risposta_finale": "${RISPOSTA_INSUFFICIENTE}"
 }
 
-Criteri ok=false: prodotti/dosi/patologie non presenti nelle fonti; risposta generica che ignora la domanda; diagnosi certa su patologia senza foto né chunk che la supportano.`;
+Criteri ok=false: prodotti/dosi inventati non presenti nelle fonti; diagnosi certa su patologia senza foto né chunk che la supportano.
+NON bloccare spiegazioni fisiologiche o idrauliche dedotte da IRRIGAZIONE CALCOLATA OGGI, profilo, mappa o meteo anche se non compaiono parola per parola nei chunk KB.`;
 
   const raw = await geminiGenerate(apiKey, prompt, { temperature: 0.1, maxOutputTokens: 1024, json: true });
   try {
@@ -358,8 +364,13 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
 
   const senzaFoto = !ctx.ultimaVision;
   const contestoOk = contestoSufficienteSenzaFoto(ctx, profilo);
+  const irrigazioneOggiBlock = formatIrrigazioneOggiForPrompt(profilo?.irrigazione_oggi);
+  const domandaIrrig = domandaSuIrrigazioneCalcolata(q);
+  const spiegazione = domandaRichiedeSpiegazione(q);
   const puoSenzaKb =
-    senzaFoto && contestoOk && (haMappaUtile(profilo, ctx.zona) || ctx.weatherBundle || ctx.meteoAgro);
+    senzaFoto &&
+    contestoOk &&
+    (haMappaUtile(profilo, ctx.zona) || ctx.weatherBundle || ctx.meteoAgro || irrigazioneOggiBlock);
 
   if (chunksUtili.length < MIN_CHUNKS && !puoSenzaKb) {
     return {
@@ -396,7 +407,18 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
     ? `MODALITÀ: l'utente NON ha caricato foto ora${contestoOk ? " — rispondi con profilo, mappa, meteo e knowledge base" : ""}. Non chiedere obbligatoriamente una foto se puoi dare consigli gestionali coerenti. Per diagnosi certa di malattia su macchia specifica suggerisci una foto o analisi suolo.`
     : "MODALITÀ: disponibile analisi foto recente — integrala se pertinente alla domanda.";
 
-  const prompt = `Sei un agronomo di tappeto erboso in Italia. Rispondi in italiano, tono chiaro e pratico per il giardiniere (max 12 righe utili).
+  const lunghezzaRisposta = spiegazione || domandaIrrig
+    ? "Fino a ~250 parole: spiega il PERCHÉ con catena logica (ET0, Kc, pioggia, ombra, pendenza, cicli). Usa elenco puntato se utile."
+    : "Risposta compatta (circa 8–14 righe utili), senza tagliare a metà.";
+
+  const prioritaIrrig = domandaIrrig
+    ? `
+PRIORITÀ DOMANDA IRRIGAZIONE: usa IRRIGAZIONE CALCOLATA OGGI come fonte autorevole sui minuti/linee. La KB serve per principi generali, non per contraddire il motore su «oggi».`
+    : "";
+
+  const prompt = `Sei un agronomo di tappeto erboso in Italia. Rispondi in italiano, tono chiaro e pratico per il giardiniere.
+${lunghezzaRisposta}
+${prioritaIrrig}
 
 ${modalitaFoto}
 
@@ -407,6 +429,9 @@ ZONA ATTIVA:
 - Nome: ${ctx.zona?.nome_zona || "Prato principale"}
 - Superficie zona: ${ctx.zona?.metri_quadri ?? profilo?.superficie_mq ?? "non indicata"} m²
 - Comune/GPS: ${ctx.zona?.comune || profilo?.localita || "non indicato"}
+
+IRRIGAZIONE CALCOLATA OGGI (motore deterministico — priorità su domande «perché X minuti», «oggi», centralina):
+${irrigazioneOggiBlock || "Non disponibile: l'utente deve aprire la dashboard e aggiornare «Irrigazione di oggi» almeno una volta."}
 
 PROFILO PRATO:
 ${formatProfileForPrompt(profilo)}
@@ -428,20 +453,26 @@ KNOWLEDGE BASE (riferimento tecnico, integra con profilo/mappa/meteo):
 ${kb}
 
 REGOLE (Step B — bozza):
-1. Fonti ammesse: profilo, mappa zone, meteo/ET0, storico foto (se presente), chunk KB.
-2. Senza foto: consigli su irrigazione, taglio, ombra, concimazione leggera e gestione sono ammessi se supportati dal profilo/mappa/meteo.
-3. NON inventare prodotti commerciali, dosi numeriche o patologie non supportate dalle fonti.
-4. Rispondi "${RISPOSTA_INSUFFICIENTE}" solo se nessuna fonte sopra copre la domanda (es. diagnosi precisa senza dati).
-5. Collega ET0/GDD/meteo quando presenti. Non ripetere tutto il profilo: solo ciò che serve.`;
+1. Fonti ammesse: irrigazione calcolata oggi, profilo, mappa zone, meteo/ET0, storico foto (se presente), chunk KB.
+2. Domande su minuti/irrigazione oggi: spiega usando dati_tecnici e programma linee sopra; non rispondere solo «per il meteo».
+3. Senza foto: consigli su irrigazione, taglio, ombra, concimazione leggera e gestione sono ammessi se supportati dalle fonti.
+4. NON inventare prodotti commerciali, dosi fitofarmaci o patologie non supportate dalle fonti.
+5. Rispondi "${RISPOSTA_INSUFFICIENTE}" solo se nessuna fonte sopra copre la domanda (es. diagnosi precisa di malattia su macchia senza foto).
+6. Completa ogni frase: non troncare spiegazioni tecniche per risparmiare spazio.`;
 
   const contestoAutorizzato = [
+    irrigazioneOggiBlock ? `Irrigazione oggi: ${irrigazioneOggiBlock.slice(0, 2000)}` : null,
     `Profilo: ${formatProfileForPrompt(profilo).slice(0, 1200)}`,
     `Mappa: ${mappaBlock.slice(0, 800)}`,
     `Meteo: ${(meteoBlock || "n/d").slice(0, 600)}`,
     visionBlock ? `Visione foto: ${visionBlock}` : "Visione foto: non disponibile",
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  const bozza = await geminiGenerate(geminiKey, prompt);
+  const bozza = await geminiGenerate(geminiKey, prompt, {
+    maxOutputTokens: spiegazione || domandaIrrig ? 2048 : 1024,
+  });
   if (!bozza) {
     return {
       risposta: RISPOSTA_INSUFFICIENTE,
