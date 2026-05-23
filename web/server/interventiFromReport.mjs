@@ -256,8 +256,9 @@ export async function persistAnalisiAndInterventi(
       /* opzionale */
     }
   }
-  let arricchiti = rimuoviRoutineCalendario(interventi ?? []).map((i) =>
-    arricchisciInterventoTrattamento(i, profilo, prodotti, vision, weatherBundle),
+  const grezzi = rimuoviRoutineCalendario(interventi ?? []);
+  const arricchiti = await Promise.all(
+    grezzi.map((i) => arricchisciInterventoTrattamento(i, profilo, prodotti, vision, weatherBundle)),
   );
 
   let saved = [];

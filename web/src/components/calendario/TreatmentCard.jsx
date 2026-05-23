@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { AVVISO_FITOFARMACO } from "../../lib/sicurezzaClient";
+import {
+  NOTA_SCELTA_PRODOTTI,
+  notaConfrontoBiostimolanti,
+  spiegazioneProdottoPerUtente,
+} from "../../lib/prodottiEducazione";
 import "../../styles-treatment-card.css";
 
 function IconLeaf() {
@@ -16,52 +21,45 @@ function IconLeaf() {
   );
 }
 
-function IconBeaker() {
-  return (
-    <svg className="treatment-card__icon treatment-card__icon--sm" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M9 3h6v7l5 9a2 2 0 0 1-1.7 3H5.7a2 2 0 0 1-1.7-3l5-9V3Z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path d="M9 10h6" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function ProdottoMicroCard({ prodotto, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const idIstruzioni = `istruzioni-${prodotto.nome_commerciale?.replace(/\s/g, "-")}`;
+function ProdottoMicroCard({ prodotto, index }) {
+  const [openIstruzioni, setOpenIstruzioni] = useState(false);
+  const idIstruzioni = `istruzioni-${prodotto.id ?? index}-${prodotto.nome_commerciale?.replace(/\s/g, "-")}`;
+  const spiegazione = spiegazioneProdottoPerUtente(prodotto);
+  const edu = prodotto.a_cosa_serve || spiegazione?.a_cosa_serve || null;
+  const istruzioni =
+    prodotto.istruzioni_uso?.trim() || spiegazione?.come_si_usa || null;
 
   return (
     <article className="treatment-card__prodotto">
-      <div className="treatment-card__prodotto-head">
-        <div>
-          <h4 className="treatment-card__prodotto-nome">{prodotto.nome_commerciale}</h4>
-          {prodotto.marca ? <p className="treatment-card__prodotto-marca">{prodotto.marca}</p> : null}
-        </div>
-      </div>
+      <p className="treatment-card__prodotto-alt">Opzione {index + 1}</p>
+      <h4 className="treatment-card__prodotto-nome">{prodotto.nome_commerciale}</h4>
+      {prodotto.marca ? <p className="treatment-card__prodotto-marca">{prodotto.marca}</p> : null}
+      {edu ? (
+        <p className="treatment-card__prodotto-perche">
+          <span className="treatment-card__prodotto-perche-label">A cosa serve: </span>
+          {edu}
+        </p>
+      ) : null}
       {prodotto.dose_totale_calcolata ? (
         <p className="treatment-card__dose-badge" role="status">
           <span className="treatment-card__dose-label">Dose per il tuo prato</span>
-          {prodotto.dose_totale_calcolata}
+          <span className="treatment-card__dose-value">{prodotto.dose_totale_calcolata}</span>
         </p>
       ) : null}
-      {prodotto.istruzioni_uso ? (
+      {istruzioni ? (
         <div className="treatment-card__istruzioni-wrap">
           <button
             type="button"
             className="treatment-card__istruzioni-toggle"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
+            onClick={() => setOpenIstruzioni((v) => !v)}
+            aria-expanded={openIstruzioni}
             aria-controls={idIstruzioni}
           >
-            {open ? "Nascondi istruzioni" : "Come applicarlo"}
+            {openIstruzioni ? "Nascondi come applicarlo" : "Come applicarlo"}
           </button>
-          {open ? (
+          {openIstruzioni ? (
             <p id={idIstruzioni} className="treatment-card__istruzioni">
-              {prodotto.istruzioni_uso}
+              {istruzioni}
             </p>
           ) : null}
         </div>
@@ -70,12 +68,26 @@ function ProdottoMicroCard({ prodotto, defaultOpen }) {
   );
 }
 
+function SpiegazioneBlocchi({ testo }) {
+  if (!testo?.trim()) return null;
+  const paragrafi = testo.split(/\n\n+/).filter(Boolean);
+  return (
+    <div className="treatment-card__spiegazione-blocchi">
+      {paragrafi.map((p, i) => (
+        <p key={i} className="treatment-card__spiegazione">
+          {p.trim()}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /**
- * Card trattamento: Educazione (perché) + Soluzione (prodotti e dose).
- * @param {{ treatment: { tipo_intervento: string, spiegazione_semplice: string, prodotti_consigliati?: object[] }, onComplete?: () => void, completing?: boolean, done?: boolean, showFitofarmacoAvviso?: boolean }} props
+ * Card trattamento: sezione educativa (perché) + soluzione pratica (prodotti/dose).
  */
 export function TreatmentCard({
   treatment,
+  superficieMq,
   onComplete,
   completing = false,
   done = false,
@@ -84,6 +96,12 @@ export function TreatmentCard({
   if (!treatment?.tipo_intervento && !treatment?.spiegazione_semplice) return null;
 
   const prodotti = treatment.prodotti_consigliati ?? [];
+  const n = prodotti.length;
+  const mqLabel = superficieMq ? ` (${superficieMq} m²)` : "";
+  const notaScelta =
+    treatment.nota_scelta_prodotti ||
+    notaConfrontoBiostimolanti(prodotti) ||
+    (n > 1 ? NOTA_SCELTA_PRODOTTI : null);
 
   return (
     <article className={`treatment-card${done ? " treatment-card--done" : ""}`}>
@@ -91,36 +109,34 @@ export function TreatmentCard({
         <div className="treatment-card__edu-icon-wrap">
           <IconLeaf />
         </div>
+        <p className="treatment-card__edu-kicker">Referto agronomico</p>
         <h3 id="treatment-edu-title" className="treatment-card__tipo">
           {treatment.tipo_intervento}
         </h3>
-        {treatment.spiegazione_semplice ? (
-          <p className="treatment-card__spiegazione">{treatment.spiegazione_semplice}</p>
-        ) : null}
+        <SpiegazioneBlocchi testo={treatment.spiegazione_semplice} />
       </section>
 
-      {prodotti.length > 0 ? (
-        <>
-          <div className="treatment-card__divider" role="separator" />
-          <section className="treatment-card__soluzione" aria-labelledby="treatment-sol-title">
-            <div className="treatment-card__soluzione-head">
-              <IconBeaker />
-              <h4 id="treatment-sol-title" className="treatment-card__soluzione-title">
-                Prodotti consigliati per le tue misurazioni
-              </h4>
-            </div>
-            <div className="treatment-card__prodotti">
-              {prodotti.map((p, idx) => (
-                <ProdottoMicroCard key={p.id ?? `${p.nome_commerciale}-${idx}`} prodotto={p} defaultOpen={idx === 0} />
-              ))}
-            </div>
-            {showFitofarmacoAvviso ? (
-              <p className="treatment-card__avviso-fito" role="note">
-                {AVVISO_FITOFARMACO}
-              </p>
-            ) : null}
-          </section>
-        </>
+      {n > 0 ? (
+        <section className="treatment-card__soluzione" aria-label="Prodotti suggeriti">
+          <h4 className="treatment-card__soluzione-title">
+            Prodotti suggeriti per i tuoi m²{mqLabel}
+          </h4>
+          {notaScelta ? (
+            <p className="treatment-card__nota-scelta" role="note">
+              {notaScelta}
+            </p>
+          ) : null}
+          <div className="treatment-card__prodotti">
+            {prodotti.map((p, idx) => (
+              <ProdottoMicroCard key={p.id ?? `${p.nome_commerciale}-${idx}`} prodotto={p} index={idx} />
+            ))}
+          </div>
+          {showFitofarmacoAvviso ? (
+            <p className="treatment-card__avviso-fito" role="note">
+              {AVVISO_FITOFARMACO}
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       {onComplete && !done ? (
@@ -152,6 +168,7 @@ export function treatmentFromIntervento(item) {
     return {
       tipo_intervento: det.tipo_intervento || item.titolo,
       spiegazione_semplice: det.spiegazione_semplice || item.spiegazione_semplice || item.messaggio_ux,
+      nota_scelta_prodotti: det.nota_scelta_prodotti ?? null,
       prodotti_consigliati: det.prodotti_consigliati ?? [],
     };
   }
@@ -159,6 +176,7 @@ export function treatmentFromIntervento(item) {
     return {
       tipo_intervento: item.titolo,
       spiegazione_semplice: item.spiegazione_semplice || item.messaggio_ux,
+      nota_scelta_prodotti: null,
       prodotti_consigliati: [],
     };
   }

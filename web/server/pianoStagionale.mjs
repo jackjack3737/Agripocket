@@ -3,7 +3,6 @@ import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 import { ensurePreEmergenzaAnnuali, valutaPreEmergenzaAnnuali } from "./preEmergenzaAnnuali.mjs";
 import { loadProdotti } from "./prodottiCatalogo.mjs";
 import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
-import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
 import { mergeControlliMensili } from "./controlliMensili.mjs";
 import { hintParassitiRegionali } from "./parassitiPrato.mjs";
 import { ensureOmbraOverseedInterventi } from "./pratoZone.mjs";
@@ -16,6 +15,7 @@ import {
   filtraInterventiFitofarmacoCurativo,
 } from "./regoleFitofarmaci.mjs";
 import { buildFocolaiPromptBlock } from "./focolaiRegionali.mjs";
+import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -66,16 +66,6 @@ async function geminiGenerate(apiKey, text, opts = {}) {
   if (!res.ok) throw new Error(`Gemini: ${res.status} ${await res.text()}`);
   const data = await res.json();
   return data?.candidates?.[0]?.content?.parts?.map((p) => p?.text ?? "").join("") ?? "";
-}
-
-async function queryKnowledgeBase(admin, embedding) {
-  const { data, error } = await admin.rpc("match_documenti", {
-    match_count: 8,
-    match_threshold: 0.2,
-    query_embedding: embedding,
-  });
-  if (error) throw new Error(`Knowledge base: ${error.message}`);
-  return data ?? [];
 }
 
 function normalizeCategoria(c) {
@@ -160,9 +150,20 @@ export async function buildPianoInterventi(profilo, env, admin, { vision = null 
     .join("\n");
 
   const emb = await geminiEmbed(searchText.slice(0, 6000), geminiKey);
-  const chunks = await queryKnowledgeBase(admin, emb);
+  const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
+    matchCount: 8,
+    fetchCount: 36,
+    minLibri: 4,
+  });
   const kb = chunks
-    .map((c, i) => `[${i + 1}] ${c.patologia || ""}\n${c.soluzione || ""}`)
+    .map((c, i) => {
+      const tier = c.soluzione?.startsWith("[libro_universitario:")
+        ? "libro"
+        : c.soluzione?.startsWith("CALENDARIO VERDE")
+          ? "calendario"
+          : "catalogo/altro";
+      return `[${i + 1}|${tier}] ${c.patologia || ""}\n${c.soluzione || ""}`;
+    })
     .join("\n\n");
 
   const mese = new Date().toLocaleString("it-IT", { month: "long", year: "numeric" });
@@ -193,10 +194,10 @@ ${hintParassitiRegionali(profilo?.localita)}
 
 ${focolaiBlock}
 
-Knowledge base (prodotti e pratiche — usa nomi e dosaggi quando presenti):
+Knowledge base (priorità: manuali universitari > Calendario Verde Bottos > schede prodotto; i tag [N|libro] indicano la fonte):
 ${kb || "(usa best practice italiane per prato da giardino)"}
 
-Nota: dopo la generazione, il sistema aggiunge automaticamente al calendario tutti i prodotti idonei del catalogo Bottos (concimi liquidi/granulari, ammendanti, biostimolanti, umettanti, trattamenti) con priorità bassa/media — non serve elencarli tutti qui.
+Per le macro-azioni usa soprattutto i manuali universitari; Calendario Verde per stagionalità; le schede prodotto solo come riferimento commerciale Bottos (non elencare tutti i prodotti nel piano).
 
 Obiettivo: elencare i lavori STRATEGICI del prato (NON taglio né irrigazione generica — gestiti dall'app come abitudini), con data_prevista YYYY-MM-DD:
 - Concimazioni (NPK, autunno/primavera, slow, microelementi, ferro)
@@ -420,10 +421,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     /* meteo opzionale per pipeline */
   }
 
-  const arricchiti = interventiGrezzi.map((i) =>
-    arricchisciInterventoTrattamento(i, profilo, prodotti, vision, weatherBundle),
-  );
-  const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(arricchiti, { vision, profilo });
+  const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(interventiGrezzi, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
   const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
   const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {

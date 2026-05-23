@@ -76,6 +76,7 @@ export default function CalendarioLavori({ profile, session }) {
   const [generatingPiano, setGeneratingPiano] = useState(false);
 
   const hasPiano = haCalendarioStagionale(interventi);
+  const superficieMq = profile?.superficie_mq ?? null;
   const autoPianoStarted = useRef(false);
   const meseCorrente = new Date().toISOString().slice(0, 7);
   const [mesiAperti, setMesiAperti] = useState(() => new Set([meseCorrente]));
@@ -287,6 +288,7 @@ export default function CalendarioLavori({ profile, session }) {
                 title="Urgenti dall'analisi foto"
                 hint="Dall'ultima foto."
                 items={groups.daFoto}
+                superficieMq={superficieMq}
                 onToggle={toggleIntervento}
               />
             ) : null}
@@ -302,6 +304,7 @@ export default function CalendarioLavori({ profile, session }) {
                     key={mese.monthKey}
                     mese={mese}
                     open={mesiAperti.has(mese.monthKey)}
+                    superficieMq={superficieMq}
                     onToggle={() => toggleMese(mese.monthKey)}
                     onToggleIntervento={toggleIntervento}
                     onPinIntervento={togglePinIntervento}
@@ -323,6 +326,7 @@ export default function CalendarioLavori({ profile, session }) {
                 title="Prossimi lavori"
                 hint="Piano in agenda."
                 items={prossimi}
+                superficieMq={superficieMq}
                 onToggle={toggleIntervento}
                 onPin={togglePinIntervento}
               />
@@ -332,6 +336,7 @@ export default function CalendarioLavori({ profile, session }) {
               <InterventoSection
                 title="Prossimi interventi"
                 items={groups.senzaData}
+                superficieMq={superficieMq}
                 onToggle={toggleIntervento}
                 onPin={togglePinIntervento}
               />
@@ -340,6 +345,7 @@ export default function CalendarioLavori({ profile, session }) {
             <InterventoSection
               title="Completati"
               items={groups.completati}
+              superficieMq={superficieMq}
               onToggle={toggleIntervento}
               onPin={togglePinIntervento}
             />

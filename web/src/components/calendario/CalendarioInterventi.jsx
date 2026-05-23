@@ -50,7 +50,7 @@ function ImportanzaIndicatore({ priorita }) {
   );
 }
 
-export function InterventoRow({ item, onToggle, onPin }) {
+export function InterventoRow({ item, onToggle, onPin, superficieMq }) {
   const done = item.stato === "completato";
   const fito = isInterventoFitofarmaco(item);
   const treatment = treatmentFromIntervento(item);
@@ -99,6 +99,7 @@ export function InterventoRow({ item, onToggle, onPin }) {
         {mostraTreatmentCard ? (
           <TreatmentCard
             treatment={treatment}
+            superficieMq={superficieMq}
             done={done}
             showFitofarmacoAvviso={fito}
             onComplete={!done && onToggle ? () => onToggle(item.id, true) : undefined}
@@ -167,7 +168,7 @@ export function InterventoRow({ item, onToggle, onPin }) {
   );
 }
 
-export function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinIntervento }) {
+export function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinIntervento, superficieMq }) {
   return (
     <section className={`dash-month${open ? " dash-month--open" : ""}`}>
       <button
@@ -202,6 +203,7 @@ export function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinI
                     <InterventoRow
                       key={item.id}
                       item={item}
+                      superficieMq={superficieMq}
                       onToggle={onToggleIntervento}
                       onPin={onPinIntervento}
                     />
@@ -254,7 +256,7 @@ export function CalendarioFiltri({ tipo, ambito, meseLabel, conteggi, onTipo, on
   );
 }
 
-export function InterventoSection({ title, hint, items, onToggle, onPin, empty }) {
+export function InterventoSection({ title, hint, items, onToggle, onPin, empty, superficieMq }) {
   if (!items.length && !empty) return null;
   return (
     <section className="dash-calendar-section">
@@ -263,7 +265,13 @@ export function InterventoSection({ title, hint, items, onToggle, onPin, empty }
       {items.length ? (
         <ul className="intervento-list">
           {items.map((item) => (
-            <InterventoRow key={item.id} item={item} onToggle={onToggle} onPin={onPin} />
+            <InterventoRow
+              key={item.id}
+              item={item}
+              superficieMq={superficieMq}
+              onToggle={onToggle}
+              onPin={onPin}
+            />
           ))}
         </ul>
       ) : (

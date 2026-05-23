@@ -5,6 +5,7 @@ import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 import { registraFocolaiDaVision } from "./focolaiRegionali.mjs";
 import { testoAlertAnalisiSuolo } from "./laboratoriSuolo.mjs";
 import { loadZonaIdForUser } from "./zoneMeteo.mjs";
+import { queryKnowledgeBasePrioritizedWithRetry } from "./kbQuery.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -97,28 +98,6 @@ function normalizeVisionGeometria(vision) {
   vision.danno_localizzato = Boolean(vision.danno_localizzato);
   vision.diagnosi_avanzata = String(vision.diagnosi_avanzata || "").trim().slice(0, 900);
   return vision;
-}
-
-async function queryKnowledgeBase(admin, embedding) {
-  const attempts = [
-    { match_count: 6, match_threshold: 0.22 },
-    { match_count: 4, match_threshold: 0.18 },
-  ];
-  let lastErr = null;
-  for (const params of attempts) {
-    const { data, error } = await admin.rpc("match_documenti", {
-      ...params,
-      query_embedding: embedding,
-    });
-    if (!error) return data ?? [];
-    lastErr = error;
-    const msg = String(error.message || "");
-    if (!/timeout|timed out|57014/i.test(msg)) break;
-  }
-  throw new Error(
-    `Knowledge base: ${lastErr?.message || "errore ricerca"}. ` +
-      "Esegui sql/patch_match_documenti.sql nel SQL Editor Supabase."
-  );
 }
 
 async function geminiEmbed(text, apiKey) {
@@ -416,7 +395,15 @@ PUNTEGGI_ASSI (obbligatorio per il radar in dashboard):
     .join("\n");
 
   const embedding = await geminiEmbed(searchText.slice(0, 8000), geminiKey);
-  const chunks = await queryKnowledgeBase(admin, embedding);
+  let chunks;
+  try {
+    chunks = await queryKnowledgeBasePrioritizedWithRetry(admin, embedding, { matchCount: 6 });
+  } catch (e) {
+    throw new Error(
+      `Knowledge base: ${e?.message || "errore ricerca"}. ` +
+        "Esegui sql/patch_match_documenti.sql nel SQL Editor Supabase.",
+    );
+  }
 
   const kbContext = (chunks ?? [])
     .map((c, i) => {

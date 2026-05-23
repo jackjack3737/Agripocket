@@ -12,6 +12,7 @@ import {
   formatOmbraSeedForPrompt,
   normalizePratoZone,
 } from "./pratoZone.mjs";
+import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -40,30 +41,29 @@ async function geminiEmbed(text, apiKey) {
 
 async function queryKnowledgeBase(admin, embedding) {
   const attempts = [
-    { match_count: 8, match_threshold: 0.24 },
-    { match_count: 6, match_threshold: 0.2 },
-    { match_count: 6, match_threshold: 0.18 },
+    { matchCount: 8, fetchCount: 36, matchThreshold: 0.24 },
+    { matchCount: 6, fetchCount: 28, matchThreshold: 0.2 },
+    { matchCount: 6, fetchCount: 24, matchThreshold: 0.18 },
   ];
   let lastErr = null;
   for (const params of attempts) {
-    const { data, error } = await admin.rpc("match_documenti", {
-      ...params,
-      query_embedding: embedding,
-    });
-    if (!error) {
-      const filtered = (data ?? []).filter(
+    try {
+      const data = await queryKnowledgeBasePrioritized(admin, embedding, {
+        ...params,
+        minLibri: 2,
+      });
+      const filtered = data.filter(
         (c) => c.somiglianza == null || c.somiglianza >= MIN_SIMILARITY_CHUNK,
       );
       if (filtered.length >= MIN_CHUNKS) return filtered;
-      if ((data ?? []).length >= MIN_CHUNKS && params === attempts[attempts.length - 1]) {
-        return (data ?? [])
-          .filter((c) => c.somiglianza == null || c.somiglianza >= 0.22)
-          .slice(0, 6);
+      if (data.length >= MIN_CHUNKS && params === attempts[attempts.length - 1]) {
+        return data.filter((c) => c.somiglianza == null || c.somiglianza >= 0.22).slice(0, 6);
       }
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e?.message || "");
+      if (!/timeout|timed out|57014/i.test(msg)) break;
     }
-    lastErr = error;
-    const msg = String(error?.message || "");
-    if (!/timeout|timed out|57014/i.test(msg)) break;
   }
   throw new Error(
     `Knowledge base: ${lastErr?.message || "errore ricerca"}. ` +

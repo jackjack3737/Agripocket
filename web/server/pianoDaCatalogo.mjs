@@ -114,7 +114,7 @@ function giaMacroNelMese(interventi, prodotto, dataIso) {
   });
 }
 
-function interventoDaProdotto(prodotto, profilo, oggi) {
+async function interventoDaProdotto(prodotto, profilo, oggi) {
   const tipo = mappaTipoProdotto(prodotto);
   if (!tipo) return null;
 
@@ -160,7 +160,7 @@ function interventoDaProdotto(prodotto, profilo, oggi) {
 /**
  * @param {object[]} interventiPiano - già arricchiti da Gemini
  */
-export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi) {
+export async function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi) {
   const cfg = configLivelloImpegno(profilo);
   const eligibili = prodotti.filter((p) => {
     if (!prodottoAmmessoAlCalendario(p, profilo)) return false;
@@ -176,7 +176,7 @@ export function integraCatalogoNelPiano(interventiPiano, prodotti, profilo, oggi
     if (extra.length >= cfg.maxCatalogo) break;
     if (giaCopertoDaPiano(interventiPiano, p) || giaCopertoDaPiano(extra, p)) continue;
 
-    const row = interventoDaProdotto(p, profilo, oggi);
+    const row = await interventoDaProdotto(p, profilo, oggi);
     if (!row) continue;
     if (giaMacroNelMese([...interventiPiano, ...extra], p, row.data_prevista)) continue;
     extra.push(row);

@@ -1,4 +1,4 @@
-/* TreatmentCard — stile clinico/scientifico, non e-commerce */
+/* TreatmentCard — educazione (referto) + soluzione (prodotti) */
 
 .treatment-card {
   margin: 0.65rem 0 0;
@@ -15,9 +15,11 @@
   opacity: 0.72;
 }
 
+/* —— Sezione alta: Perché (nessun commerciale) —— */
 .treatment-card__edu {
-  padding: 1rem 1.05rem 1.1rem;
-  background: linear-gradient(165deg, #eef7f0 0%, #e8f4f8 100%);
+  padding: 1.1rem 1.05rem 1.15rem;
+  background: linear-gradient(165deg, #e8f4fc 0%, #eef8f0 55%, #e6f2ea 100%);
+  border-bottom: 1px solid rgba(61, 92, 68, 0.08);
 }
 
 .treatment-card__edu-icon-wrap {
@@ -26,9 +28,9 @@
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.45rem;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.8);
   color: #2d5a3d;
 }
 
@@ -37,72 +39,90 @@
   height: 1.35rem;
 }
 
-.treatment-card__icon--sm {
-  width: 1.1rem;
-  height: 1.1rem;
+.treatment-card__edu-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #4a6b7a;
 }
 
 .treatment-card__tipo {
-  margin: 0 0 0.45rem;
-  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.35;
-  color: #1e3324;
+  color: #1a2e3a;
   letter-spacing: -0.01em;
 }
 
-.treatment-card__spiegazione {
-  margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.55;
-  color: #3d4a42;
-  font-weight: 450;
-}
-
-.treatment-card__divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #d8e0dc 12%, #d8e0dc 88%, transparent);
-}
-
-.treatment-card__soluzione {
-  padding: 0.95rem 1.05rem 1rem;
-  background: #fff;
-}
-
-.treatment-card__soluzione-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  color: #3d5c44;
-}
-
-.treatment-card__soluzione-title {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.4;
-  color: #3d5c44;
-}
-
-.treatment-card__prodotti {
+.treatment-card__spiegazione-blocchi {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
 }
 
+.treatment-card__spiegazione {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.58;
+  color: #2f4048;
+  font-weight: 450;
+}
+
+/* —— Sezione bassa: Come / prodotti —— */
+.treatment-card__soluzione {
+  padding: 0.95rem 1.05rem 0.85rem;
+  background: #fff;
+}
+
+.treatment-card__soluzione-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #3d5c44;
+}
+
+.treatment-card__nota-scelta {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: #f5f9f7;
+  border-left: 3px solid #3d5c44;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #2a4532;
+  font-weight: 500;
+}
+
+.treatment-card__prodotti {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
 .treatment-card__prodotto {
-  padding: 0.65rem 0.7rem;
+  padding: 0.7rem 0.75rem;
   border-radius: 10px;
-  background: #f8faf9;
-  border: 1px solid #e8eeea;
+  background: #fafcfb;
+  border: 1px solid #e4ebe6;
+}
+
+.treatment-card__prodotto-alt {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7a70;
 }
 
 .treatment-card__prodotto-nome {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.96rem;
   font-weight: 650;
   color: #1e3324;
 }
@@ -114,26 +134,43 @@
   font-weight: 500;
 }
 
-.treatment-card__dose-badge {
-  margin: 0.55rem 0 0;
-  padding: 0.45rem 0.55rem;
-  border-radius: 8px;
-  background: #e8f3eb;
-  border: 1px solid #b8d4c0;
-  font-size: 0.88rem;
+.treatment-card__prodotto-perche {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #3d4a42;
+}
+
+.treatment-card__prodotto-perche-label {
   font-weight: 650;
-  color: #1a4d2e;
-  line-height: 1.35;
+  color: #2d5a3d;
+}
+
+.treatment-card__dose-badge {
+  margin: 0.6rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #d4ecd9 0%, #c5e3cc 100%);
+  border: 2px solid #6aab78;
+  box-shadow: 0 2px 8px rgba(45, 90, 61, 0.12);
 }
 
 .treatment-card__dose-label {
   display: block;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.65rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #3d6b4a;
-  margin-bottom: 0.2rem;
+  letter-spacing: 0.06em;
+  color: #2a5c38;
+  margin-bottom: 0.25rem;
+}
+
+.treatment-card__dose-value {
+  display: block;
+  font-size: 1.02rem;
+  font-weight: 750;
+  color: #0d3d1f;
+  line-height: 1.3;
 }
 
 .treatment-card__istruzioni-wrap {
@@ -164,7 +201,7 @@
 }
 
 .treatment-card__avviso-fito {
-  margin: 0.65rem 0 0;
+  margin: 0.75rem 0 0;
   padding: 0.5rem 0.55rem;
   border-radius: 8px;
   font-size: 0.76rem;
@@ -190,6 +227,10 @@
 
 @media (min-width: 640px) {
   .treatment-card__tipo {
-    font-size: 1.1rem;
+    font-size: 1.12rem;
+  }
+
+  .treatment-card__dose-value {
+    font-size: 1.08rem;
   }
 }

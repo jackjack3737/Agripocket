@@ -144,27 +144,63 @@ const REGOLE_AZIONE = [
   },
 ];
 
+import {
+  NOTA_SCELTA_PRODOTTI,
+  notaConfrontoBiostimolanti,
+  spiegazioneProdottoPerUtente,
+} from "../src/lib/prodottiEducazione.js";
+import { arricchisciRinnovoConSemina } from "./raccomandazioneSementi.mjs";
+
+export { NOTA_SCELTA_PRODOTTI };
+
 const SPIEGAZIONI = {
-  K: (ctx) =>
-    `Con ${ctx.stagione === "estate" ? "l'arrivo del caldo intenso" : "le condizioni attuali"}, il prato ha bisogno di rinforzare le sue difese per non ingiallire e trattenere meglio l'acqua. Per farlo, serve un apporto di Potassio (K)${ctx.et0 != null ? ` (in questo periodo l'evaporazione è circa ${ctx.et0} mm/giorno)` : ""}.`,
-  N: () =>
-    "Dopo il riposo invernale il prato deve ricostruire il verde: in questa fase serve principalmente Azoto (N), la spinta che fa crescere le foglie.",
+  K: (ctx) => {
+    const caldo =
+      ctx.stagione === "estate"
+        ? "In estate il prato perde acqua più in fretta e le foglie possono ingiallire o appassire."
+        : "In questo periodo il prato può avere bisogno di sostegno per reagire meglio allo stress.";
+    const meteo =
+      ctx.et0 != null
+        ? ` Con le temperature attuali l'acqua evaporazione dal suolo è circa ${ctx.et0} mm al giorno: serve aiutare la pianta a trattenere umidità.`
+        : "";
+    return `${caldo}${meteo}\n\nIl Potassio (K) rinforza le cellule e migliora la resistenza al caldo e alla siccità: è come dare al prato una “borraccia” più efficace, senza forzare una crescita eccessiva.`;
+  },
+  N: (ctx) => {
+    const stag =
+      ctx.stagione === "primavera"
+        ? "La primavera è il momento in cui il prato si risveglia dopo l'inverno."
+        : "Il prato in questa fase ha bisogno di energia per ricostruire il verde.";
+    return `${stag}\n\nL'Azoto (N) è il nutriente che fa crescere le foglie e riporta colore al tappeto. Un apporto equilibrato aiuta densità e uniformità, senza esagerare (troppo azoto in estate può indebolire il prato).`;
+  },
   P: () =>
-    "In autunno le radici sono le protagoniste: un apporto di Fosforo (P) aiuta il prato a radicare meglio prima dell'inverno.",
-  Fungicida: () =>
-    "Con umidità e temperature miti i funghi possono attaccare le foglie. Un trattamento preventivo protegge il manto senza aspettare i danni visibili.",
+    "In autunno le radici lavorano più delle foglie: è il periodo ideale per preparare il prato all'inverno.\n\nIl Fosforo (P) favorisce lo sviluppo radicale e le riserve della pianta. Un intervento ora significa un tappeto più forte alla ripresa primaverile.",
+  Fungicida: (ctx) => {
+    const umid = ctx.umiditaAlta
+      ? " L'umidità favorevole ai funghi rende più probabile l'attacco anche se non vedi ancora macchie grandi."
+      : "";
+    return `Malattie fungine (oidio, macchie, marciumi leggeri) prosperano con foglia umida e temperature miti.${umid}\n\nUn trattamento preventivo in questa finestra protegge il manto prima che compaiano danni visibili. Meglio intervenire per tempo che curare il prato già compromesso.`;
+  },
   Insetticida: () =>
-    "Alcuni insetti o larve possono danneggiare le radici e il fogliame. Un controllo mirato aiuta a evitare calve e ingiallimenti.",
-  Diserbante: () =>
-    "Le erbe infestanti rubano spazio e acqua al prato. In questo momento conviene intervenire prima che diventino dominate.",
-  Biostimolante: (ctx) =>
-    `Il prato è sotto stress${ctx.stagione === "estate" ? " da caldo o passaggi frequenti" : ""}: i biostimolanti aiutano la pianta a reagire meglio, senza forzare una crescita eccessiva.`,
+    "Larve sotto il suolo, afidi o altri insetti possono indebolire radici e foglie, causando calve o ingiallimenti a chiazze.\n\nUn controllo mirato in questo periodo limita i danni. Serve un solo prodotto idoneo al problema: non combinarsi più insetticidi senza indicazione tecnica.",
+  Diserbante: (ctx) => {
+    const pre = /pre.?emerg|annualit/i.test(ctx.blob);
+    return pre
+      ? "Le erbe annuali stanno germinando: è la finestra migliore per un diserbo pre-emergenza, prima che competano con il prato.\n\nIntervenire ora evita che infestanti rubino acqua e spazio. Un solo prodotto adatto al tappeto è sufficiente."
+      : "Le erbe infestanti già visibili rubano luce, acqua e nutrienti al prato.\n\nUn diserbo selettivo (post-emergenza) le elimina senza danneggiare il tappeto erboso, se scelto correttamente. Scegli una sola formulazione tra quelle proposte.";
+  },
+  Biostimolante: (ctx) => {
+    const stress =
+      ctx.stagione === "estate"
+        ? "Caldo, passaggi frequenti o siccità mettono il prato sotto stress."
+        : "Il prato può essere affaticato da clima o da lavori recenti.";
+    return `${stress}\n\nI biostimolanti non sono concimi “pesanti”: aiutano la pianta a gestire meglio lo stress e a recuperare più in fretta. Sono un supporto, non una sostituzione di irrigazione o taglio corretto.`;
+  },
   Semente: () =>
-    "Ci sono zone dove il tappeto si dirada: con una semina mirata si recupera densità e colore in modo naturale.",
+    "Zone diradate, calve o tappeto consumato non si risolvono solo con concime: serve reintegrare le piante.\n\nLa semina mirata (anche overseeding) ripristina densità e colore. Va abbinata, quando possibile, ad arieggiatura o preparazione del letto nello stesso periodo.",
   Bagnante: () =>
-    "Per far funzionare bene un trattamento liquido, a volte serve un aiuto che distribuisce meglio il prodotto sulla foglia.",
+    "Quando applichi prodotti liquidi (concimi fogliari, biostimolanti, trattamenti), l'acqua deve distribuirsi bene sulla foglia.\n\nUn umettante migliora la copertura e l'efficacia del trattamento. Si usa insieme al prodotto indicato in etichetta, non al posto di esso.",
   Altro: (ctx) =>
-    `In base al tuo prato e alla stagione (${ctx.stagione}), questo intervento aiuta a mantenere il manto in equilibrio.`,
+    `In base al profilo del tuo prato e alla stagione (${ctx.stagione}), questo intervento mantiene equilibrio e salute del manto.\n\nSegui la data suggerita e le condizioni meteo del giorno: in caso di dubbio, meglio posticipare di qualche giorno che forzare in pieno caldo o con pioggia imminente.`,
 };
 
 function istruzioniUsoProdotto(prodotto, intervento, stagione) {
@@ -267,11 +303,13 @@ export function identificaMacroAzione(intervento, { profilo, vision, weatherBund
  */
 export function generaSpiegazioneSemplice(azione, ctx) {
   const fn = SPIEGAZIONI[azione.macro] || SPIEGAZIONI.Altro;
-  return fn(ctx).slice(0, 700);
+  return fn(ctx).slice(0, 950);
 }
 
+const MAX_PRODOTTI_CONSIGLIATI = 2;
+
 /**
- * Fase 3: 2–3 prodotti idonei con dose calcolata sui m².
+ * Fase 3: 1–2 prodotti idonei con dose calcolata sui m² (solo dopo educazione e guardrail).
  */
 export function suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision) {
   const mq = superficieMqVerificata(profilo);
@@ -286,24 +324,34 @@ export function suggerisciProdottiConsigliati(azione, prodotti, profilo, interve
     return macroP === azione.macro;
   });
 
-  const top = ranked.slice(0, 3).map(({ p }) => {
+  const top = ranked.slice(0, MAX_PRODOTTI_CONSIGLIATI).map(({ p }) => {
     const fito = isProdottoFitofarmaco(p);
     const dose = !fito && mq ? calcolaDose(p, mq) : null;
     const perMq =
       p.dosaggio_standard_mq ?? p.dose_fogliare ?? p.dose_radicale;
+    const edu = spiegazioneProdottoPerUtente({
+      nome: p.nome,
+      composizione: p.composizione,
+      principio_attivo: p.principio_attivo,
+      macro_categoria: inferMacroCategoriaProdotto(p, intervento),
+    });
+    const istruzioniEtichetta = istruzioniUsoProdotto(p, intervento, stagioneDaData(intervento?.data_prevista));
     return {
       id: p.id,
       nome_commerciale: p.nome,
       marca: p.marca || "",
       principio_attivo: p.principio_attivo || p.composizione?.slice(0, 120) || null,
       macro_categoria: inferMacroCategoriaProdotto(p, intervento),
+      a_cosa_serve: edu?.a_cosa_serve ?? null,
       dose_totale_calcolata: dose
         ? `${dose.dose_display} da distribuire su ${mq} m²`
         : mq
           ? null
           : "Imposta i m² del prato nel profilo per calcolare la dose",
       dose_per_mq: dose?.dose_per_mq_display || (perMq ? `${perMq} ${p.unita_misura || "g"}/m²` : null),
-      istruzioni_uso: istruzioniUsoProdotto(p, intervento, stagioneDaData(intervento?.data_prevista)),
+      istruzioni_uso: edu?.come_si_usa
+        ? `${edu.come_si_usa} ${istruzioniEtichetta}`.trim()
+        : istruzioniEtichetta,
       periodo_ideale: p.periodo_ideale || p.periodo_uso || null,
       avviso_fitofarmaco: fito,
     };
@@ -313,27 +361,34 @@ export function suggerisciProdottiConsigliati(azione, prodotti, profilo, interve
 }
 
 /**
- * Pipeline completa Educazione → Soluzione.
+ * Pipeline Educazione → Soluzione.
+ * @param {{ includeProdotti?: boolean }} [opts] — false = solo fasi 1–2 (prima dei guardrail).
  */
-export function buildDettaglioTrattamento(intervento, { profilo, prodotti, vision, weatherBundle } = {}) {
+export function buildDettaglioTrattamento(
+  intervento,
+  { profilo, prodotti, vision, weatherBundle, includeProdotti = true } = {},
+) {
   const dataIso = intervento?.data_prevista;
   const meteo = contestoMeteo(weatherBundle, dataIso);
   const ctx = { ...meteo, intervento, profilo, vision };
 
   const azione = identificaMacroAzione(intervento, { profilo, vision, weatherBundle });
   const spiegazione_semplice = generaSpiegazioneSemplice(azione, ctx);
-  const prodotti_consigliati = suggerisciProdottiConsigliati(
-    azione,
-    prodotti,
-    profilo,
-    intervento,
-    vision,
-  );
+  const prodotti_consigliati = includeProdotti
+    ? suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision)
+    : [];
 
   return {
     tipo_intervento: azione.tipo_intervento,
     macro_categoria: azione.macro,
     spiegazione_semplice,
+    nota_scelta_prodotti:
+      notaConfrontoBiostimolanti(prodotti_consigliati) ||
+      (prodotti_consigliati.length > 1
+        ? NOTA_SCELTA_PRODOTTI
+        : prodotti_consigliati.length === 1
+          ? "Un prodotto idoneo è indicato sotto, con dose già calcolata sui metri quadri del tuo prato."
+          : null),
     razionale_scientifico: azione.razionale_scientifico,
     prodotti_consigliati,
     contesto_meteo: {
@@ -345,7 +400,14 @@ export function buildDettaglioTrattamento(intervento, { profilo, prodotti, visio
   };
 }
 
-export function arricchisciInterventoTrattamento(intervento, profilo, prodotti, vision, weatherBundle) {
+export async function arricchisciInterventoTrattamento(
+  intervento,
+  profilo,
+  prodotti,
+  vision,
+  weatherBundle,
+  opts = {},
+) {
   const cat = String(intervento?.categoria || "").toLowerCase();
   if (!TRATTAMENTO_CATEGORIE.has(cat)) {
     return {
@@ -355,12 +417,19 @@ export function arricchisciInterventoTrattamento(intervento, profilo, prodotti, 
   }
 
   const mq = superficieMqVerificata(profilo);
-  const dettaglio = buildDettaglioTrattamento(intervento, {
-    profilo,
-    prodotti,
-    vision,
-    weatherBundle,
-  });
+  let dettaglio;
+
+  if (cat === "rinnovo") {
+    dettaglio = await arricchisciRinnovoConSemina(intervento, profilo, prodotti, vision);
+  } else {
+    dettaglio = buildDettaglioTrattamento(intervento, {
+      profilo,
+      prodotti,
+      vision,
+      weatherBundle,
+      includeProdotti: opts.includeProdotti !== false,
+    });
+  }
 
   const fito = cat === "trattamento" || cat === "diserbo";
   const avvisi = [];

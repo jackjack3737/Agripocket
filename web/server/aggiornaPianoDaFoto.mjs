@@ -222,7 +222,7 @@ export async function integraFotoNelPiano({
     }
 
     for (const raw of emergenza.aggiunti) {
-      let item = arricchisci(raw);
+      let item = await arricchisci(raw);
       item = bloccoTermicoEstivo([item])[0];
       const { data, error } = await admin
         .from("prato_interventi")
@@ -297,10 +297,13 @@ export async function integraFotoNelPiano({
       if (p && !consenteTutteMarche(p) && String(p.marca || "").toUpperCase() !== "BOTTOS") {
         p = null;
       }
-      if (p) item = arricchisciInterventoTrattamento(item, profilo, [p, ...prodotti], vision, weatherBundle);
-      else item = arricchisci(item);
+      if (p) {
+        item = await arricchisciInterventoTrattamento(item, profilo, [p, ...prodotti], vision, weatherBundle);
+      } else {
+        item = await arricchisci(item);
+      }
     } else {
-      item = arricchisci(item);
+      item = await arricchisci(item);
     }
 
     const { data, error } = await admin

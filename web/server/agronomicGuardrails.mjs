@@ -3,7 +3,10 @@
  */
 
 import { inferMacroCategoriaProdotto } from "./prodottiCatalogo.mjs";
-import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
+import {
+  arricchisciInterventoTrattamento,
+  buildDettaglioTrattamento,
+} from "./trattamentoPipeline.mjs";
 
 export { inferMacroCategoriaProdotto };
 
@@ -50,6 +53,20 @@ function isFrazionamentoEsplicito(intervento) {
 }
 
 function macroDaIntervento(intervento, prodottiById) {
+  const det = intervento?.dettaglio_trattamento;
+  const macroDet =
+    typeof det === "object" && det?.macro_categoria
+      ? det.macro_categoria
+      : typeof det === "string"
+        ? (() => {
+            try {
+              return JSON.parse(det)?.macro_categoria;
+            } catch {
+              return null;
+            }
+          })()
+        : null;
+  if (macroDet) return macroDet;
   if (intervento?.macro_categoria) return intervento.macro_categoria;
   if (intervento?.prodotto_id != null) {
     const p = prodottiById.get(intervento.prodotto_id);
@@ -83,7 +100,7 @@ export async function loadStoricoTrattamenti(admin, userId, oggi) {
   const { data, error } = await admin
     .from("prato_interventi")
     .select(
-      "id, titolo, descrizione, categoria, stato, data_prevista, data_completamento, prodotto_id, prodotto_nome, macro_categoria, fonte",
+      "id, titolo, descrizione, categoria, stato, data_prevista, data_completamento, prodotto_id, prodotto_nome, macro_categoria, dettaglio_trattamento, fonte",
     )
     .eq("user_id", userId)
     .gte("data_prevista", da)
@@ -198,6 +215,9 @@ export function valutaInterventoGuardrail(intervento, ctx) {
   return { ok: true, macro };
 }
 
+/** Alias esplicito: blocco stessa macro_categoria entro 30 giorni (salvo micro-dosi). */
+export const verificaAntiSovrapposizione30Giorni = valutaInterventoGuardrail;
+
 function scoreMantieni(i) {
   return (PRIORITA_SCORE[i.priorita] ?? 1) * 10 + (i.prodotto_id ? 5 : 0) + (i.dose_totale ? 2 : 0);
 }
@@ -268,9 +288,34 @@ const TEMPLATE_UX = {
 };
 
 /**
- * Struttura output Educazione → Soluzione (delega alla pipeline trattamenti).
+ * Fasi 1–2 senza prodotti (per valutazione guardrail pre-match catalogo).
  */
-export function strutturaOutputCalendario(intervento, _prodotto, profilo, opts = {}) {
+export function strutturaEducazioneSenzaProdotti(intervento, profilo, opts = {}) {
+  const { vision, weatherBundle } = opts;
+  const det = buildDettaglioTrattamento(intervento, {
+    profilo,
+    prodotti: [],
+    vision,
+    weatherBundle,
+    includeProdotti: false,
+  });
+  return {
+    ...intervento,
+    titolo: String(det.tipo_intervento).slice(0, 120),
+    macro_categoria: det.macro_categoria,
+    spiegazione_semplice: det.spiegazione_semplice,
+    messaggio_ux: det.spiegazione_semplice,
+    razionale_scientifico: det.razionale_scientifico,
+    dettaglio_trattamento: null,
+    prodotto_id: null,
+    prodotto_nome: null,
+  };
+}
+
+/**
+ * Struttura output Educazione → Soluzione (dopo guardrail: educazione + 1–2 prodotti).
+ */
+export async function strutturaOutputCalendario(intervento, _prodotto, profilo, opts = {}) {
   if (intervento?.dettaglio_trattamento?.tipo_intervento) {
     return {
       ...intervento,
@@ -330,12 +375,16 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
   );
 
   for (const i of sorted) {
-    const val = valutaInterventoGuardrail(i, ctx);
+    const bozza = strutturaEducazioneSenzaProdotti(i, profilo, { vision, weatherBundle });
+    const val = valutaInterventoGuardrail(
+      { ...bozza, macro_categoria: macroDaIntervento(bozza, prodottiById) },
+      ctx,
+    );
     if (!val.ok) {
       bloccati += 1;
       continue;
     }
-    const strutturato = strutturaOutputCalendario(
+    const strutturato = await strutturaOutputCalendario(
       { ...i, macro_categoria: val.macro || i.macro_categoria },
       null,
       profilo,
