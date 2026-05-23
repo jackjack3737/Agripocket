@@ -8,15 +8,32 @@ import { updatePratoZoneMappa } from "../lib/supabase";
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
 
 const ZONE_BUTTONS = [
-  { tool: "irrigatore", label: "Irrigatori", desc: "Statico, rotator o oscillante" },
-  { tool: "esposizione", label: "Sole / ombra", desc: "Disegna un'area e indica sole, mezz'ombra o ombra" },
-  { tool: "muschio", label: "Muschio", desc: "Zone con muschio o problemi" },
-  { tool: "pendenza", label: "Pendenza", desc: "Direzione in cui scende l'acqua" },
+  {
+    tool: "irrigatore",
+    label: "Irrigatori",
+    desc: "Tocca ogni getto sulla mappa, scegli statico, rotator o oscillante e assegna la linea della centralina (Linea 1, 2…).",
+  },
+  {
+    tool: "esposizione",
+    label: "Sole / ombra",
+    desc: "Disegna un poligono sull'area interessata, poi indica se è a pieno sole, mezz'ombra o ombra. Puoi segnare più zone diverse.",
+  },
+  {
+    tool: "muschio",
+    label: "Muschio",
+    desc: "Delimita le zone dove compare muschio o feltro: aiuta concimi, aerazione e trattamenti mirati.",
+  },
+  {
+    tool: "pendenza",
+    label: "Pendenza",
+    desc: "Traccia una freccia nel verso in cui scende l'acqua: migliora drenaggio, irrigazione e avvisi di ristagno.",
+  },
 ];
 
 export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
   const [mapOpen, setMapOpen] = useState(false);
   const [activeTool, setActiveTool] = useState(null);
+  const [hintTool, setHintTool] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -54,8 +71,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
     <section className="dash-card dash-card--zone-editor dash-card--wide">
       <h2 className="dash-card__title">Mappa del prato</h2>
       <p className="dash-card__sub">
-        Ogni pulsante apre una mappa dedicata: vedi solo irrigatori, solo ombra, ecc. Ideale anche per
-        giardini piccoli.
+        Tocca una funzione per aprire la mappa dedicata; la freccia ▾ mostra cosa fare in quella modalità.
       </p>
 
       {!hasPoligono ? (
@@ -72,19 +88,35 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       <div className="dash-zone-editor__grid">
         {ZONE_BUTTONS.map(({ tool, label, desc }) => {
           const n = counts[tool] ?? 0;
+          const hintOpen = hintTool === tool;
           return (
-            <button
+            <div
               key={tool}
-              type="button"
-              className="dash-zone-editor__btn"
-              disabled={!hasPoligono || saving}
-              onClick={() => openTool(tool)}
+              className={`dash-zone-editor__card${hintOpen ? " dash-zone-editor__card--hint-open" : ""}`}
             >
-              <span className="dash-zone-editor__dot" style={{ background: ZONE_TYPES[tool]?.color }} />
-              <span className="dash-zone-editor__label">{label}</span>
-              <span className="dash-zone-editor__desc">{desc}</span>
-              {n > 0 ? <span className="dash-zone-editor__count">{n} segnati</span> : null}
-            </button>
+              <div className="dash-zone-editor__card-top">
+                <button
+                  type="button"
+                  className="dash-zone-editor__btn"
+                  disabled={!hasPoligono || saving}
+                  onClick={() => openTool(tool)}
+                >
+                  <span className="dash-zone-editor__dot" style={{ background: ZONE_TYPES[tool]?.color }} />
+                  <span className="dash-zone-editor__label">{label}</span>
+                  {n > 0 ? <span className="dash-zone-editor__count">{n} segnati</span> : null}
+                </button>
+                <button
+                  type="button"
+                  className="dash-zone-editor__hint-btn"
+                  aria-expanded={hintOpen}
+                  aria-label={hintOpen ? `Chiudi info ${label}` : `Info ${label}`}
+                  onClick={() => setHintTool((t) => (t === tool ? null : tool))}
+                >
+                  <span className="dash-zone-editor__hint-chev" aria-hidden />
+                </button>
+              </div>
+              {hintOpen ? <p className="dash-zone-editor__hint">{desc}</p> : null}
+            </div>
           );
         })}
       </div>

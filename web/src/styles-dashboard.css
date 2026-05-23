@@ -1505,33 +1505,107 @@
 
 .dash-zone-editor__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 0.65rem;
   margin-bottom: 1rem;
 }
 
-.dash-zone-editor__btn {
+.dash-zone-editor__card {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-  padding: 0.75rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
+  overflow: hidden;
+}
+
+.dash-zone-editor__card--hint-open {
+  border-color: #a5d6a7;
+  box-shadow: 0 2px 8px rgba(26, 61, 46, 0.06);
+}
+
+.dash-zone-editor__card-top {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.dash-zone-editor__btn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   cursor: pointer;
   text-align: left;
   font: inherit;
   color: var(--text);
 }
 
-.dash-zone-editor__btn:hover:not(:disabled) {
-  border-color: var(--accent);
+.dash-zone-editor__card:hover .dash-zone-editor__btn:not(:disabled) {
+  background: #f8faf8;
 }
 
 .dash-zone-editor__btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.dash-zone-editor__hint-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: #fafaf8;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dash-zone-editor__hint-btn:hover {
+  background: #eef5ef;
+  color: var(--accent);
+}
+
+.dash-zone-editor__card--hint-open .dash-zone-editor__hint-btn {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.dash-zone-editor__hint-chev {
+  display: block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+}
+
+.dash-zone-editor__card--hint-open .dash-zone-editor__hint-chev {
+  transform: rotate(45deg);
+  margin-top: -0.15rem;
+}
+
+.dash-zone-editor__hint {
+  margin: 0;
+  padding: 0.55rem 0.75rem 0.7rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--muted);
+  border-top: 1px solid #e8ebe6;
+  background: #fafcf9;
 }
 
 .dash-zone-editor__dot {
@@ -1543,12 +1617,6 @@
 .dash-zone-editor__label {
   font-weight: 600;
   font-size: 0.9rem;
-}
-
-.dash-zone-editor__desc {
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.35;
 }
 
 .dash-zone-editor__count {
