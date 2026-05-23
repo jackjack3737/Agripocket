@@ -23,6 +23,7 @@ import {
   sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
+import { CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
 import { supabase } from "../lib/supabase";
 
 function AbitudiniPratoCard({ profile }) {
@@ -135,6 +136,12 @@ export default function CalendarioLavori({ profile, session }) {
 
   useEffect(() => {
     refresh();
+  }, [userId]);
+
+  useEffect(() => {
+    const onRefresh = () => refresh();
+    window.addEventListener(CALENDARIO_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(CALENDARIO_REFRESH_EVENT, onRefresh);
   }, [userId]);
 
   useEffect(() => {

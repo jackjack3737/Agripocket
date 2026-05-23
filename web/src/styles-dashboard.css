@@ -2077,6 +2077,18 @@
   gap: 0.4rem;
 }
 
+.stato-clinico__alerts-ok {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: #2e7d32;
+}
+
+.stato-clinico__alerts-err {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: #b71c1c;
+}
+
 /* Barra Analisi Gemini: larga come la colonna meteo + stato clinico */
 .stato-clinico-gemini {
   width: 100%;

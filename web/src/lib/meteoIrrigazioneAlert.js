@@ -28,6 +28,7 @@ export function estraiSnapshotMeteo(weather) {
     pioggia_in_corso,
     et0_media_7g: ag?.et0_mm_media_7g ?? null,
     temp_c: weather.current?.main?.temp ?? null,
+    suolo_c: ag?.soil_temperature_10cm_c ?? null,
   };
 }
 
@@ -43,6 +44,8 @@ export function estraiSnapshotDaIrrigazione(irrigazionePayload) {
     precip_prossimi_3gg_mm: null,
     pioggia_in_corso: !!m.pioggia_in_corso,
     et0_media_7g: null,
+    temp_c: null,
+    suolo_c: null,
   };
 }
 
@@ -61,32 +64,43 @@ function deltaSignificativo(vecchio, nuovo, sogliaAssoluta, sogliaPct = 0.2) {
   return false;
 }
 
-/**
- * @param {{ weather?: object, irrigazioneUltima?: object, irrigazioneProfilo?: object }} opts
- */
-export function valutaAlertMeteoIrrigazione({
-  weather,
-  irrigazioneUltima,
-  irrigazioneProfilo,
-} = {}) {
-  if (!weather) return null;
+/** Soglie assolute: caldo secco, pioggia forte, suolo caldo/freddo. */
+function motiviStressAssoluto(nuovo) {
+  if (!nuovo) return [];
+  const motivi = [];
+  const et0 = num(nuovo.et0_mm);
+  const temp = num(nuovo.temp_c);
+  const suolo = num(nuovo.suolo_c);
+  const precipOggi = num(nuovo.precip_oggi_mm) ?? 0;
+  const precip3g = num(nuovo.precip_prossimi_3gg_mm) ?? 0;
 
-  const ultimo = irrigazioneUltima || irrigazioneProfilo;
-  const vecchio = estraiSnapshotDaIrrigazione(ultimo);
-  const nuovo = estraiSnapshotMeteo(weather);
-
-  if (!nuovo) return null;
-
-  const calcolatoIl = ultimo?.calcolato_il || ultimo?.data_consiglio || null;
-  const oreDaCalcolo = calcolatoIl
-    ? (Date.now() - new Date(calcolatoIl).getTime()) / 3600000
-    : null;
-
-  if (!vecchio) {
-    if (ultimo?.azione_irrigazione) return null;
-    return null;
+  if (et0 != null && et0 >= 5.5) {
+    motivi.push(`Caldo secco: evapotraspirazione alta (${et0} mm/g).`);
+  }
+  if (temp != null && temp >= 30) {
+    motivi.push(`Temperature elevate in aria (${Math.round(temp)}°C).`);
+  }
+  if (suolo != null && suolo >= 26) {
+    motivi.push(`Suolo caldo (${suolo}°C): rivedi irrigazione e finestre di trattamento.`);
+  }
+  if (suolo != null && suolo < 8) {
+    motivi.push(`Suolo freddo (${suolo}°C): semine e rinnovi vanno posticipati.`);
+  }
+  if (nuovo.pioggia_in_corso) {
+    motivi.push("Pioggia in corso: sospendi o riduci irrigazione e verifica trattamenti.");
+  } else if (precipOggi >= 8) {
+    motivi.push(`Pioggia prevista oggi (~${precipOggi} mm): programma e calendario potrebbero essere da rivedere.`);
+  }
+  if (precip3g >= 18) {
+    motivi.push(`Molta pioggia prevista (${precip3g} mm in 3 giorni): posticipa trattamenti sensibili.`);
+  } else if (precip3g >= 12) {
+    motivi.push(`Pioggia imminente (${precip3g} mm nei prossimi giorni).`);
   }
 
+  return motivi;
+}
+
+function motiviDaConfronto(vecchio, nuovo, oreDaCalcolo) {
   const motivi = [];
 
   if (deltaSignificativo(vecchio.et0_mm, nuovo.et0_mm, 1, 0.18)) {
@@ -127,13 +141,63 @@ export function valutaAlertMeteoIrrigazione({
     (deltaSignificativo(vecchio.et0_mm, nuovo.et0_mm, 0.5, 0.12) ||
       deltaSignificativo(vecchio.precip_prossimi_3gg_mm, nuovo.precip_prossimi_3gg_mm, 2, 0.25));
 
-  if (!cambioModerato && !cambioLieve) return null;
+  if (!cambioModerato && !cambioLieve) return [];
+
+  return motivi;
+}
+
+function unisciMotivi(liste) {
+  const visti = new Set();
+  const out = [];
+  for (const m of liste.flat()) {
+    if (!m || visti.has(m)) continue;
+    visti.add(m);
+    out.push(m);
+  }
+  return out;
+}
+
+/**
+ * @param {{ weather?: object, irrigazioneUltima?: object, irrigazioneProfilo?: object }} opts
+ */
+export function valutaAlertMeteoIrrigazione({
+  weather,
+  irrigazioneUltima,
+  irrigazioneProfilo,
+} = {}) {
+  if (!weather) return null;
+
+  const ultimo = irrigazioneUltima || irrigazioneProfilo;
+  const vecchio = estraiSnapshotDaIrrigazione(ultimo);
+  const nuovo = estraiSnapshotMeteo(weather);
+
+  if (!nuovo) return null;
+
+  const calcolatoIl = ultimo?.calcolato_il || ultimo?.data_consiglio || null;
+  const oreDaCalcolo = calcolatoIl
+    ? (Date.now() - new Date(calcolatoIl).getTime()) / 3600000
+    : null;
+
+  const assoluti = motiviStressAssoluto(nuovo);
+  const confronto = vecchio ? motiviDaConfronto(vecchio, nuovo, oreDaCalcolo) : [];
+  const motivi = unisciMotivi([confronto, assoluti]);
+
+  if (motivi.length === 0) return null;
+
+  const severo =
+    confronto.length > 0 ||
+    assoluti.length >= 2 ||
+    assoluti.some((m) => /Pioggia in corso|Molto pioggia|Caldo secco/i.test(m));
+
+  const toccaCalendario = motivi.some((m) =>
+    /pioggia|Pioggia|suolo|Suolo|trattament|semin|rinnov/i.test(m),
+  );
 
   return {
-    livello: cambioModerato ? "attenzione" : "info",
+    livello: severo ? "attenzione" : "info",
     motivi,
     ore_da_calcolo: oreDaCalcolo != null ? Math.round(oreDaCalcolo) : null,
     consiglia_irrigazione: true,
-    consiglia_programma: cambioModerato,
+    consiglia_calendario: toccaCalendario || severo,
   };
 }
