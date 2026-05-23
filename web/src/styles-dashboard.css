@@ -1598,14 +1598,45 @@
   margin-top: -0.15rem;
 }
 
-.dash-zone-editor__hint {
-  margin: 0;
+.dash-zone-editor__hint-panel {
   padding: 0.55rem 0.75rem 0.7rem;
+  border-top: 1px solid #e8ebe6;
+  background: #fafcf9;
   font-size: 0.72rem;
   line-height: 1.45;
   color: var(--muted);
-  border-top: 1px solid #e8ebe6;
-  background: #fafcf9;
+}
+
+.zone-hint__lead {
+  margin: 0 0 0.45rem;
+  color: var(--text);
+}
+
+.zone-hint p {
+  margin: 0 0 0.35rem;
+}
+
+.zone-hint__note {
+  margin-top: 0.4rem !important;
+  font-style: italic;
+}
+
+.zone-hint__meta {
+  color: var(--muted);
+}
+
+.zone-hint__foot {
+  margin: 0.5rem 0 0 !important;
+  font-size: 0.7rem;
+}
+
+.zone-hint__list {
+  margin: 0.35rem 0 0.45rem;
+  padding-left: 1.1rem;
+}
+
+.zone-hint__list li {
+  margin-bottom: 0.2rem;
 }
 
 .dash-zone-editor__dot {

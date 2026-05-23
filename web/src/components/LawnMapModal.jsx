@@ -299,7 +299,7 @@ export default function LawnMapModal({
         setIrrigatorPick({ lat, lng });
         return;
       }
-      if (tool === "esposizione" || tool === "muschio") {
+      if (tool === "esposizione") {
         setDraftTipo(tool);
         setDraftPath((prev) => [...prev, { lat, lng }]);
         return;
@@ -746,7 +746,7 @@ export default function LawnMapModal({
         ) : inZones ? (
           <div className="map-zone-toolbar">
             {!isZoneEdit ? (
-              ["pan", "irrigatore", "esposizione", "muschio", "pendenza"].map((tool) => (
+              ["pan", "irrigatore", "esposizione", "pendenza"].map((tool) => (
                 <button
                   key={tool}
                   type="button"

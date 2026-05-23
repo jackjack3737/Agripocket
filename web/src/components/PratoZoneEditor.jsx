@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import LawnMapModal from "./LawnMapModal";
-import OmbraSeedCard from "./OmbraSeedCard";
+import OmbraSeedHint from "./zoneMapHints/OmbraSeedHint";
+import IrrigatoriHint from "./zoneMapHints/IrrigatoriHint";
+import PendenzaHint from "./zoneMapHints/PendenzaHint";
 import { countZonesByType, normalizePratoZone, ZONE_TYPES } from "../lib/pratoZone";
 import { updatePratoZoneMappa } from "../lib/supabase";
 
@@ -19,16 +21,18 @@ const ZONE_BUTTONS = [
     desc: "Disegna un poligono sull'area interessata, poi indica se è a pieno sole, mezz'ombra o ombra. Puoi segnare più zone diverse.",
   },
   {
-    tool: "muschio",
-    label: "Muschio",
-    desc: "Delimita le zone dove compare muschio o feltro: aiuta concimi, aerazione e trattamenti mirati.",
-  },
-  {
     tool: "pendenza",
     label: "Pendenza",
     desc: "Traccia una freccia nel verso in cui scende l'acqua: migliora drenaggio, irrigazione e avvisi di ristagno.",
   },
 ];
+
+function ZoneHintPanel({ tool, profile }) {
+  if (tool === "esposizione") return <OmbraSeedHint profile={profile} />;
+  if (tool === "irrigatore") return <IrrigatoriHint profile={profile} />;
+  if (tool === "pendenza") return <PendenzaHint profile={profile} />;
+  return null;
+}
 
 export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
   const [mapOpen, setMapOpen] = useState(false);
@@ -71,7 +75,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
     <section className="dash-card dash-card--zone-editor dash-card--wide">
       <h2 className="dash-card__title">Mappa del prato</h2>
       <p className="dash-card__sub">
-        Tocca una funzione per aprire la mappa dedicata; la freccia ▾ mostra cosa fare in quella modalità.
+        Tocca una funzione per aprire la mappa; la freccia ▾ mostra il riepilogo (seme, irrigatori o pendenza).
       </p>
 
       {!hasPoligono ? (
@@ -86,7 +90,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
       )}
 
       <div className="dash-zone-editor__grid">
-        {ZONE_BUTTONS.map(({ tool, label, desc }) => {
+        {ZONE_BUTTONS.map(({ tool, label }) => {
           const n = counts[tool] ?? 0;
           const hintOpen = hintTool === tool;
           return (
@@ -109,13 +113,17 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
                   type="button"
                   className="dash-zone-editor__hint-btn"
                   aria-expanded={hintOpen}
-                  aria-label={hintOpen ? `Chiudi info ${label}` : `Info ${label}`}
+                  aria-label={hintOpen ? `Chiudi riepilogo ${label}` : `Riepilogo ${label}`}
                   onClick={() => setHintTool((t) => (t === tool ? null : tool))}
                 >
                   <span className="dash-zone-editor__hint-chev" aria-hidden />
                 </button>
               </div>
-              {hintOpen ? <p className="dash-zone-editor__hint">{desc}</p> : null}
+              {hintOpen ? (
+                <div className="dash-zone-editor__hint-panel">
+                  <ZoneHintPanel tool={tool} profile={profile} />
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -123,8 +131,6 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
 
       {error ? <p className="form-msg form-msg--error">{error}</p> : null}
       {saving ? <p className="dash-card__loading">Salvataggio mappa…</p> : null}
-
-      <OmbraSeedCard profile={profile} />
 
       <LawnMapModal
         key={activeTool || "zone-map"}
