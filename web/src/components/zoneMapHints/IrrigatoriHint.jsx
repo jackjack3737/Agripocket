@@ -30,12 +30,19 @@ export default function IrrigatoriHint({ profile }) {
     perLinea.get(L).push(h);
   }
 
-  const ctx = analizzaContestoIrrigazioneMappa(pratoZone);
-  const advice = suggestIrrigation({
-    pratoZone,
-    superficie_mq: profile?.superficie_mq,
-    irrigazione: profile?.irrigazione,
-  });
+  let ctx = { num_teste_vicino_pendenza: 0, pct_ombra_prato: 0 };
+  let advice = { suggerimenti: [], programmaSintesi: null };
+  try {
+    ctx = analizzaContestoIrrigazioneMappa(pratoZone);
+    advice = suggestIrrigation({
+      pratoZone,
+      superficie_mq: profile?.superficie_mq,
+      irrigazione: profile?.irrigazione,
+    });
+  } catch (e) {
+    console.warn("IrrigatoriHint:", e);
+  }
+  const suggerimenti = Array.isArray(advice?.suggerimenti) ? advice.suggerimenti : [];
 
   return (
     <div className="zone-hint zone-hint--irrigatore">
@@ -67,8 +74,8 @@ export default function IrrigatoriHint({ profile }) {
           mezz&apos;ombra / ombra.
         </p>
       ) : null}
-      {advice.programmaSintesi ? <p className="zone-hint__meta">{advice.programmaSintesi}</p> : null}
-      {advice.suggerimenti.slice(0, 3).map((s, i) => (
+      {advice?.programmaSintesi ? <p className="zone-hint__meta">{advice.programmaSintesi}</p> : null}
+      {suggerimenti.slice(0, 3).map((s, i) => (
         <p key={i} className="zone-hint__meta">
           {s}
         </p>

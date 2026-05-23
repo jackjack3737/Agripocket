@@ -115,18 +115,33 @@ export function hasLawnContour(pratoZone) {
   return getLawnPolygons(pratoZone).length > 0;
 }
 
+function coercePratoZoneRaw(raw) {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw;
+  return null;
+}
+
 /** @param {unknown} raw */
 export function normalizePratoZone(raw) {
-  if (!raw || typeof raw !== "object") {
+  const data = coercePratoZoneRaw(raw);
+  if (!data) {
     return { version: 2, poligono: [], poligoni: [], zone: [] };
   }
-  const zone = Array.isArray(raw.zone) ? raw.zone.map(normalizeZone).filter(Boolean) : [];
+  const zone = Array.isArray(data.zone) ? data.zone.map(normalizeZone).filter(Boolean) : [];
 
   let poligoni = [];
-  if (Array.isArray(raw.poligoni)) {
-    poligoni = raw.poligoni.map(normalizePolygonRing).filter((ring) => ring.length >= 3);
+  if (Array.isArray(data.poligoni)) {
+    poligoni = data.poligoni.map(normalizePolygonRing).filter((ring) => ring.length >= 3);
   }
-  const legacy = normalizePolygonRing(raw.poligono);
+  const legacy = normalizePolygonRing(data.poligono);
   if (!poligoni.length && legacy.length >= 3) {
     poligoni = [legacy];
   }
