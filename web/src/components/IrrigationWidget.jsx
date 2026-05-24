@@ -184,9 +184,12 @@ function IrrigationSerbatoioBar({ bilancio }) {
   const mm = Number(b.mm_mancanti_oggi) || 0;
   const sat = b.saturazione_suolo;
 
+  const fab = Number(b.fabbisogno_oggi_mm) || 0;
   let hint = "Nessun deficit oggi";
   if (sat) hint = "Suolo saturo (pioggia recente)";
-  else if (mm > 0) hint = `Mancano ${mm} mm da reintegrare`;
+  else if (fab > 0) hint = `Irriga ${fab} mm (sotto soglia)`;
+  else if (mm > 0) hint = `Mancano ${mm} mm alla soglia`;
+  else if (pct <= 55) hint = "Vicino alla soglia di stress";
 
   return (
     <div className="irrigation-widget__serbatoio" role="status" aria-label={`Serbatoio idrico al ${pct} per cento`}>

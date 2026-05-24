@@ -83,6 +83,64 @@ export function pioggiaEfficaceMm(precip_mm, bilancioSuoloMm, cap) {
   return Math.min(Number(precip_mm || 0) * 0.85, spazio);
 }
 
+/** Avanza il bilancio suolo di un giorno (ETc, pioggia, eventuale ricarica a MAD). */
+export function avanzaSuoloGiorno(suolo, { et0_mm, precip_mm }, cap, mad, kc, modOmbra, { simulaIrrigazionePassata = true } = {}) {
+  const et0 = Number(et0_mm ?? 3);
+  const precip = Number(precip_mm ?? 0);
+  const etc = et0 * kc * modOmbra;
+
+  let s = Number(suolo);
+  s -= etc;
+  s += pioggiaEfficaceMm(precip, s, cap);
+  s = Math.min(Math.max(s, 0), cap);
+
+  if (precip >= 8) return s;
+  if (simulaIrrigazionePassata && s <= mad) return cap;
+  return s;
+}
+
+/** Ultimi N giorni prima di oggi (per ricostruire il serbatoio, non resettare al 75%). */
+export function giorniStoriciMeteo(weatherBundle, meteo, giorniIndietro = 6) {
+  const ag = weatherBundle?.agronomic;
+  const rows = ag?.gdd?.serie || ag?.forecast_daily || [];
+  const byDate = new Map();
+  for (const r of rows) {
+    if (r?.date) byDate.set(r.date, r);
+  }
+
+  const oggiIso = new Date().toISOString().slice(0, 10);
+  const out = [];
+  for (let i = giorniIndietro; i >= 1; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    if (iso >= oggiIso) continue;
+    const row = byDate.get(iso) || {};
+    out.push({
+      iso,
+      et0_mm: row.et0_mm ?? row.et0 ?? meteo?.et0_mm ?? ag?.et0_mm_media_7g ?? 3,
+      precip_mm: row.rain_mm ?? row.precipitation_sum ?? row.precip_mm ?? 0,
+    });
+  }
+  return out.sort((a, b) => a.iso.localeCompare(b.iso));
+}
+
+/**
+ * Suolo iniziale oggi: ricostruito dai giorni passati (non sempre 75% fisso).
+ */
+export function ricostruisciSuoloIniziale(weatherBundle, meteo, input, kc, percentuale_ombra, giorniIndietro = 6) {
+  const cap = capacitaCampoMm(input.tipo_terreno);
+  const mad = cap * MAD_FRAZIONE;
+  const modOmbra = modificatoreOmbra(percentuale_ombra);
+  let suolo = cap * 0.82;
+
+  const storici = giorniStoriciMeteo(weatherBundle, meteo, giorniIndietro);
+  for (const g of storici) {
+    suolo = avanzaSuoloGiorno(suolo, g, cap, mad, kc, modOmbra, { simulaIrrigazionePassata: true });
+  }
+  return Math.round(suolo * 10) / 10;
+}
+
 /**
  * Bilancio suolo su più giorni (serbatoio). Restituisce mm da reintegrare oggi e schema 7 gg.
  */
@@ -91,11 +149,17 @@ export function simulaBilancioIdricoSettimana({
   input,
   kc,
   percentuale_ombra,
+  weatherBundle = null,
+  meteo = null,
 }) {
   const cap = capacitaCampoMm(input.tipo_terreno);
   const mad = cap * MAD_FRAZIONE;
   const modOmbra = modificatoreOmbra(percentuale_ombra);
-  let suolo = cap * 0.75;
+  const suoloInizialeOggi =
+    weatherBundle && meteo
+      ? ricostruisciSuoloIniziale(weatherBundle, meteo, input, kc, percentuale_ombra)
+      : cap * 0.82;
+  let suolo = suoloInizialeOggi;
 
   const schemaGiorni = [];
 
@@ -108,6 +172,8 @@ export function simulaBilancioIdricoSettimana({
     const pioggiaUtile = pioggiaEfficaceMm(precip, suolo, cap);
     suolo += pioggiaUtile;
     suolo = Math.min(Math.max(suolo, 0), cap);
+
+    const statoFineGiorno = Math.round(suolo * 10) / 10;
 
     let irriga = false;
     let mm_necessari = 0;
@@ -126,7 +192,7 @@ export function simulaBilancioIdricoSettimana({
       et0_mm: Math.round(et0 * 10) / 10,
       precip_mm: Math.round(precip * 10) / 10,
       etc_mm: Math.round(etc * 10) / 10,
-      stato_suolo_mm: Math.round(suolo * 10) / 10,
+      stato_suolo_mm: statoFineGiorno,
       irriga,
       mm_necessari,
     });
@@ -136,11 +202,7 @@ export function simulaBilancioIdricoSettimana({
   const fabbisogno_oggi_mm = oggi?.irriga ? oggi.mm_necessari : 0;
   const saturazione = (oggi?.precip_mm ?? 0) >= 8 || (oggi && !oggi.irriga && oggi.stato_suolo_mm >= cap * 0.9);
 
-  const statoSuoloMm = oggi
-    ? oggi.irriga
-      ? Math.max(0, Math.round((oggi.stato_suolo_mm - oggi.mm_necessari) * 10) / 10)
-      : oggi.stato_suolo_mm
-    : cap * 0.75;
+  const statoSuoloMm = oggi?.stato_suolo_mm ?? suolo;
   const livelloPct = Math.min(100, Math.max(0, Math.round((statoSuoloMm / cap) * 100)));
   const mmMancanti =
     fabbisogno_oggi_mm > 0
@@ -156,6 +218,7 @@ export function simulaBilancioIdricoSettimana({
     livello_serbatoio_pct: livelloPct,
     mm_mancanti_oggi: Math.round(mmMancanti * 10) / 10,
     schema_giorni: schemaGiorni,
+    suolo_iniziale_oggi_mm: weatherBundle ? suoloInizialeOggi : null,
   };
 }
 
@@ -164,12 +227,19 @@ export function riepilogoSerbatoioUx(bilancio) {
   if (!bilancio) return null;
   const pct = bilancio.livello_serbatoio_pct ?? 0;
   const mm = bilancio.mm_mancanti_oggi ?? 0;
+  const fab = bilancio.fabbisogno_oggi_mm ?? 0;
   const sat = bilancio.saturazione_suolo;
+  const mad = bilancio.mad_mm ?? 0;
+  const statoMm = bilancio.stato_suolo_mm ?? 0;
   let stato = `Serbatoio al ${pct}%`;
   if (sat) {
     stato += " · suolo saturo (pioggia)";
+  } else if (fab > 0) {
+    stato += ` · irriga ${fab} mm (sotto soglia ${mad} mm)`;
   } else if (mm > 0) {
-    stato += ` · mancano ${mm} mm`;
+    stato += ` · mancano ${mm} mm alla soglia`;
+  } else if (statoMm <= mad + 1.5) {
+    stato += " · vicino alla soglia di stress";
   } else {
     stato += " · nessun deficit oggi";
   }
@@ -191,10 +261,17 @@ function forecast7Giorni(weatherBundle, meteo) {
     d.setDate(oggiDate.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
     const row = byDate.get(iso) || {};
+    const rowEt0 = row.et0_mm ?? row.et0 ?? null;
+    let et0Day = rowEt0 ?? (i === 0 ? meteo.et0_mm : null) ?? ag?.et0_mm_media_7g ?? 3;
+    if (i === 0 && meteo.et0_mm != null && rowEt0 != null) {
+      et0Day = Math.max(Number(meteo.et0_mm), Number(rowEt0));
+    } else if (i === 0 && meteo.et0_mm != null) {
+      et0Day = Number(meteo.et0_mm);
+    }
     out.push({
       iso,
       nome: GIORNI_BREVI[d.getDay()],
-      et0_mm: row.et0_mm ?? row.et0 ?? (i === 0 ? meteo.et0_mm : null) ?? ag?.et0_mm_media_7g ?? 3,
+      et0_mm: et0Day,
       precip_mm: row.rain_mm ?? row.precipitation_sum ?? row.precip_mm ?? 0,
     });
   }
@@ -390,6 +467,8 @@ export function calcolaSchemaSettimanale({
     input,
     kc,
     percentuale_ombra: input.percentuale_ombra,
+    weatherBundle,
+    meteo,
   });
 
   const schemaGiorni = bilancio.schema_giorni.map((g) => {
@@ -792,6 +871,8 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     input,
     kc,
     percentuale_ombra: input.percentuale_ombra,
+    weatherBundle,
+    meteo,
   });
 
   const fabbisogno_mm = bilancio.fabbisogno_oggi_mm;
