@@ -1,6 +1,14 @@
 .chat--photo {
-  max-width: 520px;
   padding-bottom: 4rem;
+}
+
+.chat--photo .weather-setup,
+.chat--photo .photo-hero,
+.chat--photo .photo-result,
+.chat--photo .photo-loading {
+  max-width: 32.5rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .photo-input-hidden {

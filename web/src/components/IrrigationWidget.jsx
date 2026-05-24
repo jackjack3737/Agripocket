@@ -14,6 +14,38 @@ function formatMinutiLinea(z) {
   return m > 0 ? `${m} min` : "OFF";
 }
 
+function formatMinutiLineaSettimana(l) {
+  if (l.cicli > 1) return `${l.cicli}×${l.minuti_per_ciclo}`;
+  const m = l.minuti_totali ?? l.minuti_per_ciclo ?? 0;
+  return m > 0 ? String(m) : "0";
+}
+
+function GiornoSettimanaIrrigazione({ g }) {
+  const mm = g.fabbisogno_mm ?? g.mm_necessari;
+  const linee = g.linee?.filter((l) => (l.minuti_totali ?? l.minuti_per_ciclo ?? 0) > 0 || l.cicli > 0);
+  const multiLinea = linee?.length > 1;
+
+  if (multiLinea) {
+    return (
+      <div className="irrigation-widget__giorno-body">
+        {mm != null ? <span className="irrigation-widget__giorno-mm">{mm} mm</span> : null}
+        <ul className="irrigation-widget__giorno-linee" aria-label="Minuti per linea centralina">
+          {linee.map((l) => (
+            <li key={l.n}>
+              <span className="irrigation-widget__giorno-linea-n">L{l.n}</span>
+              <strong className="irrigation-widget__giorno-linea-v">
+                {formatMinutiLineaSettimana(l)} min
+              </strong>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return <span className="irrigation-widget__giorno-min">{g.nota || `${g.minuti} min`}</span>;
+}
+
 /** Riga compatta: Linea 1 → tot minuti */
 function IrrigationProgramCompact({ programma, centralina, tecnici, azione }) {
   if (programma?.zone?.length) {
@@ -107,11 +139,13 @@ function IrrigationWeeklySchedule({ schema, azione }) {
           <div
             key={g.iso}
             role="listitem"
-            className={`irrigation-widget__giorno${g.irriga ? " irrigation-widget__giorno--on" : ""}`}
+            className={`irrigation-widget__giorno${g.irriga ? " irrigation-widget__giorno--on" : ""}${
+              g.irriga && g.linee?.length > 1 ? " irrigation-widget__giorno--multilinea" : ""
+            }`}
           >
             <span className="irrigation-widget__giorno-nome">{g.nome}</span>
             {g.irriga ? (
-              <span className="irrigation-widget__giorno-min">{g.nota || `${g.minuti} min`}</span>
+              <GiornoSettimanaIrrigazione g={g} />
             ) : (
               <span className="irrigation-widget__giorno-stato irrigation-widget__giorno-stato--off">
                 {g.nota || "—"}

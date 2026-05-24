@@ -562,6 +562,10 @@
   text-align: center;
 }
 
+.irrigation-widget__giorno--multilinea {
+  min-height: 4.5rem;
+}
+
 .irrigation-widget__giorno--on {
   background: #e3f2fd;
   border-color: #90caf9;
@@ -595,6 +599,51 @@
   font-size: 0.58rem;
   color: #37474f;
   line-height: 1.15;
+}
+
+.irrigation-widget__giorno-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.irrigation-widget__giorno-mm {
+  font-size: 0.58rem;
+  font-weight: 650;
+  color: #1565c0;
+  line-height: 1.1;
+}
+
+.irrigation-widget__giorno-linee {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.irrigation-widget__giorno-linee li {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.2rem;
+  font-size: 0.54rem;
+  line-height: 1.1;
+  color: #37474f;
+}
+
+.irrigation-widget__giorno-linea-n {
+  font-weight: 700;
+  color: #607d8b;
+}
+
+.irrigation-widget__giorno-linea-v {
+  font-weight: 650;
+  color: #0d47a1;
 }
 
 .irrigation-widget__settimana-riepilogo,

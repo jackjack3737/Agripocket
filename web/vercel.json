@@ -17,7 +17,7 @@
       "maxDuration": 30
     },
     "api/chat-zona.js": {
-      "maxDuration": 60
+      "maxDuration": 120
     }
   },
   "rewrites": [

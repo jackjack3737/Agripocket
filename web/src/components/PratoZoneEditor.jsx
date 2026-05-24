@@ -72,7 +72,7 @@ export default function PratoZoneEditor({ profile, userId, onProfileUpdate }) {
   }
 
   return (
-    <section className="dash-card dash-card--zone-editor dash-card--wide">
+    <section className="dash-card dash-card--zone-editor">
       <h2 className="dash-card__title">Mappa del prato</h2>
       <p className="dash-card__sub">
         Tocca una funzione per aprire la mappa; la freccia ▾ mostra il riepilogo (seme, irrigatori o pendenza).

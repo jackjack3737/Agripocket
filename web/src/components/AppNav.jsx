@@ -7,7 +7,7 @@ const LINKS = [
   { key: "calendario", to: "/calendario", label: "Calendario" },
 ];
 
-export default function AppNav({ active, showRotatingWord = false, profile }) {
+export default function AppNav({ active, profile }) {
   return (
     <nav className="dash-nav" aria-label="Sezioni app">
       {LINKS.map(({ key, to, label }) => (
@@ -19,7 +19,9 @@ export default function AppNav({ active, showRotatingWord = false, profile }) {
           {label}
         </Link>
       ))}
-      {showRotatingWord ? <DashRotatingWord profile={profile} /> : null}
+      <span className="dash-nav__tail">
+        <DashRotatingWord profile={profile} />
+      </span>
     </nav>
   );
 }

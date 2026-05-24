@@ -77,6 +77,27 @@ async function queryKnowledgeBase(admin, embedding) {
   );
 }
 
+function parseGeminiJson(raw) {
+  const cleaned = String(raw || "")
+    .replace(/^```json\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
 async function geminiGenerate(apiKey, prompt, opts = {}) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${CHAT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
@@ -93,7 +114,22 @@ async function geminiGenerate(apiKey, prompt, opts = {}) {
   });
   if (!res.ok) throw new Error(`Gemini: ${res.status}`);
   const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.map((p) => p?.text ?? "").join("")?.trim() ?? "";
+  const cand = data?.candidates?.[0];
+  const text = cand?.content?.parts?.map((p) => p?.text ?? "").join("")?.trim() ?? "";
+  if (cand?.finishReason === "MAX_TOKENS" && text && !opts.json) {
+    console.warn("[chat-zona] risposta Gemini troncata (MAX_TOKENS)");
+  }
+  return text;
+}
+
+/** Se la bozza finisce a metà frase, aggiunge una chiusura minima. */
+function chiudiBozzaSeTroncata(testo) {
+  const t = String(testo || "").trim();
+  if (!t) return t;
+  if (/[.!?…)"']\s*$/.test(t)) return t;
+  const ultimoPunto = Math.max(t.lastIndexOf("."), t.lastIndexOf("!"), t.lastIndexOf("?"));
+  if (ultimoPunto > 80) return `${t.slice(0, ultimoPunto + 1).trim()}`;
+  return `${t}… (Riprova con una domanda più breve se manca la parte finale.)`;
 }
 
 function pratoZoneEffettivo(profilo, zona) {
@@ -208,44 +244,35 @@ function formatKbChunks(chunks) {
 }
 
 async function verificaRispostaRAG(apiKey, { domanda, bozza, kb, contestoAutorizzato, senzaFoto }) {
-  const prompt = `Sei revisore agronomico. Controlla se la BOZZA risponde alla DOMANDA in modo coerente.
+  const prompt = `Sei revisore agronomico. Valuta SOLO se la BOZZA è accettabile. NON riscrivere la risposta.
 
 DOMANDA UTENTE:
 ${domanda}
 
 ${senzaFoto ? "MODALITÀ: nessuna foto allegata — profilo, mappa, meteo e KB sono fonti valide.\n" : ""}
-FONTI AUTORIZZATE (la bozza deve attenersi a queste, non inventare oltre):
-${contestoAutorizzato}
+FONTI AUTORIZZATE:
+${contestoAutorizzato.slice(0, 3500)}
 
-CHUNK KNOWLEDGE BASE:
-${kb}
+CHUNK KB (estratto):
+${String(kb).slice(0, 2500)}
 
-BOZZA:
-${bozza}
+BOZZA DA VALIDARE:
+${bozza.slice(0, 10000)}
 
-Rispondi SOLO con JSON valido:
-{
-  "ok": true,
-  "risposta_finale": "testo in italiano per il giardiniere, chiaro e concreto (fino a ~250 parole se serve spiegare un calcolo)"
-}
+Rispondi SOLO con JSON:
+{ "ok": true }
+oppure
+{ "ok": false, "motivo": "una frase breve" }
 
-oppure se la bozza inventa dati, è fuori tema o nessuna fonte supporta la risposta:
-{
-  "ok": false,
-  "risposta_finale": "${RISPOSTA_INSUFFICIENTE}"
-}
+ok=false solo se: prodotti/dosi inventati; diagnosi certa di malattia senza foto né KB; risposta completamente fuori tema.
+ok=true se la bozza risponde alla domanda usando profilo, mappa, meteo, irrigazione calcolata o KB (anche con spiegazioni dedotte).
+NON richiedere il campo risposta_finale: non riscrivere il testo.`;
 
-Criteri ok=false: prodotti/dosi inventati non presenti nelle fonti; diagnosi certa su patologia senza foto né chunk che la supportano.
-NON bloccare spiegazioni fisiologiche o idrauliche dedotte da IRRIGAZIONE CALCOLATA OGGI, profilo, mappa o meteo anche se non compaiono parola per parola nei chunk KB.`;
-
-  const raw = await geminiGenerate(apiKey, prompt, { temperature: 0.1, maxOutputTokens: 1024, json: true });
-  try {
-    const parsed = JSON.parse(raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, ""));
-    const fin = String(parsed.risposta_finale || "").trim();
-    if (parsed.ok === true && fin.length > 40) return { ok: true, risposta: fin };
-    if (fin) return { ok: false, risposta: fin };
-  } catch {
-    /* fallback sotto */
+  const raw = await geminiGenerate(apiKey, prompt, { temperature: 0.1, maxOutputTokens: 128, json: true });
+  const parsed = parseGeminiJson(raw);
+  if (parsed?.ok === true) return { ok: true, risposta: bozza };
+  if (parsed?.ok === false) {
+    return { ok: false, risposta: RISPOSTA_INSUFFICIENTE };
   }
   if (/non sono sufficienti|intervento in loco/i.test(bozza)) {
     return { ok: false, risposta: RISPOSTA_INSUFFICIENTE };
@@ -408,8 +435,8 @@ export async function rispondiChatZona(admin, userId, domanda, { zonaId, profilo
     : "MODALITÀ: disponibile analisi foto recente — integrala se pertinente alla domanda.";
 
   const lunghezzaRisposta = spiegazione || domandaIrrig
-    ? "Fino a ~250 parole: spiega il PERCHÉ con catena logica (ET0, Kc, pioggia, ombra, pendenza, cicli). Usa elenco puntato se utile."
-    : "Risposta compatta (circa 8–14 righe utili), senza tagliare a metà.";
+    ? "Spiega il PERCHÉ con catena logica (ET0, Kc, pioggia, ombra, pendenza, cicli). Usa elenco puntato se utile. Chiudi con una frase di sintesi operativa."
+    : "Risposta completa in 8–18 righe utili: ultima frase deve concludere con un consiglio pratico chiaro.";
 
   const prioritaIrrig = domandaIrrig
     ? `
@@ -458,7 +485,7 @@ REGOLE (Step B — bozza):
 3. Senza foto: consigli su irrigazione, taglio, ombra, concimazione leggera e gestione sono ammessi se supportati dalle fonti.
 4. NON inventare prodotti commerciali, dosi fitofarmaci o patologie non supportate dalle fonti.
 5. Rispondi "${RISPOSTA_INSUFFICIENTE}" solo se nessuna fonte sopra copre la domanda (es. diagnosi precisa di malattia su macchia senza foto).
-6. Completa ogni frase: non troncare spiegazioni tecniche per risparmiare spazio.`;
+6. Ogni frase deve essere completa. Termina sempre l'ultimo periodo (punto finale obbligatorio).`;
 
   const contestoAutorizzato = [
     irrigazioneOggiBlock ? `Irrigazione oggi: ${irrigazioneOggiBlock.slice(0, 2000)}` : null,
@@ -470,9 +497,10 @@ REGOLE (Step B — bozza):
     .filter(Boolean)
     .join("\n\n");
 
-  const bozza = await geminiGenerate(geminiKey, prompt, {
-    maxOutputTokens: spiegazione || domandaIrrig ? 2048 : 1024,
+  const bozzaRaw = await geminiGenerate(geminiKey, prompt, {
+    maxOutputTokens: spiegazione || domandaIrrig ? 4096 : 3072,
   });
+  const bozza = chiudiBozzaSeTroncata(bozzaRaw);
   if (!bozza) {
     return {
       risposta: RISPOSTA_INSUFFICIENTE,

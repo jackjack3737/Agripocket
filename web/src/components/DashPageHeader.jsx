@@ -1,10 +1,33 @@
+import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "./AppNav";
 
 const TAGLINE_WORDS = ["la", "scienza", "sotto", "il", "verde"];
 
+function taglineGiaVista() {
+  try {
+    return sessionStorage.getItem("solum_tagline_seen") === "1";
+  } catch {
+    return true;
+  }
+}
+
 /** Header app: logo + tagline + nav sempre visibili su dashboard, analisi foto, calendario. */
 export default function DashPageHeader({ active, onLogout, profile }) {
+  const taglineReady = useMemo(() => taglineGiaVista(), []);
+
+  useEffect(() => {
+    if (taglineReady) return undefined;
+    const id = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem("solum_tagline_seen", "1");
+      } catch {
+        /* ignore */
+      }
+    }, 2200);
+    return () => window.clearTimeout(id);
+  }, [taglineReady]);
+
   return (
     <header className="dash-header dash-header--hero">
       <div className="dash-header__brandline">
@@ -19,7 +42,10 @@ export default function DashPageHeader({ active, onLogout, profile }) {
               decoding="async"
             />
           </Link>
-          <p className="dash-header__tagline" aria-label="la scienza sotto il verde">
+          <p
+            className={`dash-header__tagline${taglineReady ? " dash-header__tagline--ready" : ""}`}
+            aria-label="la scienza sotto il verde"
+          >
             {TAGLINE_WORDS.map((word, i) => (
               <span
                 key={word}
@@ -49,7 +75,7 @@ export default function DashPageHeader({ active, onLogout, profile }) {
           </button>
         </div>
       </div>
-      <AppNav active={active} showRotatingWord={active === "dashboard"} profile={profile} />
+      <AppNav active={active} profile={profile} />
     </header>
   );
 }

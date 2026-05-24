@@ -519,6 +519,149 @@ function raggruppaLineeIdrauliche(heads) {
     }));
 }
 
+/** Linee centralina dalla mappa (null se nessun irrigatore). */
+export function lineeIdraulicheDaProfilo(profilo) {
+  const { zone } = normalizePratoZone(profilo?.prato_zone);
+  const heads = zone
+    .filter((z) => z.tipo === "irrigatore")
+    .map((z) => ({ ...z, modalita: normalizeIrrigatorModalita(z.modalita) }));
+  if (!heads.length) return null;
+  return raggruppaLineeIdrauliche(heads);
+}
+
+function formatMinutiLineaSettimana({ cicli, minuti_per_ciclo, minuti_totali }) {
+  if (cicli > 1) return `${cicli}×${minuti_per_ciclo} min`;
+  const m = minuti_totali ?? minuti_per_ciclo ?? 0;
+  return m > 0 ? `${m} min` : "OFF";
+}
+
+function notaGiornoIrriguo(mm, lineeGiorno, fallbackMin, fallbackCicli) {
+  const mmStr = `${mm} mm`;
+  if (!lineeGiorno?.length) {
+    if (fallbackCicli > 1) return `${mmStr} · ${fallbackCicli}×${fallbackMin} min`;
+    return `${mmStr} · ${fallbackMin} min`;
+  }
+  if (lineeGiorno.length === 1) {
+    return `${mmStr} · ${formatMinutiLineaSettimana(lineeGiorno[0])}`;
+  }
+  const mins = lineeGiorno.map((l) => l.minuti_totali ?? l.minuti_per_ciclo ?? 0);
+  const allSame = mins.every((m) => m === mins[0]) && lineeGiorno.every((l) => l.cicli === lineeGiorno[0].cicli);
+  if (allSame && lineeGiorno[0].cicli <= 1) {
+    return `${mmStr} · ${formatMinutiLineaSettimana(lineeGiorno[0])}`;
+  }
+  return mmStr;
+}
+
+/**
+ * Minuti/cicli per una uscita centralina e un fabbisogno mm del giorno.
+ */
+export function calcolaProgrammaLineaIdraulica(
+  linea,
+  { mm, input, azione, irriga = true, testeById = {} },
+) {
+  const tipo = modalitaToTipoCentralina(linea.modalita);
+  const pluv = pluviometriaMmOra(tipo);
+  const nTeste = linea.teste.length;
+
+  const fracOmbra =
+    nTeste > 0
+      ? linea.teste.reduce((s, t) => s + (testeById[t.id]?.peso_ombra ?? 0), 0) / nTeste
+      : 0;
+  const modLinea = modificatoreMmLinea(fracOmbra);
+  const mmLinea = Math.round(Math.max(0, Number(mm) || 0) * modLinea * 10) / 10;
+
+  const vicinoPendenza = linea.teste.some((t) => testeById[t.id]?.vicino_pendenza);
+  const pendenzaLinea = vicinoPendenza
+    ? upgradePendenzaUnLivello(input.pendenza)
+    : input.pendenza;
+
+  let minutiTotaliLinea = 0;
+  if (irriga && azione !== "SPEGNI" && mmLinea > 0) {
+    minutiTotaliLinea = minutiDaFabbisogno(mmLinea, pluv);
+  }
+
+  const cicliZona = calcolaCicli({
+    minuti_totali: minutiTotaliLinea,
+    tipo_terreno: input.tipo_terreno,
+    pendenza: pendenzaLinea,
+  });
+
+  let cicli = azione === "SPEGNI" ? 0 : cicliZona.cicli_consigliati;
+  let minutiPerCiclo = azione === "SPEGNI" ? 0 : cicliZona.minuti_per_ciclo;
+  if (linea.modalita === "dinamico" && minutiTotaliLinea > 0 && minutiTotaliLinea <= 50) {
+    cicli = 1;
+    minutiPerCiclo = minutiTotaliLinea;
+  }
+
+  return {
+    zona_numero: linea.linea_numero,
+    modalita: linea.modalita,
+    mm_da_evadere: mmLinea,
+    minuti_per_ciclo: minutiPerCiclo,
+    cicli,
+    minuti_totali_linea: minutiTotaliLinea,
+  };
+}
+
+/** Aggiunge `linee[]` per giorno irriguo nella griglia settimanale (minuti per uscita). */
+export function arricchisciSchemaSettimanalePerLinee(schema, profilo, input, azione) {
+  if (!schema?.giorni?.length) return schema;
+
+  const linee = lineeIdraulicheDaProfilo(profilo);
+  if (!linee?.length) {
+    schema.per_linea = false;
+    return schema;
+  }
+
+  const testeById = input.contesto_mappa?.teste_by_id || {};
+  const irrigaGlobale = azione !== "SPEGNI";
+
+  schema.per_linea = linee.length > 1;
+  schema.giorni = schema.giorni.map((g) => {
+    if (!g.irriga) return { ...g, linee: [] };
+
+    const mm = g.mm_necessari ?? g.fabbisogno_mm ?? 0;
+    const lineeGiorno = linee.map((linea) => {
+      const z = calcolaProgrammaLineaIdraulica(linea, {
+        mm,
+        input,
+        azione,
+        irriga: irrigaGlobale,
+        testeById,
+      });
+      return {
+        n: z.zona_numero,
+        minuti_totali: z.minuti_totali_linea,
+        cicli: z.cicli,
+        minuti_per_ciclo: z.minuti_per_ciclo,
+        modalita: z.modalita,
+      };
+    });
+
+    return {
+      ...g,
+      linee: lineeGiorno,
+      nota: notaGiornoIrriguo(mm, lineeGiorno, g.minuti, g.passate),
+    };
+  });
+
+  const primoIrriguo = schema.giorni.find((g) => g.irriga && g.linee?.length);
+  if (primoIrriguo?.linee?.length > 1 && schema.riepilogo_ux) {
+    const dettaglio = primoIrriguo.linee
+      .map((l) => `L${l.n} ~${formatMinutiLineaSettimana(l)}`)
+      .join(", ");
+    schema.riepilogo_ux = schema.riepilogo_ux.replace(
+      /\(~[\d]+ min con impianto di riferimento\)/,
+      `(per linea: ${dettaglio})`,
+    );
+    if (!schema.riepilogo_ux.includes("per linea:")) {
+      schema.riepilogo_ux = `${schema.riepilogo_ux} Minuti per uscita: ${dettaglio}.`.slice(0, 520);
+    }
+  }
+
+  return schema;
+}
+
 /**
  * Programma per linea centralina (non dividere mm per numero teste).
  */
@@ -526,14 +669,8 @@ export function calcolaProgrammaZoneCentralina(
   profilo,
   { mm_target, azione, schema_settimanale, input },
 ) {
-  const { zone } = normalizePratoZone(profilo?.prato_zone);
-  const heads = zone
-    .filter((z) => z.tipo === "irrigatore")
-    .map((z) => ({ ...z, modalita: normalizeIrrigatorModalita(z.modalita) }));
-
-  if (!heads.length) return null;
-
-  const linee = raggruppaLineeIdrauliche(heads);
+  const linee = lineeIdraulicheDaProfilo(profilo);
+  if (!linee?.length) return null;
   const freq = schema_settimanale?.frequenza;
   const frequenzaLabel = freq?.label ?? "A deficit (vedi griglia settimanale)";
   const giorniAttivi = (schema_settimanale?.giorni || []).filter((g) => g.irriga).map((g) => g.nome);
@@ -543,42 +680,34 @@ export function calcolaProgrammaZoneCentralina(
   const testeById = input.contesto_mappa?.teste_by_id || {};
 
   const zoneOut = linee.map((linea) => {
-    const tipo = modalitaToTipoCentralina(linea.modalita);
-    const pluv = pluviometriaMmOra(tipo);
-    const modeLabel = IRRIGATOR_MODES[linea.modalita]?.label || linea.modalita;
     const nTeste = linea.teste.length;
-
-    const fracOmbra =
-      nTeste > 0
-        ? linea.teste.reduce((s, t) => s + (testeById[t.id]?.peso_ombra ?? 0), 0) / nTeste
-        : 0;
     const inOmbra = linea.teste.filter((t) => (testeById[t.id]?.peso_ombra ?? 0) >= 0.99).length;
     const inMezzombra = linea.teste.filter((t) => testeById[t.id]?.in_mezzombra).length;
-    const modLinea = modificatoreMmLinea(fracOmbra);
-    const mmLinea = Math.round(mm * modLinea * 10) / 10;
-
     const vicinoPendenza = linea.teste.some((t) => testeById[t.id]?.vicino_pendenza);
     const pendenzaLinea = vicinoPendenza
       ? upgradePendenzaUnLivello(input.pendenza)
       : input.pendenza;
 
-    let minutiTotaliLinea = 0;
-    if (oggiIrriga && mmLinea > 0) {
-      minutiTotaliLinea = minutiDaFabbisogno(mmLinea, pluv);
-    }
-
-    const cicliZona = calcolaCicli({
-      minuti_totali: minutiTotaliLinea,
-      tipo_terreno: input.tipo_terreno,
-      pendenza: pendenzaLinea,
+    const calc = calcolaProgrammaLineaIdraulica(linea, {
+      mm,
+      input,
+      azione,
+      irriga: oggiIrriga,
+      testeById,
     });
-
-    let cicli = azione === "SPEGNI" ? 0 : cicliZona.cicli_consigliati;
-    let minutiPerCiclo = azione === "SPEGNI" ? 0 : cicliZona.minuti_per_ciclo;
-    if (linea.modalita === "dinamico" && minutiTotaliLinea > 0 && minutiTotaliLinea <= 50) {
-      cicli = 1;
-      minutiPerCiclo = minutiTotaliLinea;
-    }
+    const {
+      mm_da_evadere: mmLinea,
+      minuti_per_ciclo: minutiPerCiclo,
+      cicli,
+      minuti_totali_linea: minutiTotaliLinea,
+    } = calc;
+    const tipo = modalitaToTipoCentralina(linea.modalita);
+    const pluv = pluviometriaMmOra(tipo);
+    const modeLabel = IRRIGATOR_MODES[linea.modalita]?.label || linea.modalita;
+    const cicliZona =
+      cicli > 1
+        ? { pausa_tra_cicli_min: PAUSA_TRA_CICLI_MIN }
+        : { pausa_tra_cicli_min: null };
 
     const etichetta = `Linea ${linea.linea_numero} · ${modeLabel}${nTeste > 1 ? ` (${nTeste} teste)` : ""}`;
 
@@ -636,7 +765,7 @@ export function calcolaProgrammaZoneCentralina(
 
   return {
     numero_zone: zoneOut.length,
-    numero_teste_mappa: heads.length,
+    numero_teste_mappa: linee.reduce((s, l) => s + l.teste.length, 0),
     zone: zoneOut,
     minuti_totali_zone: zoneOut.reduce((s, z) => s + z.minuti_totali_linea, 0),
     sintesi:
@@ -681,7 +810,7 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     saturazione_suolo: bilancio.saturazione_suolo,
   });
 
-  const schema_settimanale = calcolaSchemaSettimanale({
+  let schema_settimanale = calcolaSchemaSettimanale({
     weatherBundle,
     input,
     meteo,
@@ -692,6 +821,13 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     kc,
     pluv_riferimento: pluv,
   });
+
+  schema_settimanale = arricchisciSchemaSettimanalePerLinee(
+    schema_settimanale,
+    profilo,
+    input,
+    azione,
+  );
 
   const programma_zone = calcolaProgrammaZoneCentralina(profilo, {
     mm_target: fabbisogno_mm,

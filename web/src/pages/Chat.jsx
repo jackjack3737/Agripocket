@@ -141,7 +141,7 @@ export default function Chat({ profile, session, onProfileUpdate }) {
   }
 
   return (
-    <div className="page chat chat--photo">
+    <div className="page dashboard chat chat--photo">
       <DashPageHeader active="chat" profile={profile} onLogout={logout} />
 
       <section className="weather-setup">

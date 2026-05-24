@@ -206,7 +206,7 @@ Regole:
 export async function persistAnalisiAndInterventi(
   admin,
   userId,
-  { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType, zonaId },
+  { report, vision, chunksUsed, interventi, profilo, imageBase64, mimeType, zonaId, modalita },
   { geminiGenerate, geminiKey, fonteInterventi = "ia_foto", integraPiano = true, openWeatherApiKey } = {},
 ) {
   const insertRow = {
@@ -216,6 +216,7 @@ export async function persistAnalisiAndInterventi(
     chunks_used: chunksUsed ?? 0,
   };
   if (zonaId) insertRow.zona_id = zonaId;
+  if (modalita) insertRow.modalita = modalita;
 
   const { data: analisi, error: analisiErr } = await admin
     .from("prato_analisi")

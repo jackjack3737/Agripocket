@@ -7,6 +7,7 @@ import { testoAlertAnalisiSuolo } from "./laboratoriSuolo.mjs";
 import { loadZonaIdForUser } from "./zoneMeteo.mjs";
 import { queryKnowledgeBasePrioritizedWithRetry } from "./kbQuery.mjs";
 import { applicaDeclassamentoFunginoMeteo, NOTA_DECLASS } from "./visionMeteoDeclass.mjs";
+import { scheduleCleanupVecchieFotoAgronomo } from "./fotoCleanup.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -511,6 +512,7 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
         imageBase64: img,
         mimeType,
         zonaId,
+        modalita: isMacchia ? "macchia_zona" : "prato",
       },
       {
         geminiGenerate,
@@ -525,6 +527,10 @@ ${testoAlertAnalisiSuolo(profilo?.localita).labListMarkdown}
     dashboardReady = !saved.tablesMissing;
   } catch (e) {
     console.warn("[analizza-prato] dashboard/interventi:", e.message);
+  }
+
+  if (isMacchia && img) {
+    scheduleCleanupVecchieFotoAgronomo(admin, userData.user.id);
   }
 
   return {

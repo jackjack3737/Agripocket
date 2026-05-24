@@ -178,14 +178,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           </section>
 
           <IrrigationWidget profile={profile} enabled={!!profile?.localita} />
-
-          <StatoClinicoWidget
-            ultimaAnalisi={ultimaAnalisi}
-            zonaNome={zonaDefault?.nome_zona}
-            weather={weather}
-            userId={userId}
-            profile={profile}
-          />
         </div>
 
         <section className="dash-card dash-card--radar">
@@ -239,9 +231,17 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
           ) : null}
         </section>
 
-        <StatoClinicoGeminiBar ultimaAnalisi={ultimaAnalisi} />
+        <StatoClinicoWidget
+          ultimaAnalisi={ultimaAnalisi}
+          zonaNome={zonaDefault?.nome_zona}
+          weather={weather}
+          userId={userId}
+          profile={profile}
+        />
 
         <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />
+
+        <StatoClinicoGeminiBar ultimaAnalisi={ultimaAnalisi} />
 
         {visionUltima?.richiede_analisi_suolo ? (
           <AnalisiSuoloAlert

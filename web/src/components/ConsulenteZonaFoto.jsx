@@ -97,6 +97,12 @@ export default function ConsulenteZonaFoto({
           zonaId,
         });
         setResultTesto(data);
+        requestAnimationFrame(() => {
+          document.getElementById("agronomo-risposta-testo")?.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        });
       }
     } catch (err) {
       setError(err.message || "Richiesta non riuscita");
@@ -278,9 +284,9 @@ export default function ConsulenteZonaFoto({
         </div>
       ) : null}
       {resultTesto && !loading ? (
-        <div className="agronomo-ask__risposta agronomo-ask__risposta--testo">
+        <div className="agronomo-ask__risposta agronomo-ask__risposta--testo" id="agronomo-risposta-testo">
           <p className="agronomo-ask__risposta-label">Risposta</p>
-          <p className="agronomo-ask__testo">{resultTesto.risposta}</p>
+          <div className="agronomo-ask__testo">{resultTesto.risposta}</div>
           {resultTesto.chunksUsed != null ? (
             <p className="dash-card__meta">
               {resultTesto.fonte === "rag_verificato"

@@ -1,6 +1,6 @@
 /** Storage foto prato: bucket privato, niente URL pubblici. */
 
-const BUCKET = "prato-foto";
+export const BUCKET = "prato-foto";
 const SIGNED_TTL_SEC = 900;
 
 export async function uploadAnalisiFoto(admin, userId, analisiId, imageBase64, mimeType = "image/jpeg") {

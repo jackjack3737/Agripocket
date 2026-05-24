@@ -3,7 +3,7 @@ import { loadServerEnv } from "../server/serverEnv.mjs";
 import { adminClient } from "../server/jobs.mjs";
 import { rispondiChatZona } from "../server/chatZonaRAG.mjs";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
