@@ -1824,6 +1824,15 @@
   background: transparent;
 }
 
+.dash-card--essenza {
+  grid-column: 1 / -1;
+}
+
+.dash-card--essenza .essenza-widget__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
 .dash-card--irrigation .dash-card__title {
   font-size: 1rem;
 }

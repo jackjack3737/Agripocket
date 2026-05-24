@@ -1,52 +1,55 @@
-.essenza-termica-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  margin-top: 0.85rem;
+/* Widget full-width in dashboard (come meteo / stato prato) */
+.essenza-widget {
+  width: 100%;
 }
 
-.essenza-termica__row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-  align-items: stretch;
-}
-
-@media (max-width: 560px) {
-  .essenza-termica__row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.essenza-termica {
-  padding: 0.9rem 1rem 1rem;
-  border-radius: 14px;
-  background: linear-gradient(165deg, #f1f8e9 0%, #fff 55%);
-  border: 1px solid rgba(76, 175, 80, 0.28);
-  box-shadow: 0 4px 16px rgba(40, 90, 50, 0.07);
-}
-
-.essenza-termica--scala {
-  margin-top: 0;
-}
-
-.essenza-termica--empty {
-  background: #fafafa;
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-.essenza-termica__title {
-  margin: 0 0 0.2rem;
-  font-size: 1rem;
-  font-weight: 700;
+.essenza-widget__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: #1b5e20;
 }
 
-.essenza-termica__sub {
+.essenza-widget--infest .essenza-widget__title {
+  color: #b71c1c;
+}
+
+.essenza-widget__meta {
   margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: #78909c;
+}
+
+.essenza-widget__sub {
+  margin: 0 0 0.5rem;
   font-size: 0.78rem;
   color: #546e7a;
+}
+
+.essenza-widget__hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  color: #607d8b;
+  line-height: 1.4;
+}
+
+.essenza-widget__foot {
+  margin: 0.5rem 0 0;
+  font-size: 0.66rem;
+  color: #90a4ae;
   line-height: 1.35;
+}
+
+.essenza-widget__body {
+  padding: 0.75rem 0.85rem 0.85rem;
+  border-radius: 12px;
+  background: linear-gradient(165deg, #f1f8e9 0%, #fff 58%);
+  border: 1px solid rgba(76, 175, 80, 0.22);
+}
+
+.essenza-widget__body--infest {
+  background: linear-gradient(165deg, #ffebee 0%, #fff 58%);
+  border-color: rgba(198, 40, 40, 0.2);
 }
 
 .essenza-termica__msg {
@@ -234,71 +237,11 @@
   box-shadow: 0 0 0 2px rgba(106, 27, 154, 0.35);
 }
 
-/* Blocco prato / infestanti */
-.essenza-termica__blocco {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 0.85rem 0.75rem 0.9rem;
-  border-radius: 14px;
-  background: linear-gradient(165deg, #f1f8e9 0%, #fff 60%);
-  border: 1px solid rgba(76, 175, 80, 0.28);
-  box-shadow: 0 4px 14px rgba(40, 90, 50, 0.06);
-}
-
-.essenza-termica__blocco .essenza-termica__panel {
-  flex: 1;
-  min-height: 0;
-}
-
-.essenza-termica__blocco--infest {
-  background: linear-gradient(165deg, #ffebee 0%, #fff 55%);
-  border-color: rgba(198, 40, 40, 0.25);
-}
-
-.essenza-termica__blocco-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.15rem;
-}
-
-.essenza-termica__blocco-tit {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #1b5e20;
-}
-
-.essenza-termica__blocco--infest .essenza-termica__blocco-tit {
-  color: #b71c1c;
-}
-
-.essenza-termica__blocco-n {
-  font-size: 0.68rem;
-  color: #78909c;
-}
-
-.essenza-termica__blocco-hint {
-  margin: 0 0 0.5rem;
-  font-size: 0.7rem;
-  color: #607d8b;
-  line-height: 1.35;
-}
-
 .essenza-termica__hint-tap {
   margin: 0.45rem 0 0;
   font-size: 0.72rem;
   color: #90a4ae;
   font-style: italic;
-}
-
-.essenza-termica__blocco-foot {
-  margin: 0.55rem 0 0;
-  font-size: 0.66rem;
-  color: #90a4ae;
-  line-height: 1.35;
 }
 
 /* Pannello elenco filtrato */
@@ -312,13 +255,13 @@
   overflow-y: auto;
 }
 
-@media (min-width: 561px) {
-  .essenza-termica__row .essenza-termica__panel {
-    max-height: 18rem;
+@media (min-width: 640px) {
+  .essenza-termica__panel {
+    max-height: 20rem;
   }
 }
 
-.essenza-termica__blocco--infest .essenza-termica__panel {
+.essenza-widget__body--infest .essenza-termica__panel {
   border-color: rgba(198, 40, 40, 0.22);
 }
 
@@ -515,7 +458,7 @@
 }
 
 
-.dashboard .essenza-termica-wrap,
-.dashboard .essenza-termica-wrap * {
+.dashboard .dash-card--essenza .essenza-widget,
+.dashboard .dash-card--essenza .essenza-widget * {
   font-family: inherit;
 }

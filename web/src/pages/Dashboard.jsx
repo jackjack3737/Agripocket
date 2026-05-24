@@ -10,7 +10,7 @@ import PratoZoneEditor from "../components/PratoZoneEditor";
 import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import IrrigationWidget from "../components/IrrigationWidget";
-import EssenzaTermicaWidget from "../components/EssenzaTermicaWidget";
+import { EssenzaInfestantiWidget, EssenzaPratoWidget } from "../components/EssenzaTermicaWidget";
 import { computePratoStats, labelStatoPrato } from "../lib/pratoStats";
 import { loadInterventi, loadUltimaAnalisi } from "../lib/dashboard";
 import { fetchMeteoForCity } from "../lib/weatherClient";
@@ -176,7 +176,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             {weather ? (
               <WeatherCard bundle={weather} compact zonaNome={zonaDefault?.nome_zona} />
             ) : null}
-            {weather ? <EssenzaTermicaWidget bundle={weather} profile={profile} /> : null}
           </section>
 
           <IrrigationWidget profile={profile} enabled={!!profile?.localita} />
@@ -232,6 +231,18 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
             </p>
           ) : null}
         </section>
+
+        {weather ? (
+          <section className="dash-card dash-grid__span dash-card--essenza">
+            <EssenzaPratoWidget bundle={weather} profile={profile} />
+          </section>
+        ) : null}
+
+        {weather ? (
+          <section className="dash-card dash-grid__span dash-card--essenza">
+            <EssenzaInfestantiWidget bundle={weather} profile={profile} />
+          </section>
+        ) : null}
 
         <StatoClinicoWidget
           ultimaAnalisi={ultimaAnalisi}
