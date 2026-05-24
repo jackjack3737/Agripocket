@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { TIPOLOGIE_PRATO } from "../data/speciePratoItalia.js";
 import {
   GRUPPI_ESSENZA,
-  SCALA_TERMICA,
   STATI_SPECIE,
   ordinaSpeciePerFiltro,
   riepilogoStati,
@@ -10,58 +9,13 @@ import {
   speciePerGruppoEssenza,
   soddisfaFiltroStato,
   statoDaMeteo,
-  zonaTermicaLabel,
 } from "../lib/essenzaTermica";
 import "../styles-essenza-termica.css";
-
-const ZONE_SCALA = [
-  { da: 0, a: 8, cls: "freddo", label: "Freddo" },
-  { da: 8, a: 18, cls: "germ", label: "Germina" },
-  { da: 18, a: 26, cls: "crescita", label: "Cresce" },
-  { da: 26, a: 36, cls: "caldo", label: "Caldo" },
-];
 
 const ORDINE_CHIP_PRATO = ["crescita", "germina", "attiva", "stallo", "no_germ"];
 const ORDINE_CHIP_INFEST = ["crescita", "germina", "stallo", "no_germ"];
 
 const TIPO_LABEL = Object.fromEntries(TIPOLOGIE_PRATO.map((t) => [t.id, t.label]));
-
-function ScalaTermica({ t, posPct }) {
-  const zona = zonaTermicaLabel(t);
-
-  return (
-    <div className="essenza-termica__scala" role="img" aria-label={`Temperatura suolo ${t}°C, ${zona.label}`}>
-      <div className="essenza-termica__scala-head">
-        <span className="essenza-termica__scala-temp">{t}°C</span>
-        <span className="essenza-termica__scala-zona">suolo · {zona.label}</span>
-      </div>
-      <div className="essenza-termica__scala-track">
-        {ZONE_SCALA.map((z) => {
-          const w = ((z.a - z.da) / (SCALA_TERMICA.max - SCALA_TERMICA.min)) * 100;
-          return (
-            <span
-              key={z.cls}
-              className={`essenza-termica__scala-zone essenza-termica__scala-zone--${z.cls}${
-                zona.id === z.cls ? " essenza-termica__scala-zone--active" : ""
-              }`}
-              style={{ width: `${w}%` }}
-            />
-          );
-        })}
-        {posPct != null ? (
-          <span className="essenza-termica__scala-marker" style={{ left: `${posPct}%` }} aria-hidden />
-        ) : null}
-      </div>
-      <div className="essenza-termica__scala-legend">
-        {ZONE_SCALA.map((z) => (
-          <span key={z.cls} className={`essenza-termica__scala-leg essenza-termica__scala-leg--${z.cls}`}>
-            {z.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function RigaSpecie({ spec }) {
   const g = spec.germinazione_pct;
@@ -143,28 +97,17 @@ function ListaFiltrata({ specie, statoId, onChiudi }) {
   );
 }
 
-function EssenzaTermicaBody({ gruppoId, specie, temperaturaSuolo, messaggio, posizioneScala, tAria, fonteTemperatura }) {
+function EssenzaTermicaBody({ gruppoId, specie, temperaturaSuolo }) {
   const gruppo = GRUPPI_ESSENZA[gruppoId];
   const [filtroStato, setFiltroStato] = useState(null);
   const riepilogo = useMemo(() => riepilogoStati(specie), [specie]);
   const isInfest = gruppoId === "infestanti";
   const chips = isInfest ? ORDINE_CHIP_INFEST : ORDINE_CHIP_PRATO;
 
-  const subAria =
-    tAria != null
-      ? `Aria ${tAria}°C · ${fonteTemperatura === "aria_proxy" ? "suolo stimato dall’aria" : "suolo rilevato"}`
-      : fonteTemperatura === "aria_proxy"
-        ? "Suolo stimato dall’aria"
-        : "Suolo rilevato";
-
   return (
     <div className={`essenza-widget__body${isInfest ? " essenza-widget__body--infest" : ""}`}>
-      <p className="essenza-widget__sub">{subAria}</p>
-      <ScalaTermica t={temperaturaSuolo} posPct={posizioneScala} />
-      {messaggio ? <p className="essenza-termica__msg">{messaggio}</p> : null}
-
       <p className="essenza-widget__hint">
-        {gruppo.hint}. Germinazione (seme) e crescita (pianta) sono <strong>separate</strong>.
+        {gruppo.hint}. Tocca i numeri per l&apos;elenco · Germ e Cresc sono <strong>separati</strong>.
       </p>
 
       <div className="essenza-termica__chips" role="group" aria-label={`Riepilogo ${gruppo.label}`}>
@@ -205,19 +148,15 @@ function EssenzaTermicaBody({ gruppoId, specie, temperaturaSuolo, messaggio, pos
   );
 }
 
-function EssenzaWidgetShell({ gruppoId, bundle, profile }) {
-  const stato = useMemo(() => (bundle ? statoDaMeteo(bundle, profile) : null), [bundle, profile]);
+function EssenzaWidgetShell({ gruppoId, stato }) {
   const gruppo = GRUPPI_ESSENZA[gruppoId];
-
-  if (!bundle) return null;
-
-  const { messaggio, temperatura_suolo, posizione_scala_pct, tAria, fonteTemperatura, specie } = stato || {};
+  const { temperatura_suolo, specie } = stato || {};
 
   if (temperatura_suolo == null) {
     return (
       <section className={`essenza-widget essenza-widget--${gruppoId}`}>
         <h2 className="essenza-widget__title">{gruppo.label}</h2>
-        <p className="essenza-widget__sub">Dati suolo non disponibili per questa località.</p>
+        <p className="essenza-widget__sub">Dati suolo non disponibili.</p>
       </section>
     );
   }
@@ -229,39 +168,55 @@ function EssenzaWidgetShell({ gruppoId, bundle, profile }) {
       <h2 id={`essenza-title-${gruppoId}`} className="essenza-widget__title">
         {gruppo.label}
       </h2>
-      <p className="essenza-widget__meta">
-        {specieGruppo.length} specie · suolo {temperatura_suolo}°C
-      </p>
-      <EssenzaTermicaBody
-        gruppoId={gruppoId}
-        specie={specieGruppo}
-        temperaturaSuolo={temperatura_suolo}
-        messaggio={messaggio}
-        posizioneScala={posizione_scala_pct}
-        tAria={tAria}
-        fonteTemperatura={fonteTemperatura}
-      />
+      <p className="essenza-widget__meta">{specieGruppo.length} specie monitorate</p>
+      <EssenzaTermicaBody gruppoId={gruppoId} specie={specieGruppo} temperaturaSuolo={temperatura_suolo} />
     </section>
   );
 }
 
-/** Widget full-width: sementi e graminacee da prato. */
-export function EssenzaPratoWidget(props) {
-  return <EssenzaWidgetShell gruppoId="prato" {...props} />;
-}
+/** Coppia prato + infestanti affiancata; temperatura condivisa sopra (niente barra duplicata). */
+export function EssenzaTermicaPair({ bundle, profile }) {
+  const stato = useMemo(() => (bundle ? statoDaMeteo(bundle, profile) : null), [bundle, profile]);
 
-/** Widget full-width: infestanti e ciperacee. */
-export function EssenzaInfestantiWidget(props) {
-  return <EssenzaWidgetShell gruppoId="infestanti" {...props} />;
-}
+  if (!bundle || !stato) return null;
 
-/** @deprecated Usare EssenzaPratoWidget + EssenzaInfestantiWidget in dashboard. */
-export default function EssenzaTermicaWidget({ bundle, profile }) {
-  if (!bundle) return null;
+  const { messaggio, temperatura_suolo, tAria, fonteTemperatura } = stato;
+
+  if (temperatura_suolo == null) {
+    return (
+      <div className="dash-essenza-pair dash-grid__span">
+        <p className="dash-essenza-pair__lead">Temperatura suolo non disponibile per questa località.</p>
+      </div>
+    );
+  }
+
+  const leadExtra =
+    tAria != null
+      ? ` · aria ${tAria}°C${fonteTemperatura === "aria_proxy" ? " (suolo stimato)" : ""}`
+      : fonteTemperatura === "aria_proxy"
+        ? " · suolo stimato dall’aria"
+        : "";
+
   return (
-    <>
-      <EssenzaPratoWidget bundle={bundle} profile={profile} />
-      <EssenzaInfestantiWidget bundle={bundle} profile={profile} />
-    </>
+    <div className="dash-essenza-pair dash-grid__span">
+      <p className="dash-essenza-pair__lead">
+        <strong>Suolo {temperatura_suolo}°C</strong>
+        {leadExtra}
+        {messaggio ? ` — ${messaggio}` : null}
+      </p>
+      <div className="dash-essenza-pair__cols">
+        <section className="dash-card dash-card--essenza-half">
+          <EssenzaWidgetShell gruppoId="prato" stato={stato} />
+        </section>
+        <section className="dash-card dash-card--essenza-half">
+          <EssenzaWidgetShell gruppoId="infestanti" stato={stato} />
+        </section>
+      </div>
+    </div>
   );
+}
+
+/** @deprecated Usare EssenzaTermicaPair in dashboard. */
+export default function EssenzaTermicaWidget({ bundle, profile }) {
+  return <EssenzaTermicaPair bundle={bundle} profile={profile} />;
 }

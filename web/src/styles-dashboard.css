@@ -1824,12 +1824,43 @@
   background: transparent;
 }
 
-.dash-card--essenza {
+.dash-essenza-pair {
   grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.dash-card--essenza .essenza-widget__title {
-  font-size: 1.05rem;
+.dash-essenza-pair__lead {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #37474f;
+  background: rgba(241, 248, 233, 0.9);
+  border-radius: var(--radius);
+  border: 1px solid rgba(76, 175, 80, 0.22);
+}
+
+.dash-essenza-pair__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .dash-essenza-pair__cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dash-card--essenza-half {
+  min-width: 0;
+}
+
+.dash-card--essenza-half .essenza-widget__title {
+  font-size: 1rem;
   font-weight: 600;
 }
 

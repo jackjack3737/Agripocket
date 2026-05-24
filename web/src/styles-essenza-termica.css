@@ -458,7 +458,7 @@
 }
 
 
-.dashboard .dash-card--essenza .essenza-widget,
-.dashboard .dash-card--essenza .essenza-widget * {
+.dashboard .dash-card--essenza-half .essenza-widget,
+.dashboard .dash-card--essenza-half .essenza-widget * {
   font-family: inherit;
 }
