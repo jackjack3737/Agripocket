@@ -1,315 +1,360 @@
-# AgriPocket — Relazione sul calendario interventi (per revisione Gemini)
+# AgriPocket / Solum — Relazione sul **Calendario stagionale** (per revisione Gemini)
 
 **Data:** maggio 2026  
 **Repo:** https://github.com/jackjack3737/Agripocket  
-**Produzione:** https://agripocket-azure.vercel.app/dashboard  
-**Stack:** React + Supabase + Gemini 2.5 Flash + Vercel serverless (`web/`)
+**Produzione:** https://agripocket-azure.vercel.app  
+**Stack:** React 19 · Vite · Supabase · Gemini 2.5 Flash · Open-Meteo · RAG (`tgif_knowledge_base`)  
+**Modulo:** generazione e visualizzazione piano manutenzione prato (12 mesi)
 
 ---
 
 ## ISTRUZIONI PER GEMINI (leggere per prime)
 
-Sei un **revisore senior** con competenze: **agronomo turfgrass** (prati da giardino in Italia), **architetto software**, **product manager B2C**.
+Sei un **revisore senior** con competenze: **agronomia tappeti erbosi (Italia, giardino / sportivo / green)**, **pianificazione fenologica (GDD, ET0, VPD)**, **fitosanitari e PFNPO**, **architetture LLM ibride (deterministico + LLM narrativo)**.
 
-**Obiettivo:** analizzare il **calendario lavori** di AgriPocket — come viene generato, popolato, filtrato, mostrato e aggiornato — e produrre una **relazione critica** con proposte concrete di miglioramento (logica, UX, agronomia, legalità fitosanitari).
+**Obiettivo:** analizzare il **calendario stagionale Solum** — come nasce, cosa è fisso, cosa fa Gemini, cosa è vietato — e produrre una **relazione critica** con remediation concrete.
 
-**Tono:** severo, preciso, costruttivo. Ogni critica con **impatto** e **remediation** proposta.
+**Filosofia prodotto (non negoziabile):**
 
-**Output richiesto:**
+- Il calendario è **pure agronomy**: molecole, fisiologia, principi attivi generici.
+- **Vietati** marchi commerciali, nomi prodotti Bottos, dosi inventate da LLM, date spostate dall’LLM.
+- Gemini **non progetta** il piano: **narra** una matrice già calcolata da DB + meteo.
 
-1. **Executive summary** (max 15 righe) — il calendario è utile / sovraccarico / fuorviante?
-2. **Diagramma testuale** dei flussi: onboarding → genera piano → foto → aggiornamenti calendario.
-3. **Tabella criticità** P0/P1/P2 (max 12 voci) sul calendario.
-4. **Valutazione densità:** 28–45 interventi Gemini + max 18 catalogo + 12 controlli mensili — è giusto per un giardiniere B2C?
-5. **Coerenza agronomica:** stagionalità, fitofarmaci, dosi, pre-emergenza, zone ombra.
-6. **Coerenza UX:** filtri, auto-generazione, scaduti vs futuri, rapporto con esagono stato prato.
-7. **Specifica miglioramenti:** pseudocodice o regole business da implementare (non solo opinioni).
-8. **3 scenari utente** con input profilo/foto e calendario atteso ideale.
+**Output richiesto dalla revisione:**
 
----
-
-## 1. Cosa promette il prodotto (UX)
-
-Sulla **Dashboard** (`/dashboard`), sezione **«Calendario lavori»**:
-
-| Promessa | Testo / comportamento |
-|----------|------------------------|
-| Piano annuale completo | CTA «Genera piano annuale completo» / «Rigenera piano annuale» |
-| Giorno per giorno | Accordion **mese → giorno → lavori** con checkbox completamento |
-| Fitofarmaci sicuri | Nessuna dose automatica su diserbi/fungicidi/insetticidi; solo riferimento catalogo + avviso legale |
-| Dosi concimi | Solo se `superficie_mq` verificata sulla mappa |
-| Foto mensile | Voce «Controllo mensile — foto del prato» ogni mese |
-| Urgenze da foto | Sezione «Urgenti dall'analisi foto» separata |
-| Filtri | **Tipo:** Tutti / Trattamenti / Lavori in giardino · **Periodo:** Questo mese / Tutto l'anno |
-| Pin lavori | «Mantieni al rigenera» su voci `calendario_stagionale` (`manual_override`) |
-| Auto-piano | Se profilo ha località ma **nessun** `calendario_stagionale`, parte generazione automatica al primo accesso dashboard |
-
-**Problemi segnalati dagli utenti / audit:**
-
-- Calendario che mostrava **solo** controlli foto mensili (piano non generato o bloccato).
-- Troppi lavori (50–90) difficili da gestire; ora prompt ridotto a 28–45 + catalogo max 18.
-- Rigenerare piano **cancellava** tutto (ora: delete solo `calendario_stagionale` non pinati e non completati).
-- Lavori **scaduti** abbassano l'esagono ma l'utente non capisce il legame.
-- Fitofarmaci in calendario senza evidenza da foto (mitigato da `regoleFitofarmaci.mjs`).
+1. **Executive summary** (max 15 righe) — il calendario è scientificamente coerente / troppo denso / rischioso?
+2. **Diagramma testuale** end-to-end: profilo → template → meteo → matrice → Gemini → guardrail → `prato_interventi`.
+3. **Tabella criticità** P0/P1/P2 (max 12 voci).
+4. **Separazione ruoli:** cosa deve restare deterministico vs cosa può essere LLM.
+5. **Copertura geografica:** 4 macro-zone — il proxy `nord_pianura` è accettabile?
+6. **Livelli impegno** (base / pro / greenkeeper): il cap a 15/35/50 interventi è equilibrato?
+7. **Adattamento meteo** (GDD primavera, ET0 estate): soglie e shift ± giorni sono sensati?
+8. **3 mesi campione** (feb, giu, ott) con interventi attesi e molecole — confronto con pratica italiana.
+9. **Product mining** (`prodotti_mercato`) vs calendario brand-free: come collegarli senza contaminare i testi?
+10. **Roadmap** 3 sprint (must / should / nice).
 
 ---
 
-## 2. Modello dati — `prato_interventi`
+## 1. Cosa vede l’utente (UX)
 
-Tabella Supabase (vedi `sql/prato_dashboard.sql` + patch).
+| Dove | Cosa |
+|------|------|
+| **Dashboard** `/dashboard` | Lista interventi (`CalendarioInterventi.jsx`), timeline bisogni, checkbox completamento |
+| **Onboarding** | Scelta `livello_impegno`: base (~15 interventi strategici/anno), pro (~35), greenkeeper (~50) |
+| **API** | `POST /api/genera-piano` → job async (max 120s) → rigenera `prato_interventi` |
 
-| Campo | Tipo | Note |
-|-------|------|------|
-| `id` | uuid | PK |
-| `user_id` | uuid | FK utente |
-| `analisi_id` | uuid? | Collegamento analisi foto se `fonte = ia_foto` |
-| `titolo` | text | max ~120 char in pratica |
-| `descrizione` | text | può includere «Alternative catalogo…» |
-| `categoria` | enum | taglio, irrigazione, concime, trattamento, pulizia, diserbo, arieggiatura, biostimolante, umettante, rinnovo, altro |
-| `priorita` | alta \| media \| bassa | |
-| `stato` | pianificato \| completato | |
-| `data_prevista` | date | chiave per ordinamento e scadenze |
-| `data_completamento` | date? | |
-| `ordine` | int | tie-break cronologico |
-| **`fonte`** | text | **`calendario_stagionale`** \| **`ia_foto`** \| **`controllo_mensile`** |
-| `manual_override` | bool | pin al rigenera piano |
-| `prodotto_id`, `prodotto_nome` | | da catalogo `Prodotti` |
-| `dose_totale`, `dose_unita`, `dose_per_mq` | | solo concimi/biostimolanti se m² ok |
+**Promessa UX:** piano annuale personalizzato su località, m², specie, livello impegno, meteo live — con spiegazioni biochimiche leggibili, senza pubblicità di prodotti.
 
-**RLS:** utente vede/modifica solo i propri interventi.
+**Prerequisiti generazione:**
+
+- `localita` (geocoding / meteo)
+- `superficie_mq` verificata (dosi e sicurezza)
+- Sessione Supabase valida
 
 ---
 
-## 3. Le tre fonti (`fonte`)
-
-### 3.1 `calendario_stagionale`
-
-**Come nasce:**
-
-1. Utente clicca «Genera piano annuale» (o auto-trigger dashboard).
-2. API `POST /api/genera-piano` → job async `prato_jobs` → `generaPianoStagionale()` in `web/server/pianoStagionale.mjs`.
-3. Pipeline server:
-   - RAG: embedding query + `match_documenti` (KB turfgrass/Bottos).
-   - **Gemini JSON:** 28–45 interventi con `titolo`, `descrizione`, `categoria`, `priorita`, `data_prevista`.
-   - Post-processing:
-     - `ensurePreEmergenzaAnnuali` (diserbi pre-emergenza setaria/digitaria se meteo OK).
-     - `filtraInterventiFitofarmacoCurativo` (niente fungicidi/insetticidi curativi senza evidenza foto/profilo).
-     - `ensureOmbraOverseedInterventi` (zone ombra da mappa).
-   - `arricchisciInterventoConProdotto` per ogni voce (catalogo Bottos, dosi se ammesse).
-   - `integraCatalogoNelPiano` — fino a **18** voci extra «Catalogo — {nome prodotto}» (1 prodotto/idoneo, priorità bassa/media).
-   - `mergeControlliMensili` — 12 mesi avanti «Controllo mensile — foto».
-4. `persistPianoStagionale`:
-   - **DELETE** `prato_interventi` WHERE `fonte = calendario_stagionale` AND `stato = pianificato` AND `manual_override = false`.
-   - **INSERT** nuove righe.
-
-**Rigenerazione:** stesso flusso; i lavori con pin (`manual_override = true`) e i **completati** restano.
-
-### 3.2 `ia_foto`
-
-**Come nasce:**
-
-1. Utente carica foto in `/chat` → `POST /api/analizza-prato` (async job).
-2. `analizzaPratoCore.mjs`: vision JSON + report Markdown + RAG.
-3. `extractInterventiFromReport` — interventi urgenti dal report (con `quando` / `data_suggerita`).
-4. `persistAnalisiAndInterventi`:
-   - INSERT `prato_analisi`.
-   - DELETE precedenti `ia_foto` pianificati.
-   - INSERT nuovi urgenti arricchiti con prodotti.
-   - Opzionale: `integraFotoNelPiano` (`aggiornaPianoDaFoto.mjs`) — Gemini propone `aggiungi_calendario` / `modifica_calendario` / `rimuovi_ids` sul piano stagionale esistente.
-
-**Nota:** gli urgenti foto **non** vengono cancellati al rigenera piano annuale.
-
-### 3.3 `controllo_mensile`
-
-**Come nasce:**
-
-- Client: `syncControlliMensili()` in `web/src/lib/dashboard.js` alla refresh dashboard.
-- Server: anche in `mergeControlliMensili` durante genera piano.
-- Una voce al mese (giorno 12), priorità media, categoria `altro`, link a `/chat?controllo={id}`.
-- **Non** inclusi nei filtri «Trattamenti» / «Lavori giardino» (solo in «Tutti»).
-
----
-
-## 4. Diagramma flusso (testuale)
+## 2. Architettura a due livelli (DB-first + voce Gemini)
 
 ```
-[Onboarding profilo + mappa m²/località]
-        │
-        ▼
-[Dashboard load] ──► syncControlliMensili (client)
-        │
-        ├─ ha calendario_stagionale? ──NO──► auto generaPianoAnnuale (1×)
-        │
-        ▼
-[Genera piano] ──► Gemini 28-45 lavori
-        │              + catalogo ≤18
-        │              + fitofarmaci filtrati
-        │              + pre-emergenza meteo
-        │              + overseed ombra
-        ▼
-[persistPianoStagionale] ──► DB prato_interventi
-
-[Chat foto] ──► vision + report
-        │
-        ├─► ia_foto urgenti (replace pianificati ia_foto)
-        └─► integraFotoNelPiano (aggiungi/modifica calendario_stagionale)
-
-[UI Dashboard]
-        │
-        ├─ filtri tipo/ambito
-        ├─ groupInterventiPerMese (solo data >= oggi nel timeline!)
-        ├─ sezione Urgenti ia_foto
-        └─ checkbox completato / pin manual_override
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  prato_profilo (user_id, localita, lat/lon, livello_impegno, uso, m², …)      │
+└───────────────────────────────────┬─────────────────────────────────────────┘
+                                    │
+                    POST /api/genera-piano.js → generaPianoStagionale()
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+  fetchWeatherBundle          caricaTemplateCalendario    caricaClimaNormale
+  (Open-Meteo live)           (Supabase o fallback)       (clima_mese_normale)
+        │                           │                           │
+        └───────────────────────────┼───────────────────────────┘
+                                    ▼
+              ┌─────────────────────────────────────────────────────┐
+              │  LIVELLO 1 — DETERMINISTICO (calendarioBase.mjs)     │
+              │  generaCalendarioDeterministico()                    │
+              │  • GPS → macro-zona (4 zone Italia)                  │
+              │  • Template mese/giorno → data_prevista assoluta     │
+              │  • Delta GDD mar-apr → anticipo fino a ±finestra     │
+              │  • ET0 picco estate → priorità stress (GABA/prolina)│
+              └───────────────────────────┬─────────────────────────┘
+                                          │ matrice.interventi[]
+                                          ▼
+              ┌─────────────────────────────────────────────────────┐
+              │  LIVELLO 2 — GEMINI NARRATIVO (pianoStagionale.mjs)  │
+              │  arricchisciVoceBiochimica()                          │
+              │  • RAG 4 chunk (tgif_knowledge_base)                  │
+              │  • SOLO descrizione + timeline_bisogni                │
+              │  • date/titolo/molecole INVARIATI                     │
+              └───────────────────────────┬─────────────────────────┘
+                                          ▼
+              ┌─────────────────────────────────────────────────────┐
+              │  LIVELLO 3 — GUARDRAIL & ARRICCHIMENTO               │
+              │  • arricchisciInterventoEsigenze (molecole derivate) │
+              │  • filtraInterventiFitofarmacoCurativo (PFNPO/vision)│
+              │  • applicaRegolaTrasemina, ombra/overseed zone        │
+              │  • mergeControlliMensili, sanitizzaPianoCompleto     │
+              │  • buildTimelineBisogni (UI)                         │
+              │  • pipelineAdattamentiPostPiano (focolai, ecc.)      │
+              └───────────────────────────┬─────────────────────────┘
+                                          ▼
+                        persistPianoStagionale → prato_interventi
+                        (fonte: calendario_stagionale, stato: pianificato)
 ```
 
-**Punto di rottura noto (storico):** `hasPiano` era `interventi.length > 0` → i soli controlli mensili bloccavano l'auto-generazione. **Fix attuale:** `haCalendarioStagionale(interventi)` — conta solo `fonte === calendario_stagionale`.
+---
 
-**Altro punto:** `groupInterventiPerGiorno` **esclude** `data_prevista < oggi` dalla timeline mese-per-mese → i lavori scaduti **non appaiono** nell'accordion (ma restano in DB e penalizzano l'esagono).
+## 3. Database (Supabase)
+
+### 3.1 Template «anno normale»
+
+| Tabella | Scopo |
+|---------|--------|
+| `clima_mese_normale` | GDD, ET0, pioggia, Kc per mese × 4 macro-zone |
+| `calendario_base_intervento` | Interventi template: `mese`, `giorno_mese`, `categoria`, `titolo`, `fabbisogno_fisiologico`, `esigenze_molecolari[]`, `macro_categoria`, `livello_impegno`, `finestra_shift_giorni` |
+
+**Patch SQL:** `sql/patch_calendario_base.sql`  
+**Seed:** `node server/scripts/seed_calendario_base.mjs` (da `web/`)
+
+**Macro-zone** (assegnazione da coordinate, non da comune):
+
+| `zona_climatica` | Area indicativa |
+|------------------|-----------------|
+| `nord_pianura` | Pianura padana, Nord-Est |
+| `centro_tirrenico` | Centro Italia tirrenico |
+| `sud_isole_arido` | Sud peninsulare, Sicilia, Sardegna |
+| `alpino_appenninico` | Alpi, Appennino |
+
+Se manca seed per una zona → **proxy** da `nord_pianura` (nota in `adattamento_dinamico`).
+
+### 3.2 Piano utente
+
+| Tabella | Scopo |
+|---------|--------|
+| `prato_interventi` | Istanze utente: `data_prevista`, `titolo`, `descrizione`, `categoria`, `priorita`, `fonte`, `manual_override`, campi prodotto/dose opzionali |
+
+Alla rigenerazione: delete righe `fonte=calendario_stagionale`, `stato=pianificato`, `manual_override=false`.
+
+### 3.3 Product mining (separato dal calendario)
+
+| Tabella | Scopo |
+|---------|--------|
+| `prodotti_mercato` | Etichette commerciali estratte (PDF/OCR + Gemini) |
+| `prodotti_mercato_intervento` | N:N verso `calendario_base_intervento` (match molecolare) |
+
+**Patch:** `sql/patch_prodotti_mercato.sql` · **Script:** `server/scripts/data/product_miner.mjs`
+
+I nomi commerciali **non** entrano nei testi del calendario deterministico; il mining alimenta un catalogo parallelo per suggerimenti futuri.
 
 ---
 
-## 5. Arricchimento prodotti e dosi
+## 4. Template interventi (nord_pianura)
 
-File: `web/server/prodottiCatalogo.mjs`, `web/server/sicurezzaProdotti.mjs`
+**File:** `web/server/scripts/data/interventi_nord_pianura.mjs`  
+**Volume:** 59 interventi (9 base / 18 pro / 32 greenkeeper)
 
-| Regola | Comportamento |
-|--------|----------------|
-| Dosi | `dose_per_mq` da DB × `superficie_mq` — **nessun fallback 100 m²** |
-| Fitofarmaci | Nessuna dose; `AVVISO_FITOFARMACO` in UI |
-| Catalogo consumer | `filtraProdottiConsumer` + `categoria_legale` (PFNPO vs PROFESSIONALE) |
-| Marca | Preferenza Bottos; opzione tutte le marche da profilo |
-| Livello concimi | `livelloConcimi.mjs` filtra concimi troppo «professionali» per obiettivo estetico/bassa manutenzione |
+### 4.1 Struttura record template
 
-Voci catalogo automatiche: titolo `Catalogo — {nome}`, `ordine` alto (~5000), priorità bassa, una data nel periodo d'uso del prodotto.
+```javascript
+{
+  livello_impegno: "base" | "pro" | "greenkeeper",
+  mese: 2,                    // 1–12
+  giorno_mese: 12,            // 1–28 (cap SQL)
+  categoria: "concime" | "trattamento" | "diserbo" | "arieggiatura" |
+             "biostimolante" | "umettante" | "rinnovo" | "pulizia" | "altro",
+  priorita: "alta" | "media" | "bassa",
+  titolo: "…",
+  fabbisogno_fisiologico: "OBIETTIVO: … 💡 LA SCIENZA: …",
+  esigenze_molecolari: ["Ferro chelato Fe-EDDHA …", "…"],
+  macro_categoria: "N" | "P" | "K" | "Biostimolante" | "Correttivo" | …,
+  finestra_shift_giorni: 7,   // max anticipo/rinvio meteo
+  ordine: 100,
+}
+```
 
----
+### 4.2 Livelli impegno (runtime)
 
-## 6. Regole fitofarmaci nel calendario
+| Livello | Max interventi strategici/anno (Gemini) | Template inclusi |
+|---------|----------------------------------------|------------------|
+| `base` | 15 | solo `base` |
+| `pro` | 35 | `base` + `pro` |
+| `greenkeeper` | 50 | `base` + `pro` + `greenkeeper` |
 
-File: `web/server/regoleFitofarmaci.mjs`
+Config: `web/server/livelloImpegno.mjs`
 
-- **Pre-emergenza** (diserbi annuali): ammessi nel piano stagionale; finestre meteo da OpenWeather.
-- **Curativi** (fungicidi, insetticidi, diserbo post-emergenza): solo se `visioneMostraDifetti(vision)` OR problemi dichiarati in profilo (`problemi_noti`).
-- Prompt Gemini include `REGOLE_FITOFARMACI_PROMPT` in `pianoStagionale.mjs`.
+### 4.3 Temi «magie» integrate (greenkeeper / pro)
 
----
+Esempi presenti nel seed (da KB OpenAlex, linguaggio divulgativo):
 
-## 7. UI calendario (Dashboard)
+- Silicio / fitoliti, Epichloë endofiti, fitomelatonina  
+- Stress memory / HSP, nano-Se, crosstalk etilene–citochinine  
+- PGPR / biofilm EPS, poliammine, rete PA–GABA–prolina  
+- ISR fosfiti, spoon-feeding, carbohydrate loading, epigenetica rizosfera  
+- GABA / prolina / ROS, fluidità membrane, allelopatia  
 
-File: `web/src/pages/Dashboard.jsx`, `web/src/lib/dashboard.js`
-
-### Visualizzazione
-
-| Sezione | Contenuto |
-|---------|-----------|
-| Urgenti dall'analisi foto | `fonte === ia_foto`, solo se filtro «Tutti» |
-| Piano mese per mese | `groupInterventiPerMese` dopo filtri |
-| Prossimi lavori | fallback se timeline vuota |
-| Completati | sempre in fondo |
-
-### Filtri (`filtraInterventiPerCalendario`)
-
-| Tipo | Categorie incluse | Esclude |
-|------|-------------------|---------|
-| tutti | tutto | — |
-| trattamenti | concime, biostimolante, umettante, rinnovo, trattamento, diserbo | controllo_mensile |
-| giardino | taglio, arieggiatura, pulizia, irrigazione | controllo_mensile |
-
-| Ambito | Effetto |
-|--------|---------|
-| mese | `data_prevista` nel mese corrente |
-| anno | nessun filtro data |
-
-**Conteggi chip:** solo lavori **futuri** (`data_prevista >= oggi`, pianificati).
-
-### Azioni utente
-
-- **Checkbox:** `setInterventoCompletato` → stato + `data_completamento`.
-- **Pin:** `setInterventoManualOverride` solo su `calendario_stagionale`.
-- **CTA foto mensile:** link Chat con `?controllo=id`.
+**Nessun brand** nei testi template.
 
 ---
 
-## 8. API e async
+## 5. Motore deterministico (`calendarioBase.mjs`)
 
-| Endpoint | Durata | Job |
-|----------|--------|-----|
-| `POST /api/genera-piano` | max 120s Vercel | `prato_jobs.tipo = genera_piano` |
-| `POST /api/analizza-prato` | max 120s | `analizza_foto` |
+### 5.1 Flusso
 
-Client: `pollJobUntilDone` fino 180s. Rate limit per utente (`rateLimit.mjs`).
+1. `mapZonaClimaticaFromCoords(lat, lon)` → una delle 4 zone  
+2. `livelliImpegnoPerQuery(livello_impegno)` → filtro template  
+3. `caricaTemplateCalendario` → Supabase, fallback `INTERVENTI_NORD_PIANURA`  
+4. `caricaClimaNormale` → DB o `calendarioBaseData.mjs`  
+5. `calcolaDeltaMeteo(meteoBundle, climaNormale)`  
+6. Per ogni template: `istanziaIntervento` → `data_prevista`, note `adattamento_dinamico`  
+7. Filtra interventi con `data_prevista` ∈ [oggi, fine anno]
 
-**Prerequisiti genera piano:**
+### 5.2 Regole adattamento meteo
 
-- `localita` nel profilo.
-- `superficie_mq` verificata (blocco server se assente).
+| Segnale | Soglia | Effetto |
+|---------|--------|---------|
+| GDD primavera (mar–apr) | live > normale + **15%** | Anticipo date template mar/apr (max `finestra_shift_giorni`, cap 14 g) |
+| ET0 estate | live ≥ normale × **1.15** | Interventi stress (GABA, prolina, osmoprotezione…) → `priorita: alta` + nota ET0 |
+
+Campi output utili per UI e prompt Gemini:
+
+- `delta_meteo.gdd_primavera_delta_pct`  
+- `delta_meteo.et0_picco_estivo`  
+- `adattamento_dinamico` (stringa umana)
 
 ---
 
-## 9. Integrazione con esagono «Stato prato»
+## 6. Ruolo di Gemini (`arricchisciVoceBiochimica`)
 
-File: `web/src/lib/pratoStats.js`
+**Modello:** `gemini-2.5-flash` · **Temperatura:** ~0.2 · **Output:** JSON
 
-- L'esagono **non** usa i filtri calendario UI.
-- Penalizza solo lavori **scaduti** (`data_prevista < oggi`, pianificati), esclusi controllo_mensile, priorità bassa, «Catalogo —».
-- Cap **−15 punti per asse** (non legato al numero di voci in UI).
+### 6.1 Cosa Gemini DEVE fare
 
-**Incoerenza UX:** scaduti possono essere **invisibili** nella timeline (filtro `data >= oggi`) ma influenzano ancora l'esagono.
+- Scrivere `descrizione` (2–4 frasi accademiche) per ogni riga della matrice  
+- Produrre `timeline_bisogni`: `oggi`, `prossimo_mese`, `finestre_stagionali[]`  
+- Usare chunk RAG (max 4) solo come **contesto**, senza inventare interventi
+
+### 6.2 Cosa Gemini NON DEVE fare (vincoli in prompt)
+
+| Vietato | Motivo |
+|---------|--------|
+| Cambiare `data_prevista` | Le date sono contratto deterministico |
+| Cambiare `titolo`, `fabbisogno_fisiologico`, `esigenze_molecolari` | Contenuto scientifico curato / seed |
+| Inventare dosi o prodotti | Legalità PFNPO + filosofia Solum |
+| Inserire marchi | Pure agronomy |
+
+Se il JSON Gemini è malformato → fallback: `descrizione = fabbisogno_fisiologico`.
+
+### 6.3 Prompt (estratto concettuale)
+
+```
+NON inventare interventi, date, dosi o prodotti commerciali.
+Ricevi una MATRICE DETERMINISTICA già calcolata da Solum (DB + adattamento meteo).
+Ogni data_prevista nell'output DEVE essere IDENTICA all'input.
+```
 
 ---
 
-## 10. File chiave da leggere nel repo
+## 7. Pipeline post-Gemini
+
+| Step | Modulo | Funzione |
+|------|--------|----------|
+| Esigenze | `esigenzeAgronomiche.mjs` | `arricchisciInterventoEsigenze`, `buildTimelineBisogni` |
+| Fitofarmaci | `regoleFitofarmaci.mjs` | Filtra curativi se utente non PFNPO / vision critica |
+| Trasemina | `sanitizzaCalendario.mjs` | Regole finestra semina |
+| Zone ombra | `pratoZone.mjs` | Overseed mirato |
+| Controlli | `controlliMensili.mjs` | Voci mensili tipo «controllo feltro» |
+| Sanitizzazione | `sanitizzaCalendario.mjs` | `sanitizzaPianoCompleto(..., pureAgronomy: true)` |
+| Adattamenti | `pianoAdattivo.mjs` | Focolai regionali, ecc. |
+| Pre-emergenza | `preEmergenzaAnnuali.mjs` | Da bundle meteo annuale |
+
+**Persistenza:** `persistPianoStagionale` → `prato_interventi`, `fonte: calendario_stagionale`.
+
+---
+
+## 8. Armeria biochimica dinamica (stato: preparata, non in runtime)
+
+**File:** `web/server/scripts/data/armeria_biochimica_dinamica.mjs`  
+**Contenuto:** ~25 interventi **tattici** con `trigger_condizione` (VPD, ET0, patogeni, gelo, idrofobia…)
+
+**Nota architetturale:** non sono nel calendario base annuale; il design prevede inserimento **on-demand** quando il trigger è vero (meteo live, vision, storico). **Oggi non sono ancora collegati** a `generaCalendarioDeterministico` né a `pipelineAdattamentiPostPiano`.
+
+---
+
+## 9. Product mining e calendario
+
+```
+Etichetta PDF/JPG → product_miner.mjs → prodotti_mercato
+                                              │
+                                              ▼
+                              prodotti_mercato_intervento
+                              (match_score vs calendario_base_intervento)
+```
+
+**Principio:** il calendario utente resta brand-free; il catalogo commerciale è **parallelo** per:
+
+- Suggerimenti prodotto in UI (`TreatmentCard`, dose da catalogo legacy `"Prodotti"`)  
+- Match per `esigenze_molecolari` / `macro_categoria` / token fisiologici  
+
+**Rischio da valutare:** leakage di brand da `prodotti_mercato` nei testi Gemini — oggi il prompt calendario vieta marchi; eventuali link prodotto vanno solo in campi UI dedicati (`prodotto_nome`, `dettaglio_trattamento`).
+
+---
+
+## 10. File sorgente (mappa rapida)
 
 | File | Ruolo |
 |------|--------|
-| `web/src/lib/dashboard.js` | load, filtri, gruppi, controlli mensili |
-| `web/src/pages/Dashboard.jsx` | UI calendario, auto-piano, CTA |
-| `web/server/pianoStagionale.mjs` | Generazione piano Gemini + persist |
-| `web/server/pianoDaCatalogo.mjs` | Integrazione catalogo (max 18) |
-| `web/server/interventiFromReport.mjs` | Urgenti da foto |
-| `web/server/aggiornaPianoDaFoto.mjs` | Modifiche piano post-foto |
-| `web/server/regoleFitofarmaci.mjs` | Filtro fitofarmaci curativi |
-| `web/server/controlliMensili.mjs` | Voci mensili |
-| `web/server/prodottiCatalogo.mjs` | Prodotti, dosi, match |
-| `web/server/preEmergenzaAnnuali.mjs` | Diserbi pre-emergenza |
-| `web/server/pratoZone.mjs` | Overseed zone ombra |
-| `web/api/genera-piano.js` | API + job |
-| `sql/prato_dashboard.sql` | Schema base |
-| `sql/patch_interventi_*.sql` | Categorie, prodotti, manual_override |
+| `web/server/calendarioBase.mjs` | Motore deterministico |
+| `web/server/calendarioBaseData.mjs` | Clima anno tipo (no shebang — bundle Vite-safe) |
+| `web/server/pianoStagionale.mjs` | Orchestrazione + Gemini narrativo |
+| `web/server/scripts/seed_calendario_base.mjs` | Seed Supabase (CLI) |
+| `web/server/scripts/data/interventi_nord_pianura.mjs` | 59 template nord_pianura |
+| `web/server/scripts/data/armeria_biochimica_dinamica.mjs` | Trigger tattici (futuro) |
+| `web/server/scripts/data/product_miner.mjs` | Mining etichette |
+| `web/server/esigenzeAgronomiche.mjs` | Molecole generiche, timeline |
+| `web/server/livelloImpegno.mjs` | Cap interventi per livello |
+| `web/api/genera-piano.js` | Endpoint Vercel |
+| `web/src/components/calendario/CalendarioInterventi.jsx` | UI lista |
+| `sql/patch_calendario_base.sql` | DDL template |
+| `sql/patch_prodotti_mercato.sql` | DDL mining |
 
 ---
 
-## 11. Domande specifiche per la revisione
+## 11. API e job
 
-1. **Densità:** 28–45 + 18 catalogo + 12 foto/mese ≈ 58–75 voci/anno — troppo per B2C? Quale target ideale?
-2. **Scaduti invisibili:** è corretto nasconderli dalla timeline? Come gestire «in ritardo» in UX?
-3. **Auto-generazione** al primo accesso: rischio timeout / abbandono? Meglio opt-in?
-4. **Catalogo automatico** vs lavori Gemini: duplicazioni semantiche? Regole anti-duplicato sufficienti?
-5. **integraFotoNelPiano:** Gemini modifica il piano in modo affidabile? Serve validazione strutturata?
-6. **Stagionalità Italia:** le date Gemini sono realistiche per Nord/Centro/Sud? Serve vincolo per `localita`?
-7. **Robot taglio:** il profilo `frequenza_taglio = robot` è riflesso abbastanza nel piano?
-8. **Fitofarmaci:** il filtro «solo con evidenza» è troppo restrittivo o ancora permissivo?
-9. **Rigenera piano:** cosa dovrebbe succedere a `ia_foto` e `controllo_mensile`? (oggi: non toccati)
-10. **Notifiche:** senza push/email il calendario è inutile? Priorità backlog?
+| Endpoint | Durata max | Comportamento |
+|----------|------------|---------------|
+| `POST /api/genera-piano` | 120s | Job async: cancella piano precedente non pinato, rigenera |
+
+**Env server:** `GEMINI_API_KEY`, `SUPABASE_*`, `OPENWEATHER_API_KEY` (meteo).
 
 ---
 
-## 12. Vincoli legali / sicurezza (Italia)
+## 12. Checklist operativa (umano / DevOps)
 
-- D.Lgs. 150/2012 (PAN): fitofarmaci senza dose automatica; PFNPO in B2C.
-- Disclaimer onboarding obbligatorio.
-- Dosi solo concimi/biostimolanti con m² verificati.
-
----
-
-## 13. Stato deploy (maggio 2026)
-
-- Piano prompt: **28–45** interventi (non più 50–90).
-- Catalogo: **max 18** extra.
-- Genera piano: richiede **m²** sulla mappa.
-- `manual_override` su rigenera.
-- Job async + rate limit.
+- [ ] Eseguito `sql/patch_calendario_base.sql` in Supabase  
+- [ ] Eseguito seed: `npm run seed:calendario-base` (da `web/`)  
+- [ ] (Opzionale) `sql/patch_prodotti_mercato.sql` + mining etichette  
+- [ ] Vercel Root Directory = `web/` (deploy Git)  
+- [ ] Profilo utente con `localita` + `superficie_mq`
 
 ---
 
-*Allegare a Gemini i file sopra o incollare `docs/PROMPT_GEMINI_CALENDARIO.txt` per il prompt operativo.*
+## 13. Domande aperte per la revisione Gemini
+
+1. **Proxy climatico:** le altre 3 zone usano template padani fino a seed dedicati — bias accettabile o da bloccare in UI?  
+2. **Densità greenkeeper:** 50 interventi + testi lunghi — rischio overload utente giardino?  
+3. **Gemini temperature 0.2:** sufficiente a evitare deriva su `descrizione`? Serve validazione automatica campo-per-campo?  
+4. **Wiring armeria dinamica:** priorità P0 per estate 2026 o rimandare?  
+5. **Integrazione vision:** ultima `prato_analisi.vision_json` influenza filtro fitofarmaci ma non sposta date — è sufficiente?  
+6. **Confronto Bottos:** il vecchio calendario brand-centric è deprecato — cosa migrare senza perdere valore agronomico?
+
+---
+
+## 14. Riferimenti incrociati
+
+- Chat agronomo (modulo separato): `docs/RELAZIONE_CHIEDI_AGRONOMO_GEMINI.md`  
+- Knowledge base RAG: `tgif_knowledge_base`, harvest `cacciatore_scienza.mjs` / `iniettore_scienza.mjs`  
+- Guardrail PFNPO: `web/server/regoleFitofarmaci.mjs`, `web/server/agronomicGuardrails.mjs`
+
+---
+
+*Documento generato per audit interno e prompt di revisione esterna Gemini. Aggiornare quando cambiano soglie meteo, seed interventi o vincoli LLM.*
