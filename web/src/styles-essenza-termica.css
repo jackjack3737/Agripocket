@@ -5,6 +5,19 @@
   margin-top: 0.85rem;
 }
 
+.essenza-termica__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+@media (max-width: 560px) {
+  .essenza-termica__row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .essenza-termica {
   padding: 0.9rem 1rem 1rem;
   border-radius: 14px;
@@ -216,11 +229,19 @@
 
 /* Blocco prato / infestanti */
 .essenza-termica__blocco {
-  padding: 0.85rem 1rem 0.9rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem 0.75rem 0.9rem;
   border-radius: 14px;
   background: linear-gradient(165deg, #f1f8e9 0%, #fff 60%);
   border: 1px solid rgba(76, 175, 80, 0.28);
   box-shadow: 0 4px 14px rgba(40, 90, 50, 0.06);
+}
+
+.essenza-termica__blocco .essenza-termica__panel {
+  flex: 1;
+  min-height: 0;
 }
 
 .essenza-termica__blocco--infest {
@@ -280,8 +301,14 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(76, 175, 80, 0.25);
-  max-height: 22rem;
+  max-height: min(22rem, 50vh);
   overflow-y: auto;
+}
+
+@media (min-width: 561px) {
+  .essenza-termica__row .essenza-termica__panel {
+    max-height: 18rem;
+  }
 }
 
 .essenza-termica__blocco--infest .essenza-termica__panel {

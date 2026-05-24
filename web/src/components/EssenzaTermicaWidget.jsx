@@ -217,12 +217,14 @@ export default function EssenzaTermicaWidget({ bundle, profile }) {
         {messaggio ? <p className="essenza-termica__msg">{messaggio}</p> : null}
       </section>
 
-      <EssenzaTermicaBlocco gruppo={GRUPPI_ESSENZA.prato} specie={speciePrato} temperaturaSuolo={temperatura_suolo} />
-      <EssenzaTermicaBlocco
-        gruppo={GRUPPI_ESSENZA.infestanti}
-        specie={specieInfest}
-        temperaturaSuolo={temperatura_suolo}
-      />
+      <div className="essenza-termica__row">
+        <EssenzaTermicaBlocco gruppo={GRUPPI_ESSENZA.prato} specie={speciePrato} temperaturaSuolo={temperatura_suolo} />
+        <EssenzaTermicaBlocco
+          gruppo={GRUPPI_ESSENZA.infestanti}
+          specie={specieInfest}
+          temperaturaSuolo={temperatura_suolo}
+        />
+      </div>
     </div>
   );
 }
