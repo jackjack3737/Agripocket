@@ -17,48 +17,96 @@ export const SPECIE_PRATO = SPECIE_PRATO_ITALIA;
 
 export const SCALA_TERMICA = { min: 0, max: 36 };
 
-/** Etichette stato unico per specie (UI compatta). */
+/**
+ * Filtri UI — assi indipendenti (KB: emergenza seme ~10°C suolo, poi
+ * accrescimento vegetativo nella stessa finestra primaverile; HortTechnology 2020).
+ */
 export const STATI_SPECIE = {
-  crescita: { id: "crescita", label: "Cresce", colorClass: "grow" },
-  stallo: { id: "stallo", label: "In stallo", colorClass: "stall" },
-  germina: { id: "germina", label: "Germina", colorClass: "germ" },
-  no_germ: { id: "no_germ", label: "No germina", colorClass: "nogerm" },
+  crescita: {
+    id: "crescita",
+    label: "Cresce",
+    hint: "Accrescimento vegetativo (pianta già in campo o atleta)",
+    colorClass: "grow",
+    campo: "crescita_pct",
+    soglia: 45,
+    modo: "min",
+  },
+  germina: {
+    id: "germina",
+    label: "Germina",
+    hint: "Seme in terreno / banco semi (emergenza)",
+    colorClass: "germ",
+    campo: "germinazione_pct",
+    soglia: 50,
+    modo: "min",
+  },
+  attiva: {
+    id: "attiva",
+    label: "Semina attiva",
+    hint: "Germinazione e crescita entrambe favorevoli (overseeding / intervento)",
+    colorClass: "both",
+    modo: "entrambe",
+  },
+  stallo: {
+    id: "stallo",
+    label: "In stallo",
+    hint: "Crescita vegetativa quasi ferma",
+    colorClass: "stall",
+    campo: "crescita_pct",
+    soglia: 30,
+    modo: "max",
+  },
+  no_germ: {
+    id: "no_germ",
+    label: "No germina",
+    hint: "Semina sconsigliata (suolo troppo freddo o caldo per il seme)",
+    colorClass: "nogerm",
+    campo: "germinazione_pct",
+    soglia: 25,
+    modo: "max",
+  },
 };
 
-/**
- * Stato dominante oggi (una sola etichetta per taxon).
- * @param {{ germinazione_pct: number, crescita_pct: number }} spec
- */
-export function statoPrincipaleSpecie(spec) {
+/** @param {{ germinazione_pct: number, crescita_pct: number }} spec @param {string} statoId */
+export function soddisfaFiltroStato(spec, statoId) {
   const g = spec.germinazione_pct;
   const c = spec.crescita_pct;
-  if (g >= 55 && c < 45) {
-    return { ...STATI_SPECIE.germina, pct: g, metric: "germinazione" };
+  switch (statoId) {
+    case "crescita":
+      return c >= STATI_SPECIE.crescita.soglia;
+    case "germina":
+      return g >= STATI_SPECIE.germina.soglia;
+    case "attiva":
+      return g >= STATI_SPECIE.germina.soglia && c >= STATI_SPECIE.crescita.soglia;
+    case "stallo":
+      return c < STATI_SPECIE.stallo.soglia;
+    case "no_germ":
+      return g < STATI_SPECIE.no_germ.soglia;
+    default:
+      return false;
   }
-  if (c >= 48) {
-    return { ...STATI_SPECIE.crescita, pct: c, metric: "crescita" };
-  }
-  if (c < 28) {
-    return { ...STATI_SPECIE.stallo, pct: c, metric: "crescita" };
-  }
-  if (g < 22) {
-    return { ...STATI_SPECIE.no_germ, pct: g, metric: "germinazione" };
-  }
-  if (g >= 40) {
-    return { ...STATI_SPECIE.germina, pct: g, metric: "germinazione" };
-  }
-  return { ...STATI_SPECIE.stallo, pct: c, metric: "crescita" };
 }
 
-/** Specie con stato marcato o presenti nel profilo utente. */
-export function specieInEvidenza(spec) {
-  const s = statoPrincipaleSpecie(spec);
-  if (spec.in_profilo) return true;
-  if (s.id === "crescita" && s.pct >= 55) return true;
-  if (s.id === "germina" && s.pct >= 50) return true;
-  if (s.id === "stallo" && s.pct < 22) return true;
-  if (s.id === "no_germ" && s.pct < 18) return true;
-  return false;
+/** @param {readonly object[]} specie @param {string} statoId */
+export function specieConStato(specie, statoId) {
+  return specie.filter((s) => soddisfaFiltroStato(s, statoId));
+}
+
+/** Ordinamento elenco filtrato. */
+export function ordinaSpeciePerFiltro(specie, statoId) {
+  return [...specie].sort((a, b) => {
+    if (a.in_profilo !== b.in_profilo) return a.in_profilo ? -1 : 1;
+    if (statoId === "stallo") return a.crescita_pct - b.crescita_pct;
+    if (statoId === "no_germ") return a.germinazione_pct - b.germinazione_pct;
+    if (statoId === "germina") return b.germinazione_pct - a.germinazione_pct;
+    if (statoId === "crescita") return b.crescita_pct - a.crescita_pct;
+    if (statoId === "attiva") {
+      const sa = a.germinazione_pct + a.crescita_pct;
+      const sb = b.germinazione_pct + b.crescita_pct;
+      return sb - sa;
+    }
+    return b.crescita_pct - a.crescita_pct;
+  });
 }
 
 /** @param {number} t °C suolo */
@@ -71,11 +119,15 @@ export function zonaTermicaLabel(t) {
   return { id: "caldo", label: "Caldo / stress C3" };
 }
 
-/** Conteggi per chip riepilogo. */
+/** Conteggi per chip (non esclusivi: una specie può essere in Cresce e Germina). */
 export function riepilogoStati(specie) {
-  const out = { crescita: 0, stallo: 0, germina: 0, no_germ: 0 };
+  const out = { crescita: 0, germina: 0, attiva: 0, stallo: 0, no_germ: 0 };
   for (const s of specie) {
-    out[statoPrincipaleSpecie(s).id] += 1;
+    if (soddisfaFiltroStato(s, "crescita")) out.crescita += 1;
+    if (soddisfaFiltroStato(s, "germina")) out.germina += 1;
+    if (soddisfaFiltroStato(s, "attiva")) out.attiva += 1;
+    if (soddisfaFiltroStato(s, "stallo")) out.stallo += 1;
+    if (soddisfaFiltroStato(s, "no_germ")) out.no_germ += 1;
   }
   return out;
 }
@@ -100,11 +152,6 @@ export const GRUPPI_ESSENZA = {
 export function speciePerGruppoEssenza(specie, gruppoId) {
   const tipi = GRUPPI_ESSENZA[gruppoId]?.tipologie ?? [];
   return specie.filter((s) => tipi.includes(s.tipologia));
-}
-
-/** @param {readonly object[]} specie @param {string} statoId */
-export function specieConStato(specie, statoId) {
-  return specie.filter((s) => statoPrincipaleSpecie(s).id === statoId);
 }
 
 /** Rampa 0→100 tra a e b. */
@@ -247,9 +294,11 @@ export function calcolaStatoEssenze(tSuolo, opts = {}) {
     messaggio =
       "Suolo freddo: le graminacee da prato temperato sono in stallo; la semina è sconsigliata sotto ~8°C (rischio marciumi).";
   } else if (t < 12) {
-    messaggio = "Finestra ideale per germinazione di Lolium perenne; Festuca e Poa ancora lente.";
+    messaggio =
+      "Emergenza seme da ~10°C suolo (KB bentgrass/loietto): germinazione attiva; crescita vegetativa ancora moderata.";
   } else if (t <= 18) {
-    messaggio = "Temperatura ottimale per crescita delle specie a stagione fredda e semina festuche.";
+    messaggio =
+      "Primavera: germinazione e crescita vegetativa possono essere entrambe alte (semina + accrescimento tappeto C3).";
   } else if (t < 26) {
     messaggio = "Caldo: le specie da prato temperato rallentano; bermuda e zoysia entrano in zona attiva.";
   } else {

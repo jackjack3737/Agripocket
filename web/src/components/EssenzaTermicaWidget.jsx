@@ -4,11 +4,12 @@ import {
   GRUPPI_ESSENZA,
   SCALA_TERMICA,
   STATI_SPECIE,
+  ordinaSpeciePerFiltro,
   riepilogoStati,
   specieConStato,
   speciePerGruppoEssenza,
+  soddisfaFiltroStato,
   statoDaMeteo,
-  statoPrincipaleSpecie,
   zonaTermicaLabel,
 } from "../lib/essenzaTermica";
 import "../styles-essenza-termica.css";
@@ -20,7 +21,7 @@ const ZONE_SCALA = [
   { da: 26, a: 36, cls: "caldo", label: "Caldo" },
 ];
 
-const ORDINE_STATO = ["crescita", "germina", "stallo", "no_germ"];
+const ORDINE_CHIP = ["crescita", "germina", "attiva", "stallo", "no_germ"];
 
 const TIPO_LABEL = Object.fromEntries(TIPOLOGIE_PRATO.map((t) => [t.id, t.label]));
 
@@ -62,23 +63,42 @@ function ScalaTermica({ t, posPct }) {
 }
 
 function RigaSpecie({ spec }) {
-  const stato = statoPrincipaleSpecie(spec);
+  const g = spec.germinazione_pct;
+  const c = spec.crescita_pct;
+  const germOn = soddisfaFiltroStato(spec, "germina");
+  const crescOn = soddisfaFiltroStato(spec, "crescita");
+
   return (
     <li
-      className={`essenza-termica__row essenza-termica__row--${stato.colorClass}${
-        spec.in_profilo ? " essenza-termica__row--highlight" : ""
-      }`}
+      className={`essenza-termica__row${spec.in_profilo ? " essenza-termica__row--highlight" : ""}`}
     >
       <span className="essenza-termica__nome">
         <em>{spec.nome}</em>
         {spec.citotipo ? <span className="essenza-termica__cyto">{spec.citotipo}</span> : null}
         {spec.in_profilo ? <span className="essenza-termica__badge">tuo prato</span> : null}
       </span>
-      <span className={`essenza-termica__stato essenza-termica__stato--${stato.colorClass}`}>{stato.label}</span>
-      <div className="essenza-termica__bar-track" aria-hidden>
-        <div className="essenza-termica__bar-fill" style={{ width: `${stato.pct}%` }} />
+      <div className="essenza-termica__metriche">
+        <span
+          className={`essenza-termica__metric essenza-termica__metric--germ${germOn ? " essenza-termica__metric--on" : ""}`}
+          title="Germinazione seme"
+        >
+          Germ {g}%
+        </span>
+        <span
+          className={`essenza-termica__metric essenza-termica__metric--grow${crescOn ? " essenza-termica__metric--on" : ""}`}
+          title="Crescita vegetativa"
+        >
+          Cresc {c}%
+        </span>
       </div>
-      <span className="essenza-termica__pct">{stato.pct}%</span>
+      <div className="essenza-termica__bars" aria-hidden>
+        <div className="essenza-termica__bar-line">
+          <div className="essenza-termica__bar-fill essenza-termica__bar-fill--germ" style={{ width: `${g}%` }} />
+        </div>
+        <div className="essenza-termica__bar-line">
+          <div className="essenza-termica__bar-fill essenza-termica__bar-fill--grow" style={{ width: `${c}%` }} />
+        </div>
+      </div>
     </li>
   );
 }
@@ -86,10 +106,7 @@ function RigaSpecie({ spec }) {
 function ListaFiltrata({ specie, statoId, onChiudi }) {
   const meta = STATI_SPECIE[statoId];
   const perTipologia = useMemo(() => {
-    const ordinati = [...specieConStato(specie, statoId)].sort((a, b) => {
-      if (a.in_profilo !== b.in_profilo) return a.in_profilo ? -1 : 1;
-      return statoPrincipaleSpecie(b).pct - statoPrincipaleSpecie(a).pct;
-    });
+    const ordinati = ordinaSpeciePerFiltro(specieConStato(specie, statoId), statoId);
     const map = new Map();
     for (const s of ordinati) {
       if (!map.has(s.tipologia)) map.set(s.tipologia, []);
@@ -101,9 +118,12 @@ function ListaFiltrata({ specie, statoId, onChiudi }) {
   return (
     <div className="essenza-termica__panel" role="region" aria-label={`Elenco ${meta.label}`}>
       <header className="essenza-termica__panel-head">
-        <h4 className="essenza-termica__panel-tit">
-          {perTipologia.totale} {meta.label}
-        </h4>
+        <div>
+          <h4 className="essenza-termica__panel-tit">
+            {perTipologia.totale} {meta.label}
+          </h4>
+          {meta.hint ? <p className="essenza-termica__panel-hint">{meta.hint}</p> : null}
+        </div>
         <button type="button" className="essenza-termica__panel-close" onClick={onChiudi}>
           Chiudi
         </button>
@@ -133,6 +153,8 @@ function EssenzaTermicaBlocco({ gruppo, specie, temperaturaSuolo }) {
     setFiltroStato((prev) => (prev === id ? null : id));
   };
 
+  const chips = isInfest ? ORDINE_CHIP.filter((id) => id !== "attiva") : ORDINE_CHIP;
+
   return (
     <section
       className={`essenza-termica__blocco${isInfest ? " essenza-termica__blocco--infest" : ""}`}
@@ -144,24 +166,29 @@ function EssenzaTermicaBlocco({ gruppo, specie, temperaturaSuolo }) {
         </h3>
         <span className="essenza-termica__blocco-n">{specie.length} specie</span>
       </header>
-      <p className="essenza-termica__blocco-hint">{gruppo.hint}</p>
+      <p className="essenza-termica__blocco-hint">
+        {gruppo.hint}. Germinazione (seme) e crescita (pianta) sono <strong>separate</strong>: possono essere alte
+        insieme.
+      </p>
 
       <div className="essenza-termica__chips" role="group" aria-label={`Riepilogo ${gruppo.label}`}>
-        {ORDINE_STATO.map((id) => {
+        {chips.map((id) => {
           const n = riepilogo[id];
           const attivo = filtroStato === id;
+          const meta = STATI_SPECIE[id];
           return (
             <button
               key={id}
               type="button"
-              className={`essenza-termica__chip essenza-termica__chip--${STATI_SPECIE[id].colorClass}${
+              className={`essenza-termica__chip essenza-termica__chip--${meta.colorClass}${
                 attivo ? " essenza-termica__chip--active" : ""
               }`}
               disabled={n === 0}
               aria-pressed={attivo}
+              title={meta.hint}
               onClick={() => toggleStato(id)}
             >
-              <strong>{n}</strong> {STATI_SPECIE[id].label}
+              <strong>{n}</strong> {meta.label}
             </button>
           );
         })}
@@ -170,13 +197,13 @@ function EssenzaTermicaBlocco({ gruppo, specie, temperaturaSuolo }) {
       {filtroStato ? (
         <ListaFiltrata specie={specie} statoId={filtroStato} onChiudi={() => setFiltroStato(null)} />
       ) : (
-        <p className="essenza-termica__hint-tap">Tocca un numero (es. «{riepilogo.crescita} Cresce») per vedere l&apos;elenco</p>
+        <p className="essenza-termica__hint-tap">Tocca un riepilogo per l&apos;elenco (i conteggi possono sovrapporsi)</p>
       )}
 
       <p className="essenza-termica__blocco-foot">
         {isInfest
-          ? `A ${temperaturaSuolo}°C suolo — «Germina» alto → valuta pre-emergenza.`
-          : `A ${temperaturaSuolo}°C suolo — semina e crescita del miscuglio.`}
+          ? `A ${temperaturaSuolo}°C — «Germina» = banco semi infestanti; «Cresce» = accrescimento erba concorrente.`
+          : `A ${temperaturaSuolo}°C — «Semina attiva» = germina e cresce insieme (finestra overseeding).`}
       </p>
     </section>
   );
