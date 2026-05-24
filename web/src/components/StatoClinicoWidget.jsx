@@ -38,11 +38,9 @@ function MeteoConsigliPanel({ alert, profile, onIrrigazioneAggiornata }) {
   const [azioneMsg, setAzioneMsg] = useState("");
   const [azioneErr, setAzioneErr] = useState("");
 
-  if (!alert?.consiglia_irrigazione && !alert?.consiglia_calendario) return null;
-
   const irrigazioneAttiva = profile?.irrigazione && profile.irrigazione !== "pioggia";
-  const mostraIrrigazione = irrigazioneAttiva && alert.consiglia_irrigazione;
-  const mostraCalendario = alert.consiglia_calendario;
+  const mostraIrrigazione = irrigazioneAttiva;
+  const mostraCalendario = true;
 
   async function aggiornaIrrigazione() {
     setAzioneErr("");
@@ -78,20 +76,29 @@ function MeteoConsigliPanel({ alert, profile, onIrrigazioneAggiornata }) {
 
   return (
     <div
-      className={`stato-clinico__alerts stato-clinico__alerts--${alert.livello}`}
-      role="alert"
+      className={`stato-clinico__alerts${alert ? ` stato-clinico__alerts--${alert.livello}` : " stato-clinico__alerts--azioni"}`}
+      role={alert ? "alert" : "region"}
+      aria-label="Azioni meteo"
     >
-      <p className="stato-clinico__alerts-title">Meteo cambiato — conviene aggiornare</p>
-      <ul className="stato-clinico__alerts-motivi">
-        {alert.motivi.map((m, i) => (
-          <li key={i}>{m}</li>
-        ))}
-      </ul>
-      {alert.ore_da_calcolo != null ? (
-        <p className="stato-clinico__alerts-meta">
-          Ultimo calcolo irrigazione: circa {alert.ore_da_calcolo} ore fa.
+      {alert ? (
+        <>
+          <p className="stato-clinico__alerts-title">Meteo cambiato — conviene aggiornare</p>
+          <ul className="stato-clinico__alerts-motivi">
+            {alert.motivi.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+          {alert.ore_da_calcolo != null ? (
+            <p className="stato-clinico__alerts-meta">
+              Ultimo calcolo irrigazione: circa {alert.ore_da_calcolo} ore fa.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="stato-clinico__alerts-title stato-clinico__alerts-title--quiet">
+          Ricalcola irrigazione e calendario con il meteo attuale
         </p>
-      ) : null}
+      )}
       <div className="stato-clinico__alerts-actions">
         {mostraIrrigazione ? (
           <button
@@ -212,7 +219,7 @@ export default function StatoClinicoWidget({
         </span>
       </div>
 
-      {alertMeteo ? (
+      {weather ? (
         <MeteoConsigliPanel
           alert={alertMeteo}
           profile={profile}
