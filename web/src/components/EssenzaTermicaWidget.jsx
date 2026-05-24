@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { TIPOLOGIE_PRATO } from "../data/speciePratoItalia.js";
+import { ESPOSIZIONE_LUCE, TIPOLOGIE_PRATO } from "../data/speciePratoItalia.js";
 import {
   GRUPPI_ESSENZA,
   STATI_SPECIE,
@@ -17,7 +17,29 @@ const ORDINE_CHIP_INFEST = ["crescita", "germina", "stallo", "no_germ"];
 
 const TIPO_LABEL = Object.fromEntries(TIPOLOGIE_PRATO.map((t) => [t.id, t.label]));
 
-function RigaSpecie({ spec }) {
+function IconEsposizione({ spec }) {
+  const exp = spec.esposizione && ESPOSIZIONE_LUCE[spec.esposizione];
+  if (!exp) return null;
+  return (
+    <span className={`essenza-termica__luce essenza-termica__luce--${spec.esposizione}`} title={exp.label} aria-label={exp.label}>
+      {exp.icon}
+    </span>
+  );
+}
+
+function LegendaLuce() {
+  return (
+    <p className="essenza-termica__leg-luce" aria-label="Legenda esposizione">
+      {Object.entries(ESPOSIZIONE_LUCE).map(([id, e]) => (
+        <span key={id} className="essenza-termica__leg-luce-item" title={e.label}>
+          {e.icon} {e.label}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function RigaSpecie({ spec, mostraLuce = false }) {
   const g = spec.germinazione_pct;
   const c = spec.crescita_pct;
   const germOn = soddisfaFiltroStato(spec, "germina");
@@ -26,6 +48,7 @@ function RigaSpecie({ spec }) {
   return (
     <li className={`essenza-termica__row${spec.in_profilo ? " essenza-termica__row--highlight" : ""}`}>
       <span className="essenza-termica__nome">
+        {mostraLuce ? <IconEsposizione spec={spec} /> : null}
         <em>{spec.nome}</em>
         {spec.citotipo ? <span className="essenza-termica__cyto">{spec.citotipo}</span> : null}
         {spec.in_profilo ? <span className="essenza-termica__badge">tuo prato</span> : null}
@@ -56,7 +79,7 @@ function RigaSpecie({ spec }) {
   );
 }
 
-function ListaFiltrata({ specie, statoId, onChiudi }) {
+function ListaFiltrata({ specie, statoId, onChiudi, mostraLuce = false }) {
   const meta = STATI_SPECIE[statoId];
   const perTipologia = useMemo(() => {
     const ordinati = ordinaSpeciePerFiltro(specieConStato(specie, statoId), statoId);
@@ -87,7 +110,7 @@ function ListaFiltrata({ specie, statoId, onChiudi }) {
             <div className="essenza-termica__panel-gruppo">{TIPO_LABEL[tipo]}</div>
             <ul className="essenza-termica__lista essenza-termica__lista--nested">
               {specs.map((s) => (
-                <RigaSpecie key={s.id} spec={s} />
+                <RigaSpecie key={s.id} spec={s} mostraLuce={mostraLuce} />
               ))}
             </ul>
           </li>
@@ -102,10 +125,12 @@ function EssenzaTermicaBody({ gruppoId, specie, temperaturaSuolo }) {
   const [filtroStato, setFiltroStato] = useState(null);
   const riepilogo = useMemo(() => riepilogoStati(specie), [specie]);
   const isInfest = gruppoId === "infestanti";
+  const isPrato = gruppoId === "prato";
   const chips = isInfest ? ORDINE_CHIP_INFEST : ORDINE_CHIP_PRATO;
 
   return (
     <div className={`essenza-widget__body${isInfest ? " essenza-widget__body--infest" : ""}`}>
+      {isPrato ? <LegendaLuce /> : null}
       <p className="essenza-widget__hint">
         {gruppo.hint}. Tocca i numeri per l&apos;elenco · Germ e Cresc sono <strong>separati</strong>.
       </p>
@@ -134,7 +159,12 @@ function EssenzaTermicaBody({ gruppoId, specie, temperaturaSuolo }) {
       </div>
 
       {filtroStato ? (
-        <ListaFiltrata specie={specie} statoId={filtroStato} onChiudi={() => setFiltroStato(null)} />
+        <ListaFiltrata
+          specie={specie}
+          statoId={filtroStato}
+          mostraLuce={isPrato}
+          onChiudi={() => setFiltroStato(null)}
+        />
       ) : (
         <p className="essenza-termica__hint-tap">Tocca un riepilogo per l&apos;elenco (i conteggi possono sovrapporsi)</p>
       )}

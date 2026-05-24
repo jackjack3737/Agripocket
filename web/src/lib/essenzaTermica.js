@@ -9,6 +9,7 @@ export {
   SPECIE_PRATO_ITALIA,
   ELENCO_LATINO_ITALIA,
   TIPOLOGIE_PRATO,
+  ESPOSIZIONE_LUCE,
   speciePerTipologia,
 } from "../data/speciePratoItalia.js";
 

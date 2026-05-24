@@ -448,8 +448,30 @@
 }
 
 .essenza-termica__nome {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
   color: #37474f;
   line-height: 1.25;
+}
+
+.essenza-termica__luce {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.essenza-termica__leg-luce {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.62rem;
+  color: #78909c;
+}
+
+.essenza-termica__leg-luce-item {
+  white-space: nowrap;
 }
 
 .essenza-termica__nome em {

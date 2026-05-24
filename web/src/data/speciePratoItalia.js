@@ -5,7 +5,15 @@
 
 /** @typedef {'fredda'|'calda'} TipoStagione */
 /** @typedef {'ovunque'|'nord_centro'|'sud'|'costa'} UsoItalia */
+/** @typedef {'sole'|'nuvola'|'ombra'} EsposizioneLuce */
 /** @typedef {'tappeto_c3'|'macroterma_c4'|'rustico'|'infestante_c3'|'infestante_c4'|'infestante_ciperacea'} TipologiaPrato */
+
+/** Icone esposizione per specie da prato (semina / tappeto). */
+export const ESPOSIZIONE_LUCE = {
+  sole: { icon: "☀️", label: "Pieno sole" },
+  nuvola: { icon: "⛅", label: "Mezz'ombra" },
+  ombra: { icon: "☁️", label: "Ombra" },
+};
 
 export const TIPOLOGIE_PRATO = [
   { id: "tappeto_c3", label: "Prato tappeto (C3)", desc: "Graminacee da tappeto a stagione fresca" },
@@ -22,6 +30,7 @@ function sp(base) {
     tipologia: "tappeto_c3",
     tipo: "fredda",
     uso_italia: "ovunque",
+    esposizione: "nuvola",
     germMin: 8,
     germOptMin: 10,
     germOptMax: 18,
@@ -36,32 +45,32 @@ function sp(base) {
 
 export const SPECIE_PRATO_ITALIA = [
   // ═══ Prato tappeto (C3) ═══════════════════════════════════════════════════
-  sp({ id: "lolium_perenne", nome: "Lolium perenne", tipologia: "tappeto_c3", germMin: 5, germOptMin: 8, germOptMax: 18, germMax: 26, growMin: 4, growOptMin: 12, growOptMax: 22, growMax: 28 }),
-  sp({ id: "lolium_perenne_4n", nome: "Lolium perenne", citotipo: "4n", tipologia: "tappeto_c3", germMin: 5, germOptMin: 8, germOptMax: 20, germMax: 28, growMin: 4, growOptMin: 12, growOptMax: 24, growMax: 30 }),
-  sp({ id: "lolium_multiflorum", nome: "Lolium multiflorum", tipologia: "tappeto_c3", germMin: 6, germOptMin: 8, germOptMax: 20, germMax: 28, growMin: 6, growOptMin: 10, growOptMax: 22, growMax: 28 }),
-  sp({ id: "lolium_hybridum", nome: "Lolium hybridum", tipologia: "tappeto_c3", germMin: 5, germOptMin: 8, germOptMax: 19, germMax: 27, growMin: 5, growOptMin: 11, growOptMax: 23, growMax: 29 }),
-  sp({ id: "festuca_arundinacea", nome: "Festuca arundinacea", tipologia: "tappeto_c3", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 28, growMin: 8, growOptMin: 15, growOptMax: 24, growMax: 30 }),
-  sp({ id: "festuca_rubra", nome: "Festuca rubra", tipologia: "tappeto_c3", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 24, growMin: 6, growOptMin: 12, growOptMax: 20, growMax: 26 }),
-  sp({ id: "festuca_rubra_commutata", nome: "Festuca rubra subsp. commutata", tipologia: "tappeto_c3", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 24, growMin: 6, growOptMin: 12, growOptMax: 20, growMax: 26 }),
-  sp({ id: "festuca_rubra_trichophylla", nome: "Festuca rubra subsp. trichophylla", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 23, growMin: 6, growOptMin: 11, growOptMax: 19, growMax: 25 }),
-  sp({ id: "festuca_ovina", nome: "Festuca ovina", tipologia: "tappeto_c3", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 24, growMin: 5, growOptMin: 10, growOptMax: 18, growMax: 24 }),
-  sp({ id: "festuca_trachyphylla", nome: "Festuca trachyphylla", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 9, germOptMin: 11, germOptMax: 18, germMax: 25, growMin: 7, growOptMin: 12, growOptMax: 20, growMax: 26 }),
-  sp({ id: "poa_pratensis", nome: "Poa pratensis", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 26, growMin: 8, growOptMin: 14, growOptMax: 22, growMax: 28 }),
-  sp({ id: "poa_trivialis", nome: "Poa trivialis", tipologia: "tappeto_c3", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 22, growMin: 6, growOptMin: 11, growOptMax: 19, growMax: 24 }),
-  sp({ id: "poa_supina", nome: "Poa supina", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 22, growMin: 6, growOptMin: 10, growOptMax: 18, growMax: 24 }),
-  sp({ id: "poa_angustifolia", nome: "Poa angustifolia", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 10, germOptMin: 12, germOptMax: 19, germMax: 25, growMin: 8, growOptMin: 13, growOptMax: 21, growMax: 27 }),
-  sp({ id: "agrostis_stolonifera", nome: "Agrostis stolonifera", tipologia: "tappeto_c3", uso_italia: "nord_centro", germMin: 10, germOptMin: 14, germOptMax: 22, germMax: 26, growMin: 10, growOptMin: 16, growOptMax: 23, growMax: 27 }),
-  sp({ id: "agrostis_capillaris", nome: "Agrostis capillaris", tipologia: "tappeto_c3", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 26, growMin: 8, growOptMin: 14, growOptMax: 22, growMax: 28 }),
+  sp({ id: "lolium_perenne", nome: "Lolium perenne", tipologia: "tappeto_c3", esposizione: "sole", germMin: 5, germOptMin: 8, germOptMax: 18, germMax: 26, growMin: 4, growOptMin: 12, growOptMax: 22, growMax: 28 }),
+  sp({ id: "lolium_perenne_4n", nome: "Lolium perenne", citotipo: "4n", tipologia: "tappeto_c3", esposizione: "sole", germMin: 5, germOptMin: 8, germOptMax: 20, germMax: 28, growMin: 4, growOptMin: 12, growOptMax: 24, growMax: 30 }),
+  sp({ id: "lolium_multiflorum", nome: "Lolium multiflorum", tipologia: "tappeto_c3", esposizione: "sole", germMin: 6, germOptMin: 8, germOptMax: 20, germMax: 28, growMin: 6, growOptMin: 10, growOptMax: 22, growMax: 28 }),
+  sp({ id: "lolium_hybridum", nome: "Lolium hybridum", tipologia: "tappeto_c3", esposizione: "sole", germMin: 5, germOptMin: 8, germOptMax: 19, germMax: 27, growMin: 5, growOptMin: 11, growOptMax: 23, growMax: 29 }),
+  sp({ id: "festuca_arundinacea", nome: "Festuca arundinacea", tipologia: "tappeto_c3", esposizione: "sole", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 28, growMin: 8, growOptMin: 15, growOptMax: 24, growMax: 30 }),
+  sp({ id: "festuca_rubra", nome: "Festuca rubra", tipologia: "tappeto_c3", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 24, growMin: 6, growOptMin: 12, growOptMax: 20, growMax: 26 }),
+  sp({ id: "festuca_rubra_commutata", nome: "Festuca rubra subsp. commutata", tipologia: "tappeto_c3", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 24, growMin: 6, growOptMin: 12, growOptMax: 20, growMax: 26 }),
+  sp({ id: "festuca_rubra_trichophylla", nome: "Festuca rubra subsp. trichophylla", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 23, growMin: 6, growOptMin: 11, growOptMax: 19, growMax: 25 }),
+  sp({ id: "festuca_ovina", nome: "Festuca ovina", tipologia: "tappeto_c3", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 24, growMin: 5, growOptMin: 10, growOptMax: 18, growMax: 24 }),
+  sp({ id: "festuca_trachyphylla", nome: "Festuca trachyphylla", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "nuvola", germMin: 9, germOptMin: 11, germOptMax: 18, germMax: 25, growMin: 7, growOptMin: 12, growOptMax: 20, growMax: 26 }),
+  sp({ id: "poa_pratensis", nome: "Poa pratensis", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "nuvola", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 26, growMin: 8, growOptMin: 14, growOptMax: 22, growMax: 28 }),
+  sp({ id: "poa_trivialis", nome: "Poa trivialis", tipologia: "tappeto_c3", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 18, germMax: 22, growMin: 6, growOptMin: 11, growOptMax: 19, growMax: 24 }),
+  sp({ id: "poa_supina", nome: "Poa supina", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "ombra", germMin: 8, germOptMin: 10, germOptMax: 17, germMax: 22, growMin: 6, growOptMin: 10, growOptMax: 18, growMax: 24 }),
+  sp({ id: "poa_angustifolia", nome: "Poa angustifolia", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "nuvola", germMin: 10, germOptMin: 12, germOptMax: 19, germMax: 25, growMin: 8, growOptMin: 13, growOptMax: 21, growMax: 27 }),
+  sp({ id: "agrostis_stolonifera", nome: "Agrostis stolonifera", tipologia: "tappeto_c3", uso_italia: "nord_centro", esposizione: "nuvola", germMin: 10, germOptMin: 14, germOptMax: 22, germMax: 26, growMin: 10, growOptMin: 16, growOptMax: 23, growMax: 27 }),
+  sp({ id: "agrostis_capillaris", nome: "Agrostis capillaris", tipologia: "tappeto_c3", esposizione: "sole", germMin: 10, germOptMin: 12, germOptMax: 20, germMax: 26, growMin: 8, growOptMin: 14, growOptMax: 22, growMax: 28 }),
 
   // ═══ Macroterma (C4) ══════════════════════════════════════════════════════
-  sp({ id: "cynodon_dactylon", nome: "Cynodon dactylon", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", germMin: 18, germOptMin: 24, germOptMax: 32, germMax: 38, growMin: 15, growOptMin: 26, growOptMax: 34, growMax: 40 }),
-  sp({ id: "zoysia_matrella", nome: "Zoysia matrella", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", germMin: 18, germOptMin: 22, germOptMax: 30, germMax: 35, growMin: 12, growOptMin: 24, growOptMax: 32, growMax: 38 }),
-  sp({ id: "zoysia_japonica", nome: "Zoysia japonica", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", germMin: 18, germOptMin: 22, germOptMax: 30, germMax: 35, growMin: 12, growOptMin: 24, growOptMax: 32, growMax: 38 }),
-  sp({ id: "paspalum_vaginatum", nome: "Paspalum vaginatum", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "costa", germMin: 20, germOptMin: 24, germOptMax: 32, germMax: 36, growMin: 18, growOptMin: 26, growOptMax: 34, growMax: 40 }),
+  sp({ id: "cynodon_dactylon", nome: "Cynodon dactylon", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", esposizione: "sole", germMin: 18, germOptMin: 24, germOptMax: 32, germMax: 38, growMin: 15, growOptMin: 26, growOptMax: 34, growMax: 40 }),
+  sp({ id: "zoysia_matrella", nome: "Zoysia matrella", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", esposizione: "sole", germMin: 18, germOptMin: 22, germOptMax: 30, germMax: 35, growMin: 12, growOptMin: 24, growOptMax: 32, growMax: 38 }),
+  sp({ id: "zoysia_japonica", nome: "Zoysia japonica", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "sud", esposizione: "nuvola", germMin: 18, germOptMin: 22, germOptMax: 30, germMax: 35, growMin: 12, growOptMin: 24, growOptMax: 32, growMax: 38 }),
+  sp({ id: "paspalum_vaginatum", nome: "Paspalum vaginatum", tipologia: "macroterma_c4", tipo: "calda", uso_italia: "costa", esposizione: "sole", germMin: 20, germOptMin: 24, germOptMax: 32, germMax: 36, growMin: 18, growOptMin: 26, growOptMax: 34, growMax: 40 }),
 
   // ═══ Rustico ════════════════════════════════════════════════════════════════
-  sp({ id: "dactylis_glomerata", nome: "Dactylis glomerata", tipologia: "rustico", germMin: 8, germOptMin: 10, germOptMax: 20, germMax: 28, growMin: 7, growOptMin: 12, growOptMax: 22, growMax: 30 }),
-  sp({ id: "lolium_rigidum", nome: "Lolium rigidum", tipologia: "rustico", uso_italia: "sud", germMin: 8, germOptMin: 12, germOptMax: 22, germMax: 30, growMin: 8, growOptMin: 14, growOptMax: 24, growMax: 32 }),
+  sp({ id: "dactylis_glomerata", nome: "Dactylis glomerata", tipologia: "rustico", esposizione: "nuvola", germMin: 8, germOptMin: 10, germOptMax: 20, germMax: 28, growMin: 7, growOptMin: 12, growOptMax: 22, growMax: 30 }),
+  sp({ id: "lolium_rigidum", nome: "Lolium rigidum", tipologia: "rustico", uso_italia: "sud", esposizione: "sole", germMin: 8, germOptMin: 12, germOptMax: 22, germMax: 30, growMin: 8, growOptMin: 14, growOptMax: 24, growMax: 32 }),
 
   // ═══ Infestanti C3 ══════════════════════════════════════════════════════════
   sp({ id: "poa_annua", nome: "Poa annua", tipologia: "infestante_c3", germMin: 6, germOptMin: 8, germOptMax: 16, germMax: 22, growMin: 4, growOptMin: 8, growOptMax: 16, growMax: 22 }),
