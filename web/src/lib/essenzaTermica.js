@@ -80,6 +80,33 @@ export function riepilogoStati(specie) {
   return out;
 }
 
+/** Raggruppamento UI: prato coltivato vs infestanti. */
+export const GRUPPI_ESSENZA = {
+  prato: {
+    id: "prato",
+    label: "Sementi e prato",
+    hint: "Loietto, festuche, poa, macroterme…",
+    tipologie: ["tappeto_c3", "macroterma_c4", "rustico"],
+  },
+  infestanti: {
+    id: "infestanti",
+    label: "Infestanti",
+    hint: "Erbe concorrenti e ciperacee — rischio pre-emergenza",
+    tipologie: ["infestante_c3", "infestante_c4", "infestante_ciperacea"],
+  },
+};
+
+/** @param {readonly object[]} specie @param {'prato'|'infestanti'} gruppoId */
+export function speciePerGruppoEssenza(specie, gruppoId) {
+  const tipi = GRUPPI_ESSENZA[gruppoId]?.tipologie ?? [];
+  return specie.filter((s) => tipi.includes(s.tipologia));
+}
+
+/** @param {readonly object[]} specie @param {string} statoId */
+export function specieConStato(specie, statoId) {
+  return specie.filter((s) => statoPrincipaleSpecie(s).id === statoId);
+}
+
 /** Rampa 0→100 tra a e b. */
 function ramp(t, a, b) {
   if (t <= a) return 0;
