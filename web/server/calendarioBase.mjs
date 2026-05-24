@@ -3,7 +3,7 @@
  */
 
 import { normalizzaLivelloImpegno } from "./livelloImpegno.mjs";
-import { CLIMA_MENSILE_BY_ZONA } from "./scripts/seed_calendario_base.mjs";
+import { CLIMA_MENSILE_BY_ZONA } from "./calendarioBaseData.mjs";
 import { INTERVENTI_NORD_PIANURA } from "./scripts/data/interventi_nord_pianura.mjs";
 
 export const ZONE_CLIMATICHE = [
