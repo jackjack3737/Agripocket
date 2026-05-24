@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import DashPageHeader from "../components/DashPageHeader";
 import ProfileResetButton from "../components/ProfileResetButton";
 import PratoRadar from "../components/PratoRadar";
@@ -7,7 +7,6 @@ import WeatherCard from "../components/WeatherCard";
 import StatoClinicoWidget from "../components/StatoClinicoWidget";
 import StatoClinicoGeminiBar from "../components/StatoClinicoGeminiBar";
 import PratoZoneEditor from "../components/PratoZoneEditor";
-import ConsulenteZonaFoto from "../components/ConsulenteZonaFoto";
 import AnalisiSuoloAlert from "../components/AnalisiSuoloAlert";
 import IrrigationWidget from "../components/IrrigationWidget";
 import { EssenzaTermicaPair } from "../components/EssenzaTermicaWidget";
@@ -20,6 +19,8 @@ import { AVVISO_MQ_MANCANTI, superficieMqVerificata } from "../lib/sicurezzaClie
 
 export default function Dashboard({ profile, session, onProfileUpdate }) {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const controlloId = searchParams.get("controllo");
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState("");
@@ -125,18 +126,6 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
     <div className="page dashboard">
       <DashPageHeader active="dashboard" profile={profile} onLogout={logout} />
 
-      <ConsulenteZonaFoto
-        variant="google"
-        profile={profile}
-        userId={userId}
-        zonaId={zonaDefault?.id}
-        zonaNome={zonaDefault?.nome_zona}
-        onAnalisiComplete={async () => {
-          const analisi = await loadUltimaAnalisi(userId).catch(() => null);
-          setUltimaAnalisi(analisi);
-        }}
-      />
-
       {banner ? (
         <p className="dash-banner">
           {banner}{" "}
@@ -204,16 +193,16 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
               {pratoRadar.isExpired ? (
                 <>
                   Foto scaduta ({pratoRadar.ageDays} giorni).{" "}
-                  <Link to="/chat">Carica una nuova foto</Link>.
+                  <a href="#carica-foto-prato">Carica una nuova foto</a>.
                 </>
               ) : pratoRadar.needsPunteggiAssi ? (
                 <>
                   Analisi precedente senza punteggi per asse.{" "}
-                  <Link to="/chat">Rifai l&apos;analisi foto</Link>.
+                  <a href="#carica-foto-prato">Rifai l&apos;analisi foto</a>.
                 </>
               ) : (
                 <>
-                  <Link to="/chat">Carica una foto</Link> per attivare l&apos;esagono.
+                  <a href="#carica-foto-prato">Carica una foto</a> per attivare l&apos;esagono.
                 </>
               )}
             </p>
@@ -237,9 +226,12 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
         <StatoClinicoWidget
           ultimaAnalisi={ultimaAnalisi}
           zonaNome={zonaDefault?.nome_zona}
+          zonaId={zonaDefault?.id}
           weather={weather}
           userId={userId}
           profile={profile}
+          controlloId={controlloId}
+          onAnalisiComplete={refresh}
         />
 
         <PratoZoneEditor profile={profile} userId={userId} onProfileUpdate={onProfileUpdate} />

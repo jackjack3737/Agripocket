@@ -31,7 +31,7 @@ export default function Login() {
           password,
         });
         if (error) throw error;
-        nav("/", { replace: true });
+        nav("/dashboard", { replace: true });
       }
     } catch (err) {
       setMsg(err.message || "Errore");

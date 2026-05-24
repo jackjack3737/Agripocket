@@ -2231,6 +2231,75 @@
   margin-top: 0.5rem !important;
 }
 
+.carica-foto-prato {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e8e8e8);
+}
+
+.carica-foto-prato__label {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.carica-foto-prato__controllo {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.carica-foto-prato__preview {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+
+.carica-foto-prato__preview img {
+  display: block;
+  max-width: 120px;
+  max-height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.carica-foto-prato__remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: none;
+  border-radius: 50%;
+  background: #333;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.carica-foto-prato__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.carica-foto-prato__loading {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.carica-foto-prato__ok {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: #2e7d32;
+}
+
+.carica-foto-prato--compact .carica-foto-prato__label {
+  font-size: 0.85rem;
+}
+
 .stato-clinico__alerts {
   margin: 0 0 0.75rem;
   padding: 0.6rem 0.7rem;

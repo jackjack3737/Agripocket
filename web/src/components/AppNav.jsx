@@ -3,7 +3,6 @@ import DashRotatingWord from "./DashRotatingWord";
 
 const LINKS = [
   { key: "dashboard", to: "/dashboard", label: "Dashboard" },
-  { key: "chat", to: "/chat", label: "Analisi foto" },
   { key: "calendario", to: "/calendario", label: "Calendario" },
 ];
 

@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { supabase, loadPratoProfilo } from "./lib/supabase";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
-import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
 import CalendarioLavori from "./pages/CalendarioLavori";
+function ChatRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/dashboard${search}#carica-foto-prato`} replace />;
+}
+
 function appEntryPath(session, needsOnboarding) {
   if (!session) return "/login";
   if (needsOnboarding) return "/onboarding";
   return "/dashboard";
+}
+
+function ProtectedDashboard({ session, profile, profileReady, needsOnboarding, onProfileUpdate }) {
+  if (!session) return <Navigate to="/login" replace />;
+  if (profileReady && needsOnboarding) return <Navigate to="/onboarding" replace />;
+  return <Dashboard profile={profile} session={session} onProfileUpdate={onProfileUpdate} />;
 }
 
 export default function App() {
@@ -20,9 +30,6 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const timeout = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 4000);
 
     supabase.auth
       .getSession()
@@ -41,7 +48,6 @@ export default function App() {
 
     return () => {
       cancelled = true;
-      clearTimeout(timeout);
       sub.subscription.unsubscribe();
     };
   }, []);
@@ -59,7 +65,7 @@ export default function App() {
       .finally(() => setProfileReady(true));
   }, [session]);
 
-  if (loading || (session && !profileReady)) {
+  if (loading) {
     return (
       <div className="app-loading">
         <div className="spinner" />
@@ -69,6 +75,7 @@ export default function App() {
   }
 
   const needsOnboarding =
+    profileReady &&
     session &&
     (!profile || !profile.onboarding_completato || !profile.disclaimer_accettato_at);
 
@@ -83,6 +90,8 @@ export default function App() {
         element={
           !session ? (
             <Navigate to="/login" replace />
+          ) : profileReady && !needsOnboarding ? (
+            <Navigate to="/dashboard" replace />
           ) : (
             <Onboarding
               userId={session.user.id}
@@ -97,13 +106,13 @@ export default function App() {
       <Route
         path="/dashboard"
         element={
-          !session ? (
-            <Navigate to="/login" replace />
-          ) : needsOnboarding ? (
-            <Navigate to="/onboarding" replace />
-          ) : (
-            <Dashboard profile={profile} session={session} onProfileUpdate={setProfile} />
-          )
+          <ProtectedDashboard
+            session={session}
+            profile={profile}
+            profileReady={profileReady}
+            needsOnboarding={needsOnboarding}
+            onProfileUpdate={setProfile}
+          />
         }
       />
       <Route
@@ -111,10 +120,10 @@ export default function App() {
         element={
           !session ? (
             <Navigate to="/login" replace />
-          ) : needsOnboarding ? (
+          ) : profileReady && needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <Chat profile={profile} session={session} onProfileUpdate={setProfile} />
+            <ChatRedirect />
           )
         }
       />
@@ -123,7 +132,7 @@ export default function App() {
         element={
           !session ? (
             <Navigate to="/login" replace />
-          ) : needsOnboarding ? (
+          ) : profileReady && needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
             <CalendarioLavori profile={profile} session={session} />

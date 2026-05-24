@@ -109,7 +109,7 @@ export function buildMeteoMetriche(bundle) {
       perche: [advice.advice].filter(Boolean),
       pratica: [
         "Usa questo come promemoria: incrocia sempre con quello che vedi sul prato (colore, impronte, feltro).",
-        "Se il consiglio e la foto non coincidono, priorità alla diagnosi visiva in «Analisi foto».",
+        "Se il consiglio e la foto non coincidono, priorità alla diagnosi visiva dall'ultima foto del prato.",
       ],
     });
   }

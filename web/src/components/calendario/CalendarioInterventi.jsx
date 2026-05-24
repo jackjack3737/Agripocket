@@ -151,7 +151,7 @@ export function InterventoRow({ item, onToggle, onPin, superficieMq }) {
         {controlloMensile && !done ? (
           <Link
             className="btn btn-primary btn-sm intervento-row__foto-cta"
-            to={`/chat?controllo=${item.id}`}
+            to={`/dashboard?controllo=${item.id}#carica-foto-prato`}
           >
             Carica foto controllo mensile
           </Link>

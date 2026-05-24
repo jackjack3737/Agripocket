@@ -57,7 +57,7 @@ export function calcolaStatoClinico({ vision, weather, agronomic } = {}) {
     return {
       livello: "grigio",
       label: MSG.grigio,
-      motivo: "Carica una foto in Analisi per lo stato clinico.",
+      motivo: "Carica una foto del prato per lo stato clinico.",
     };
   }
 

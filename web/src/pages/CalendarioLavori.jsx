@@ -384,8 +384,8 @@ export default function CalendarioLavori({ profile, session }) {
                 >
                   Genera piano annuale
                 </button>
-                <Link className="btn btn-outline btn-sm" to="/chat">
-                  Oppure analisi foto
+                <Link className="btn btn-outline btn-sm" to="/dashboard#carica-foto-prato">
+                  Oppure carica foto del prato
                 </Link>
               </div>
             ) : null}

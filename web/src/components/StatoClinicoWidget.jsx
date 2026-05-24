@@ -9,6 +9,7 @@ import {
 } from "../lib/irrigazioneClient";
 import { adattaCalendarioMeteo } from "../lib/calendarioMeteoClient";
 import { valutaAlertMeteoIrrigazione } from "../lib/meteoIrrigazioneAlert";
+import CaricaFotoPrato from "./CaricaFotoPrato";
 
 function parseVision(raw) {
   if (!raw) return null;
@@ -122,9 +123,12 @@ function MeteoConsigliPanel({ alert, profile, onIrrigazioneAggiornata }) {
 export default function StatoClinicoWidget({
   ultimaAnalisi,
   zonaNome,
+  zonaId,
   weather,
   userId,
   profile,
+  onAnalisiComplete,
+  controlloId,
 }) {
   const [thumbUrl, setThumbUrl] = useState(null);
   const [irrCacheTick, setIrrCacheTick] = useState(0);
@@ -196,6 +200,7 @@ export default function StatoClinicoWidget({
 
   return (
     <section
+      id="carica-foto-prato"
       className={`dash-card stato-clinico stato-clinico--${stato.livello}`}
       aria-live="polite"
     >
@@ -222,7 +227,6 @@ export default function StatoClinicoWidget({
           ) : (
             <div className="stato-clinico__thumb-placeholder">
               <span>Nessuna foto</span>
-              <Link to="/chat">Analizza</Link>
             </div>
           )}
         </div>
@@ -236,6 +240,16 @@ export default function StatoClinicoWidget({
           <p className="stato-clinico__motivo">{stato.motivo}</p>
         </div>
       </div>
+
+      <CaricaFotoPrato
+        profile={profile}
+        userId={userId}
+        zonaId={zonaId}
+        zonaNome={zonaNome}
+        controlloId={controlloId}
+        onAnalisiComplete={onAnalisiComplete}
+        compact
+      />
     </section>
   );
 }
