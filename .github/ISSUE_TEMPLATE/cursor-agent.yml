@@ -1,0 +1,54 @@
+name: Richiesta Cursor (da telefono o web)
+description: Chiedi modifiche al codice AgriPocket — l'agent Cursor lavora sul repo e apre una PR
+title: "[Cursor] "
+labels:
+  - cursor-agent
+body:
+  - type: markdown
+    value: |
+      Scrivi sotto **cosa vuoi** in italiano. Poi nel primo commento (o qui sotto se sei su web) aggiungi:
+      ```
+      @cursor implementa questa richiesta sul branch main
+      ```
+      **Da telefono:** crea l'issue, pubblica, poi aggiungi un commento con `@cursor` + istruzioni.
+      Guida completa: [docs/CURSOR_DA_TELEFONO.md](https://github.com/jackjack3737/Agripocket/blob/main/docs/CURSOR_DA_TELEFONO.md)
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Dashboard / irrigazione
+        - Chiedi all'agronomo / chat
+        - Analisi foto
+        - Calendario
+        - Onboarding / mappa prato
+        - Deploy / produzione
+        - Altro
+    validations:
+      required: true
+
+  - type: textarea
+    id: richiesta
+    attributes:
+      label: Cosa deve fare Cursor
+      description: Sii specifico (schermata, testo atteso, URL produzione se serve)
+      placeholder: "Es. Nella griglia settimana irrigazione mostra L1/L2 minuti per ogni linea centralina..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: contesto
+    attributes:
+      label: Contesto extra (opzionale)
+      description: Screenshot, messaggio errore, passi per riprodurre
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: deploy
+    attributes:
+      label: Dopo la PR
+      options:
+        - label: Voglio anche il deploy su Vercel (scrivilo nel testo se serve subito)
+        - label: Solo codice, deploy lo faccio io dal PC

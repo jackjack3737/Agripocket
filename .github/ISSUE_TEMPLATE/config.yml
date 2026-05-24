@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Guida — richieste da telefono con Cursor
+    url: https://github.com/jackjack3737/Agripocket/blob/main/docs/CURSOR_DA_TELEFONO.md
+    about: Come scrivere issue e usare @cursor dall'app GitHub
