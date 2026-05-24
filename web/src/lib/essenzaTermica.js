@@ -17,6 +17,69 @@ export const SPECIE_PRATO = SPECIE_PRATO_ITALIA;
 
 export const SCALA_TERMICA = { min: 0, max: 36 };
 
+/** Etichette stato unico per specie (UI compatta). */
+export const STATI_SPECIE = {
+  crescita: { id: "crescita", label: "Cresce", colorClass: "grow" },
+  stallo: { id: "stallo", label: "In stallo", colorClass: "stall" },
+  germina: { id: "germina", label: "Germina", colorClass: "germ" },
+  no_germ: { id: "no_germ", label: "No germina", colorClass: "nogerm" },
+};
+
+/**
+ * Stato dominante oggi (una sola etichetta per taxon).
+ * @param {{ germinazione_pct: number, crescita_pct: number }} spec
+ */
+export function statoPrincipaleSpecie(spec) {
+  const g = spec.germinazione_pct;
+  const c = spec.crescita_pct;
+  if (g >= 55 && c < 45) {
+    return { ...STATI_SPECIE.germina, pct: g, metric: "germinazione" };
+  }
+  if (c >= 48) {
+    return { ...STATI_SPECIE.crescita, pct: c, metric: "crescita" };
+  }
+  if (c < 28) {
+    return { ...STATI_SPECIE.stallo, pct: c, metric: "crescita" };
+  }
+  if (g < 22) {
+    return { ...STATI_SPECIE.no_germ, pct: g, metric: "germinazione" };
+  }
+  if (g >= 40) {
+    return { ...STATI_SPECIE.germina, pct: g, metric: "germinazione" };
+  }
+  return { ...STATI_SPECIE.stallo, pct: c, metric: "crescita" };
+}
+
+/** Specie con stato marcato o presenti nel profilo utente. */
+export function specieInEvidenza(spec) {
+  const s = statoPrincipaleSpecie(spec);
+  if (spec.in_profilo) return true;
+  if (s.id === "crescita" && s.pct >= 55) return true;
+  if (s.id === "germina" && s.pct >= 50) return true;
+  if (s.id === "stallo" && s.pct < 22) return true;
+  if (s.id === "no_germ" && s.pct < 18) return true;
+  return false;
+}
+
+/** @param {number} t °C suolo */
+export function zonaTermicaLabel(t) {
+  if (t == null || !Number.isFinite(t)) return { id: "unknown", label: "" };
+  if (t < 8) return { id: "freddo", label: "Suolo freddo" };
+  if (t < 12) return { id: "germ", label: "Germinazione loietto" };
+  if (t <= 18) return { id: "germ", label: "Ottimo C3 e semina" };
+  if (t < 26) return { id: "crescita", label: "Crescita attiva" };
+  return { id: "caldo", label: "Caldo / stress C3" };
+}
+
+/** Conteggi per chip riepilogo. */
+export function riepilogoStati(specie) {
+  const out = { crescita: 0, stallo: 0, germina: 0, no_germ: 0 };
+  for (const s of specie) {
+    out[statoPrincipaleSpecie(s).id] += 1;
+  }
+  return out;
+}
+
 /** Rampa 0→100 tra a e b. */
 function ramp(t, a, b) {
   if (t <= a) return 0;

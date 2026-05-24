@@ -20,31 +20,54 @@
 }
 
 .essenza-termica__sub {
-  margin: 0 0 0.75rem;
-  font-size: 0.82rem;
-  color: #455a64;
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  color: #546e7a;
+  line-height: 1.35;
 }
 
 .essenza-termica__msg {
-  margin: 0.65rem 0 0.85rem;
-  padding: 0.5rem 0.6rem;
-  font-size: 0.8rem;
+  margin: 0.5rem 0 0.65rem;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
   line-height: 1.45;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
   border-left: 3px solid #43a047;
-  color: #37474f;
+  color: #263238;
+  font-weight: 500;
 }
 
 /* Scala temperatura */
 .essenza-termica__scala {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.essenza-termica__scala-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.essenza-termica__scala-temp {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1b5e20;
+  font-variant-numeric: tabular-nums;
+}
+
+.essenza-termica__scala-zona {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #558b2f;
 }
 
 .essenza-termica__scala-track {
   position: relative;
   display: flex;
-  height: 14px;
+  height: 12px;
   border-radius: 999px;
   overflow: hidden;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -63,11 +86,15 @@
   background: linear-gradient(90deg, #ffa726, #ef6c00);
 }
 
+.essenza-termica__scala-zone--active {
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.5);
+}
+
 .essenza-termica__scala-marker {
   position: absolute;
   top: 50%;
   width: 4px;
-  height: 22px;
+  height: 20px;
   margin-left: -2px;
   transform: translateY(-50%);
   border-radius: 2px;
@@ -77,133 +104,199 @@
   pointer-events: none;
 }
 
-.essenza-termica__scala-labels {
+.essenza-termica__scala-legend {
   display: flex;
-  justify-content: space-between;
-  margin-top: 0.25rem;
-  font-size: 0.68rem;
+  margin-top: 0.3rem;
+}
+
+.essenza-termica__scala-leg {
+  flex: 1;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-align: center;
   color: #78909c;
 }
 
-.essenza-termica__scala-val {
-  margin: 0.35rem 0 0;
-  font-size: 0.78rem;
+.essenza-termica__scala-leg--freddo {
+  color: #5c6bc0;
+}
+.essenza-termica__scala-leg--germ {
+  color: #388e3c;
+}
+.essenza-termica__scala-leg--crescita {
   color: #2e7d32;
-  text-align: center;
+}
+.essenza-termica__scala-leg--caldo {
+  color: #e65100;
 }
 
+/* Riepilogo chip */
+.essenza-termica__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.essenza-termica__chip {
+  font-size: 0.68rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #455a64;
+}
+
+.essenza-termica__chip strong {
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.15rem;
+}
+
+.essenza-termica__chip--grow {
+  border-color: rgba(46, 125, 50, 0.35);
+  color: #2e7d32;
+}
+.essenza-termica__chip--germ {
+  border-color: rgba(21, 101, 192, 0.35);
+  color: #1565c0;
+}
+.essenza-termica__chip--stall {
+  border-color: rgba(84, 110, 122, 0.35);
+  color: #546e7a;
+}
+.essenza-termica__chip--nogerm {
+  border-color: rgba(198, 40, 40, 0.3);
+  color: #c62828;
+}
+
+/* Legenda */
+.essenza-termica__legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  list-style: none;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  font-size: 0.65rem;
+  color: #607d8b;
+}
+
+.essenza-termica__leg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.essenza-termica__leg-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.essenza-termica__leg-item--grow .essenza-termica__leg-dot {
+  background: #2e7d32;
+}
+.essenza-termica__leg-item--germ .essenza-termica__leg-dot {
+  background: #1565c0;
+}
+.essenza-termica__leg-item--stall .essenza-termica__leg-dot {
+  background: #78909c;
+}
+.essenza-termica__leg-item--nogerm .essenza-termica__leg-dot {
+  background: #c62828;
+}
+
+.essenza-termica__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  font-size: 0.72rem;
+  color: #455a64;
+  cursor: pointer;
+  user-select: none;
+}
+
+.essenza-termica__toggle input {
+  accent-color: #43a047;
+}
+
+/* Accordion tipologie */
 .essenza-termica__tipi {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  max-height: 32rem;
+  gap: 0.4rem;
+  max-height: 28rem;
   overflow-y: auto;
-  padding-right: 0.25rem;
+  padding-right: 0.2rem;
 }
 
-.essenza-termica__tipo {
+.essenza-termica__acc {
   border-radius: 10px;
-  padding: 0.65rem 0.7rem 0.75rem;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(76, 175, 80, 0.2);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(76, 175, 80, 0.22);
+  overflow: hidden;
 }
 
-.essenza-termica__tipo--infest {
+.essenza-termica__acc--infest {
   border-color: rgba(198, 40, 40, 0.22);
-  background: rgba(255, 235, 238, 0.55);
+  background: rgba(255, 235, 238, 0.5);
 }
 
-.essenza-termica__tipo-head {
+.essenza-termica__acc-sum {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.2rem;
-}
-
-.essenza-termica__tipo-tit {
-  margin: 0;
-  font-size: 0.82rem;
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.8rem;
   font-weight: 700;
   color: #1b5e20;
 }
 
-.essenza-termica__tipo--infest .essenza-termica__tipo-tit {
+.essenza-termica__acc--infest .essenza-termica__acc-sum {
   color: #b71c1c;
 }
 
-.essenza-termica__tipo-n {
-  font-size: 0.68rem;
+.essenza-termica__acc-sum::-webkit-details-marker {
+  display: none;
+}
+
+.essenza-termica__acc-sum::before {
+  content: "▸";
+  margin-right: 0.35rem;
+  font-size: 0.7rem;
   color: #78909c;
-  white-space: nowrap;
+  transition: transform 0.15s ease;
+}
+
+.essenza-termica__acc[open] .essenza-termica__acc-sum::before {
+  transform: rotate(90deg);
+}
+
+.essenza-termica__acc-tit {
+  flex: 1;
+}
+
+.essenza-termica__acc-meta {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: #78909c;
 }
 
 .essenza-termica__tipo-desc {
-  margin: 0 0 0.45rem;
+  margin: 0 0.65rem 0.4rem;
+  padding: 0 0.65rem;
   font-size: 0.68rem;
   color: #607d8b;
   line-height: 1.35;
 }
 
-.essenza-termica__tipo-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem 0.65rem;
-}
-
-@media (max-width: 400px) {
-  .essenza-termica__tipo-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.essenza-termica__mini-tit {
-  margin: 0 0 0.25rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #546e7a;
-}
-
-.essenza-termica__mini .essenza-termica__row {
-  margin-bottom: 0.28rem;
-}
-
-.essenza-termica__cyto {
-  display: inline-block;
-  margin-left: 0.2rem;
-  font-size: 0.62rem;
-  font-style: normal;
-  font-weight: 700;
-  color: #1565c0;
-  vertical-align: super;
-}
-
-@media (min-width: 520px) {
-  .essenza-termica__griglia {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.essenza-termica__gruppo-tit {
-  margin: 0 0 0.15rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #33691e;
-}
-
-.essenza-termica__gruppo-hint {
-  margin: 0 0 0.4rem;
-  font-size: 0.7rem;
-  color: #78909c;
-}
-
 .essenza-termica__vuoto {
-  margin: 0;
-  font-size: 0.75rem;
+  margin: 0 0.65rem 0.55rem;
+  font-size: 0.72rem;
   color: #90a4ae;
   font-style: italic;
 }
@@ -211,26 +304,53 @@
 .essenza-termica__lista {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.55rem 0.55rem;
 }
 
 .essenza-termica__row {
   display: grid;
-  grid-template-columns: minmax(8.5rem, 46%) 1fr 2.2rem;
+  grid-template-columns: minmax(6.5rem, 1fr) auto minmax(3.5rem, 28%) 2.1rem;
   align-items: center;
-  gap: 0.35rem;
-  margin-bottom: 0.35rem;
-  font-size: 0.75rem;
+  gap: 0.3rem 0.35rem;
+  margin-bottom: 0.32rem;
+  font-size: 0.72rem;
 }
 
-.essenza-termica__row--highlight .essenza-termica__nome {
+@media (max-width: 380px) {
+  .essenza-termica__row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+  .essenza-termica__bar-track {
+    grid-column: 1 / -1;
+  }
+  .essenza-termica__pct {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+.essenza-termica__row--highlight {
+  padding: 0.15rem 0.25rem;
+  margin-left: -0.25rem;
+  margin-right: -0.25rem;
+  border-radius: 6px;
+  background: rgba(200, 230, 201, 0.45);
+}
+
+.essenza-termica__cyto {
+  display: inline-block;
+  margin-left: 0.2rem;
+  font-size: 0.6rem;
+  font-style: normal;
   font-weight: 700;
-  color: #1b5e20;
+  color: #1565c0;
+  vertical-align: super;
 }
 
 .essenza-termica__badge {
   display: block;
-  font-size: 0.58rem;
+  font-size: 0.56rem;
   font-weight: 600;
   color: #2e7d32;
   text-transform: uppercase;
@@ -240,7 +360,6 @@
 .essenza-termica__nome {
   color: #37474f;
   line-height: 1.25;
-  font-size: 0.72rem;
 }
 
 .essenza-termica__nome em {
@@ -248,8 +367,33 @@
   font-weight: 500;
 }
 
+.essenza-termica__stato {
+  font-size: 0.62rem;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.essenza-termica__stato--grow {
+  background: rgba(46, 125, 50, 0.12);
+  color: #2e7d32;
+}
+.essenza-termica__stato--germ {
+  background: rgba(21, 101, 192, 0.12);
+  color: #1565c0;
+}
+.essenza-termica__stato--stall {
+  background: rgba(84, 110, 122, 0.12);
+  color: #546e7a;
+}
+.essenza-termica__stato--nogerm {
+  background: rgba(198, 40, 40, 0.1);
+  color: #c62828;
+}
+
 .essenza-termica__bar-track {
-  height: 8px;
+  height: 7px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.06);
   overflow: hidden;
@@ -279,11 +423,12 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: #455a64;
+  font-size: 0.68rem;
 }
 
 .essenza-termica__foot {
-  margin: 0.75rem 0 0;
-  font-size: 0.68rem;
+  margin: 0.65rem 0 0;
+  font-size: 0.66rem;
   color: #90a4ae;
   line-height: 1.4;
 }
