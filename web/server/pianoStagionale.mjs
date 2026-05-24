@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { fetchWeatherBundle, formatWeatherForPrompt } from "./weatherCore.mjs";
 import { ensurePreEmergenzaAnnuali, valutaPreEmergenzaAnnuali } from "./preEmergenzaAnnuali.mjs";
-import { loadProdotti } from "./prodottiCatalogo.mjs";
 import { superficieMqVerificata } from "./sicurezzaProdotti.mjs";
 import { mergeControlliMensili } from "./controlliMensili.mjs";
 import { hintParassitiRegionali } from "./parassitiPrato.mjs";
@@ -18,6 +17,10 @@ import { buildFocolaiPromptBlock } from "./focolaiRegionali.mjs";
 import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
 import { recuperaParametriRag } from "./ragParametriAgronomici.mjs";
 import { pipelineAdattamentiPostPiano } from "./pianoAdattivo.mjs";
+import {
+  arricchisciInterventoEsigenze,
+  buildTimelineBisogni,
+} from "./esigenzeAgronomiche.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -200,39 +203,52 @@ ${hintParassitiRegionali(profilo?.localita)}
 
 ${focolaiBlock}
 
-Knowledge base (priorità: manuali universitari > Calendario Verde Bottos > schede prodotto; i tag [N|libro] indicano la fonte):
+Knowledge base (priorità: manuali universitari > calendari agronomici > schede tecniche generiche; tag [N|libro] = fonte):
 ${kb || "(usa best practice italiane per prato da giardino)"}
 
-Parametri RAG estratti (fonte: ${ragParams.fonte}): Kc mensili disponibili; rispetta finestre fisiologiche da manuali.
+Parametri RAG (fonte: ${ragParams.fonte}): Kc mensili; rispetta finestre fisiologiche.
 
-## MATRICE N-P-K STAGIONALE OBBLIGATORIA (corsetto fisiologico)
-Distribuisci i macro-elementi su tutto l'anno — non concentrare tutto in una stagione:
-- **Primavera (mar–mag) e Autunno (set–ott):** concimazioni con **Azoto (N)** per spinta vegetativa, ripresa e densità (titoli tipo «Concimazione azotata primaverile/autunnale»).
-- **Estate (giu–lug) e Inverno (nov–dic):** **Potassio (K)** antistress / rinforzo (titoli tipo «Concimazione potassica antistress»). In giu–lug **VIETATO** concime azotato classico.
-- **Autunno (set–nov):** anche **Fosforo (P)** per radici e riserve pre-inverno.
-- Non programmare due interventi della stessa famiglia NPK (es. due potassici) a meno di 30 giorni di distanza salvo frazionamento esplicito in descrizione.
+## FILOSOFIA SOLUM — PURE AGRONOMY & PREDICTIVE NEED
+NON sei un catalogo commerciale. NON citare MAI marchi, nomi commerciali, SKU o prodotti specifici (es. niente Bottos, Barenbrug, Scotts, Fly, Trichoderma come brand).
+Restituisci SOLO necessità molecolari, nutrizionali e fisiologiche in linguaggio tecnico:
+- N-P-K con cessione rapida/lenta e dose indicativa in g/m² quando utile
+- Acidi umici, acidi fulvici, amminoacidi
+- Microelementi (Ferro chelato, Magnesio, Zinco…)
+- Principi attivi fitosanitari/biologici generici (es. Propiconazolo, Acetamiprid SL, Trichoderma spp., Pendimetalin) — mai come prodotto commerciale
 
-Per le macro-azioni usa soprattutto i manuali universitari; Calendario Verde per stagionalità; le schede prodotto solo come riferimento commerciale Bottos (non elencare tutti i prodotti nel piano).
+Esempio corretto: "Il prato è in stress termico (ET0 alto): necessita di biostimolazione con Acidi Umici e Fulvici + agente umettante."
+Esempio VIETATO: "Usa concime X" o "Applica Tryko Plus".
 
-Obiettivo: elencare i lavori STRATEGICI del prato (NON taglio né irrigazione generica — gestiti dall'app come abitudini), con data_prevista YYYY-MM-DD:
-- Concimazioni (NPK, autunno/primavera, slow, microelementi, ferro)
-- Diserbi: pre-emergenza setaria/digitaria quando il blocco termico indica finestra aperta; post-emergenza selettivo se erbe visibili
-- Arieggiazione / scarifica / svasatura
-- Biostimolanti e stress (caldo, siccità) — in luglio/agosto NO concimi azotati, solo antistress
-- Agenti umettanti (solo livello Pro/Greenkeeper)
-- Solo marca BOTTOS per concimi, biostimolanti, umettanti, ammendanti
-- Overseeding/semina SOLO abbinato ad arieggiatura o scarifica nello stesso mese (vedi regola TRASEMINA)
-- Pulizia foglie, controllo feltro, bordi
+## MATRICE N-P-K STAGIONALE (corsetto fisiologico)
+- Primavera (mar–mag) e autunno (set–ott): **N** a lenta o rapida cessione secondo temperatura
+- Estate (giu–lug): **K** antistress; VIETATO N classico in pieno caldo
+- Autunno (set–nov): **P** per radici + eventuale overseeding
+- Distanza minima 30 gg tra stesso macroelemento salvo frazionamento esplicito
+
+Obiettivo: lavori STRATEGICI (NO taglio/irrigazione generica — gestiti come abitudini), date YYYY-MM-DD:
+- Nutrizione NPK, microelementi, biostimolanti, umettanti
+- Diserbo pre/post emergenza (principio attivo generico)
+- Trattamenti solo con evidenza patologia/parassiti
+- Arieggiazione, overseeding abbinato ad arieggiatura (regola TRASEMINA)
 
 ${REGOLE_FITOFARMACI_PROMPT}
 
 Rispondi SOLO JSON:
 {
+  "timeline_bisogni": {
+    "oggi": "frase emergenza/oggi (es. stress idrico → umettanti + umici/fulvici)",
+    "prossimo_mese": "previsione bisogni entro 30 giorni (es. 20 g/m² N a lenta cessione)",
+    "finestre_stagionali": [
+      { "periodo": "SETTEMBRE", "esigenza": "finestra overseeding + fosforo radicale" }
+    ]
+  },
   "interventi": [
     {
-      "titolo": "max 80 caratteri, MACRO-AZIONE agronomica (es. Concimazione potassica antistress, Trattamento funghicida preventivo) — MAI nomi commerciali",
-      "descrizione": "perché serve ora (GDD, meteo, stress), cosa fare in pratica — senza citare marchi o dosi commerciali",
-      "categoria": "taglio|irrigazione|concime|trattamento|pulizia|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
+      "titolo": "macro-azione fisiologica (MAI marchi)",
+      "fabbisogno_fisiologico": "spiegazione causa-effetto (meteo, GDD, stress)",
+      "esigenze_molecolari": ["N a lenta cessione 20 g/m²", "Acidi umici"],
+      "descrizione": "sintesi operativa per il giardiniere",
+      "categoria": "concime|trattamento|diserbo|arieggiatura|biostimolante|umettante|rinnovo|pulizia|altro",
       "priorita": "alta|media|bassa",
       "data_prevista": "YYYY-MM-DD"
     }
@@ -240,18 +256,12 @@ Rispondi SOLO JSON:
 }
 
 REGOLE TASSATIVE:
-1. LIVELLO UTENTE: ${testoLivelloPerPrompt(profilo)}. Massimo ${cfgLivello.maxInterventi} interventi strategici. Se Base, ignora trattamenti liquidi mensili ripetuti.
-2. ROUTINE: NON generare mai task per taglio o irrigazione generica (settimanali o ricorrenti).
-3. TANK-MIX: Se in un mese prevedi più prodotti liquidi compatibili (es. Tryko Plus + Vigor Liquid, Pre-Stress + Always), uniscili in UN solo intervento "Tank-Mix: [Nome]" con miscela in descrizione.
-4. REGOLA TRASEMINA: Non generare MAI interventi isolati di categoria "rinnovo" (semina/trasemina). Il seme va consigliato ESCLUSIVAMENTE in abbinamento o nello stesso mese di un intervento di "arieggiatura" o "scarifica". Se non c'è arieggiatura nello stesso mese, non c'è trasemina.
-
-Regole aggiuntive:
-- Distribuisci su tutto l'anno (non ammassare in una settimana).
-- Date reali tra ${oggi} e ${fine}; stagionalità italiana e località.
-- Picco concimi primavera/autunno; luglio-agosto solo biostimolanti antistress, mai concimi azotati.
-- Evita duplicati stesso giorno con stesso titolo.
-- priorita alta per overseeding, pre-emergenza, stress caldo.
-- Adatta a obiettivo e livello concimi del profilo.`;
+1. LIVELLO: ${testoLivelloPerPrompt(profilo)}. Max ${cfgLivello.maxInterventi} interventi.
+2. NO taglio/irrigazione generica nel piano.
+3. TANK-MIX: più applicazioni liquide compatibili nello stesso mese → UN intervento "Miscela fogliare" con elenco molecole in esigenze_molecolari (no nomi commerciali).
+4. TRASEMINA: rinnovo solo nello stesso mese di arieggiatura/scarifica.
+5. Date tra ${oggi} e ${fine}; distribuite sull'anno.
+6. Completa timeline_bisogni con almeno 3 finestre_stagionali (mesi in maiuscolo italiano).`;
 
   const raw = await geminiGenerate(geminiKey, prompt, { maxTokens: 16384 });
   let parsed;
@@ -262,25 +272,29 @@ Regole aggiuntive:
   }
 
   const list = Array.isArray(parsed?.interventi) ? parsed.interventi : [];
+  const timelineLlm = parsed?.timeline_bisogni || null;
   const seen = new Set();
 
   let parsedList = list
-    .filter((i) => i?.titolo?.trim())
+    .filter((i) => i?.titolo?.trim() || i?.esigenze_molecolari?.length)
     .map((item, idx) => {
       const data = parseIsoDate(item.data_prevista, addDays(oggi, Math.min(idx * 3, 360)));
-      const key = `${data}|${String(item.titolo).slice(0, 40)}`;
-      if (seen.has(key)) return null;
-      seen.add(key);
-      return {
-        titolo: String(item.titolo).trim().slice(0, 120),
-        descrizione: String(item.descrizione || "").trim().slice(0, 600),
+      const base = arricchisciInterventoEsigenze({
+        titolo: String(item.titolo || "").trim(),
+        descrizione: String(item.descrizione || "").trim(),
+        fabbisogno_fisiologico: String(item.fabbisogno_fisiologico || "").trim(),
+        esigenze_molecolari: item.esigenze_molecolari,
         priorita: ["alta", "media", "bassa"].includes(String(item.priorita).toLowerCase())
           ? String(item.priorita).toLowerCase()
           : "media",
         categoria: normalizeCategoria(item.categoria),
         data_prevista: data >= oggi && data <= fine ? data : oggi,
         ordine: idx,
-      };
+      });
+      const key = `${base.data_prevista}|${String(base.titolo).slice(0, 40)}`;
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return base;
     })
     .filter(Boolean)
     .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista) || a.ordine - b.ordine);
@@ -299,6 +313,7 @@ Regole aggiuntive:
   parsedList = applicaRegolaTrasemina(parsedList);
   parsedList = ensureOmbraOverseedInterventi(parsedList, profilo?.prato_zone, profilo, oggi, addDays);
   parsedList = applicaRegolaTrasemina(parsedList);
+  parsedList._timelineLlm = timelineLlm;
 
   return parsedList;
 }
@@ -421,10 +436,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     .maybeSingle();
   const vision = ultimaAnalisi?.vision_json ?? null;
 
-  const profiloPerPrompt = {
-    ...profilo,
-    _prodottiCatalogo: await loadProdotti(admin),
-  };
+  const profiloPerPrompt = { ...profilo };
 
   const parametriRag = await recuperaParametriRag("calendario", {
     admin,
@@ -432,11 +444,12 @@ export async function generaPianoStagionale({ authHeader, env }) {
     profilo,
   });
 
-  const interventiGrezzi = await buildPianoInterventi(profiloPerPrompt, env, admin, {
+  const interventiGrezziRaw = await buildPianoInterventi(profiloPerPrompt, env, admin, {
     vision,
     parametriRag,
   });
-  const prodotti = profiloPerPrompt._prodottiCatalogo;
+  const timelineLlm = interventiGrezziRaw._timelineLlm;
+  const interventiGrezzi = interventiGrezziRaw;
 
   let weatherBundle = null;
   try {
@@ -450,8 +463,13 @@ export async function generaPianoStagionale({ authHeader, env }) {
   const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
   const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
     storico,
-    prodotti,
+    prodotti: [],
     vision,
+    weatherBundle,
+    pureAgronomy: true,
+  });
+  const timeline_bisogni = buildTimelineBisogni(sanitizzati, oggi, {
+    llmTimeline: timelineLlm,
     weatherBundle,
   });
   const catalogoAggiunti = 0;
@@ -476,6 +494,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     tablesMissing: saved.tablesMissing,
     catalogoAggiunti,
     adattamenti,
+    timeline_bisogni,
     parametri_rag_fonte: parametriRag?.fonte,
   };
 }

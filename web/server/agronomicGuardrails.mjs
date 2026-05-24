@@ -7,6 +7,10 @@ import {
   arricchisciInterventoTrattamento,
   buildDettaglioTrattamento,
 } from "./trattamentoPipeline.mjs";
+import {
+  arricchisciInterventoEsigenze,
+  dettaglioPureAgronomy,
+} from "./esigenzeAgronomiche.mjs";
 
 export { inferMacroCategoriaProdotto };
 
@@ -291,7 +295,20 @@ const TEMPLATE_UX = {
  * Fasi 1–2 senza prodotti (per valutazione guardrail pre-match catalogo).
  */
 export function strutturaEducazioneSenzaProdotti(intervento, profilo, opts = {}) {
-  const { vision, weatherBundle } = opts;
+  const { vision, weatherBundle, pureAgronomy } = opts;
+  if (pureAgronomy) {
+    const enriched = arricchisciInterventoEsigenze(intervento, { weatherBundle });
+    return {
+      ...enriched,
+      macro_categoria: macroDaIntervento(enriched, new Map()),
+      spiegazione_semplice: enriched.fabbisogno_fisiologico || enriched.descrizione,
+      messaggio_ux: enriched.fabbisogno_fisiologico || enriched.descrizione,
+      razionale_scientifico: enriched.descrizione,
+      dettaglio_trattamento: null,
+      prodotto_id: null,
+      prodotto_nome: null,
+    };
+  }
   const det = buildDettaglioTrattamento(intervento, {
     profilo,
     prodotti: [],
@@ -322,7 +339,23 @@ export async function strutturaOutputCalendario(intervento, _prodotto, profilo, 
       macro_categoria: intervento.macro_categoria || intervento.dettaglio_trattamento.macro_categoria,
     };
   }
-  const { prodotti = [], vision, weatherBundle } = opts;
+  const { prodotti = [], vision, weatherBundle, pureAgronomy } = opts;
+  if (pureAgronomy) {
+    const det = dettaglioPureAgronomy(intervento, { profilo, weatherBundle });
+    return {
+      ...intervento,
+      titolo: String(det.tipo_intervento).slice(0, 120),
+      macro_categoria: det.macro_categoria || intervento.macro_categoria,
+      spiegazione_semplice: det.spiegazione_semplice,
+      messaggio_ux: det.fabbisogno_fisiologico || det.spiegazione_semplice,
+      razionale_scientifico: det.razionale_scientifico,
+      dettaglio_trattamento: det,
+      esigenze_molecolari: det.esigenze_molecolari,
+      fabbisogno_fisiologico: det.fabbisogno_fisiologico,
+      prodotto_id: null,
+      prodotto_nome: null,
+    };
+  }
   if (prodotti.length) {
     return arricchisciInterventoTrattamento(intervento, profilo, prodotti, vision, weatherBundle);
   }
@@ -351,6 +384,7 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
     vision,
     weatherBundle,
     oggi = new Date().toISOString().slice(0, 10),
+    pureAgronomy = false,
   } = opts;
   const prodottiById = new Map(prodotti.map((p) => [p.id, p]));
 
@@ -375,7 +409,7 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
   );
 
   for (const i of sorted) {
-    const bozza = strutturaEducazioneSenzaProdotti(i, profilo, { vision, weatherBundle });
+    const bozza = strutturaEducazioneSenzaProdotti(i, profilo, { vision, weatherBundle, pureAgronomy });
     const val = valutaInterventoGuardrail(
       { ...bozza, macro_categoria: macroDaIntervento(bozza, prodottiById) },
       ctx,
@@ -388,7 +422,7 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
       { ...i, macro_categoria: val.macro || i.macro_categoria },
       null,
       profilo,
-      { prodotti, vision, weatherBundle },
+      { prodotti, vision, weatherBundle, pureAgronomy },
     );
     ctx.pianoAccettati.push(strutturato);
     accettati.push(strutturato);

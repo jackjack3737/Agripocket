@@ -1,11 +1,6 @@
-import {
-  catalogoCompattoPerPrompt,
-  consenteTutteMarche,
-  loadProdotti,
-  mqPrato,
-} from "./prodottiCatalogo.mjs";
+import { loadProdotti, mqPrato } from "./prodottiCatalogo.mjs";
 import { fetchWeatherBundle } from "./weatherCore.mjs";
-import { arricchisciInterventoTrattamento } from "./trattamentoPipeline.mjs";
+import { arricchisciInterventoCalendarioPuro } from "./esigenzeAgronomiche.mjs";
 import {
   filtraInterventiFitofarmacoCurativo,
   isInterventoFitofarmacoCurativo,
@@ -104,19 +99,17 @@ ${JSON.stringify(
   2,
 )}
 
-Catalogo prodotti (id per prodotto_suggerito_id se serve trattamento/concime/diserbo):
-${catalogoCompattoPerPrompt(prodotti, 60)}
-
-Rispondi SOLO JSON:
+Rispondi SOLO JSON (Solum — pure agronomy, MAI marchi o nomi commerciali):
 {
   "aggiungi_calendario": [
     {
-      "titolo": "max 80 char",
-      "descrizione": "cosa fare",
+      "titolo": "macro-azione fisiologica",
+      "fabbisogno_fisiologico": "causa-effetto da foto",
+      "esigenze_molecolari": ["Principio attivo o molecola generica"],
+      "descrizione": "sintesi operativa",
       "priorita": "alta|media|bassa",
-      "categoria": "taglio|irrigazione|concime|trattamento|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
-      "data_prevista": "YYYY-MM-DD",
-      "prodotto_suggerito_id": null
+      "categoria": "concime|trattamento|diserbo|arieggiatura|biostimolante|umettante|rinnovo|altro",
+      "data_prevista": "YYYY-MM-DD"
     }
   ],
   "modifica_calendario": [
@@ -132,9 +125,9 @@ Regole:
 - Date da oggi in avanti, distribuite logicamente (non tutte lo stesso giorno).
 - annulla_ids: max 2, solo per lavori fitofarmaco curativi non più giustificati dopo foto sana.
 - modifica per anticipare/posticipare trattamenti SOLO se c'è evidenza visiva di gravità.
-- Prodotto: preferisci BOTTOS per concimi, biostimolanti, sementi, bagnanti.
-- Fitofarmaci curativi solo con difetto visibile in foto; se in catalogo usa BOTTOS: Fly (larve/popillia), Trichoderma (funghi).
-- Larve sotto prato / popillia con segni: categoria trattamento con Fly BOTTOS.`;
+- Output solo molecole/principi attivi (NPK, umici/fulvici, Acetamiprid SL, Propiconazolo, Trichoderma spp., Pendimetalin…).
+- Fitofarmaci curativi solo con difetto visibile in foto.
+- Larve sotto prato / popillia: categoria trattamento con insetticida sistemico (es. Acetamiprid SL) — mai nomi commerciali.`;
 
   const raw = await geminiGenerate(geminiKey, [{ text: prompt }], {
     json: true,
@@ -180,7 +173,7 @@ export async function integraFotoNelPiano({
     }
   }
   const arricchisci = (item) =>
-    arricchisciInterventoTrattamento(item, profilo, prodotti, vision, weatherBundle);
+    arricchisciInterventoCalendarioPuro(item, profilo, weatherBundle);
 
   const piano = await pianificaAggiornamentiDaFoto({
     profilo,
@@ -218,7 +211,7 @@ export async function integraFotoNelPiano({
   const emergenza = buildInterventiPatologiaEmergenza(vision, profilo, oggi);
   if (emergenza.aggiunti.length) {
     for (const raw of emergenza.aggiunti) {
-      let item = await arricchisci(raw);
+      let item = arricchisci(raw);
       item = bloccoTermicoEstivo([item])[0];
       const { data, error } = await admin
         .from("prato_interventi")
@@ -288,19 +281,11 @@ export async function integraFotoNelPiano({
       continue;
     }
 
-    if (raw.prodotto_suggerito_id) {
-      let p = prodotti.find((x) => x.id === Number(raw.prodotto_suggerito_id));
-      if (p && !consenteTutteMarche(p) && String(p.marca || "").toUpperCase() !== "BOTTOS") {
-        p = null;
-      }
-      if (p) {
-        item = await arricchisciInterventoTrattamento(item, profilo, [p, ...prodotti], vision, weatherBundle);
-      } else {
-        item = await arricchisci(item);
-      }
-    } else {
-      item = await arricchisci(item);
-    }
+    item = arricchisci({
+      ...item,
+      fabbisogno_fisiologico: raw.fabbisogno_fisiologico,
+      esigenze_molecolari: raw.esigenze_molecolari,
+    });
 
     const { data, error } = await admin
       .from("prato_interventi")

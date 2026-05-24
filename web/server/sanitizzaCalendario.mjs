@@ -4,9 +4,14 @@
 
 import { configLivelloImpegno, normalizzaLivelloImpegno } from "./livelloImpegno.mjs";
 import { applicaGuardrailsCalendario, macroDaIntervento } from "./agronomicGuardrails.mjs";
+import { arricchisciInterventoEsigenze, derivaEsigenzeMolecolari } from "./esigenzeAgronomiche.mjs";
+
+function derivaEsigenzeDaItem(item) {
+  return item.esigenze_molecolari?.length ? item.esigenze_molecolari : derivaEsigenzeMolecolari(item);
+}
 
 const ROUTINE_CATEGORIE = new Set(["taglio", "irrigazione"]);
-const LIQUID_HINT = /liquid|liquido|umett|biostim|tryko|vigor|pre-stress|always|surfact/i;
+const LIQUID_HINT = /liquid|liquido|umett|biostim|surfact|fogliar|miscela/i;
 
 export function isRoutineCategoria(categoria) {
   return ROUTINE_CATEGORIE.has(String(categoria || "").toLowerCase());
@@ -70,22 +75,29 @@ export function applicaTankMix(interventi) {
       continue;
     }
     items.sort((a, b) => a.data_prevista.localeCompare(b.data_prevista));
-    const nomi = items
-      .map((x) => x.prodotto_nome || x.titolo.replace(/^Tank-Mix:\s*/i, ""))
-      .filter(Boolean);
-    const titolo = `Tank-Mix: ${nomi.slice(0, 3).join(" + ")}`.slice(0, 120);
-    const descrizione = items
-      .map((x) => x.descrizione || x.prodotto_nome)
+    const esigenze = [
+      ...new Set(
+        items.flatMap((x) => x.esigenze_molecolari || derivaEsigenzeDaItem(x)).filter(Boolean),
+      ),
+    ];
+    const titolo = "Miscela fogliare compatibile".slice(0, 120);
+    const descrizione = [
+      items.map((x) => x.fabbisogno_fisiologico || x.descrizione).filter(Boolean).join(" · "),
+      esigenze.length ? `Esigenze: ${esigenze.join(" · ")}` : "",
+    ]
       .filter(Boolean)
-      .join(" · ")
+      .join("\n\n")
       .slice(0, 600);
-    out.push({
-      ...items[0],
-      titolo,
-      descrizione: descrizione || "Miscela liquida compatibile da applicare insieme.",
-      categoria: "biostimolante",
-      priorita: items.some((x) => x.priorita === "alta") ? "alta" : "media",
-    });
+    out.push(
+      arricchisciInterventoEsigenze({
+        ...items[0],
+        titolo,
+        descrizione: descrizione || "Miscela liquida compatibile da applicare insieme.",
+        esigenze_molecolari: esigenze,
+        categoria: "biostimolante",
+        priorita: items.some((x) => x.priorita === "alta") ? "alta" : "media",
+      }),
+    );
   }
 
   return out.sort(
@@ -175,13 +187,17 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
   list = ensureMatriceNPKObbligatoria(list, oggi, prodottiById);
   list = capInterventiPerLivello(list, profilo);
 
-  const { storico = [], prodotti = [], vision, weatherBundle } = opts;
+  const { storico = [], prodotti = [], vision, weatherBundle, pureAgronomy = false } = opts;
+  if (pureAgronomy) {
+    list = list.map((i) => arricchisciInterventoEsigenze(i, { weatherBundle }));
+  }
   const { interventi: conGuardrails, bloccati, deduped } = await applicaGuardrailsCalendario(list, {
     storico,
-    prodotti,
+    prodotti: pureAgronomy ? [] : prodotti,
     profilo,
     vision,
     weatherBundle,
+    pureAgronomy,
     oggi: oggi || new Date().toISOString().slice(0, 10),
   });
   if (bloccati > 0 || deduped > 0) {
@@ -236,7 +252,7 @@ export function buildInterventiPatologiaEmergenza(vision, profilo, oggi) {
   const recupero = {
     titolo: "Biostimolante recupero post-trattamento",
     descrizione:
-      "Supporto antistress 3 giorni dopo il trattamento curativo per aiutare il recupero fogliare (es. Always o equivalente).",
+      "Supporto antistress 3 giorni dopo il trattamento curativo: Acidi umici/fulvici e amminoacidi per recupero fogliare.",
     categoria: "biostimolante",
     priorita: "media",
     data_prevista: addDaysIso(oggi, 3),

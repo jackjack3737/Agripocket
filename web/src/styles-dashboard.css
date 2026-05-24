@@ -954,6 +954,92 @@
   color: #fff;
 }
 
+.dash-timeline-bisogni {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius, 10px);
+  background: linear-gradient(145deg, #eef6ff 0%, #edf7ef 100%);
+  border: 1px solid rgba(46, 125, 50, 0.15);
+}
+
+.dash-timeline-bisogni__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.dash-timeline-bisogni__lead {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  color: #4a5c50;
+}
+
+.dash-timeline-bisogni__grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .dash-timeline-bisogni__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.dash-timeline-bisogni__card {
+  padding: 0.75rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(61, 92, 68, 0.12);
+}
+
+.dash-timeline-bisogni__card--oggi {
+  border-color: rgba(46, 125, 50, 0.35);
+}
+
+.dash-timeline-bisogni__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #2e7d32;
+}
+
+.dash-timeline-bisogni__testo {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.dash-timeline-bisogni__finestre {
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dash-timeline-bisogni__finestra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 0.88rem;
+}
+
+.dash-timeline-bisogni__periodo {
+  font-weight: 700;
+  color: #1b5e20;
+  min-width: 5.5rem;
+}
+
+.dash-timeline-bisogni__esigenza {
+  flex: 1;
+  color: #2c3e30;
+}
+
 .dash-month-timeline {
   margin-bottom: 1.5rem;
   display: flex;

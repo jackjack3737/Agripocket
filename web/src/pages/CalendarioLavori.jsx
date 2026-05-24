@@ -5,7 +5,13 @@ import {
   CalendarioFiltri,
   InterventoSection,
   MeseAccordion,
+  TimelineBisogni,
 } from "../components/calendario/CalendarioInterventi";
+import {
+  loadTimelineBisogni,
+  saveTimelineBisogni,
+  timelineDaInterventi,
+} from "../lib/timelineBisogni";
 import { abitudiniDaProfilo } from "../lib/abitudiniPrato.js";
 import {
   contaLavoriPianificatiFiltrati,
@@ -74,6 +80,7 @@ export default function CalendarioLavori({ profile, session }) {
       : "Piano aggiornato dall'ultima analisi foto.";
   });
   const [generatingPiano, setGeneratingPiano] = useState(false);
+  const [timelineBisogni, setTimelineBisogni] = useState(null);
 
   const hasPiano = haCalendarioStagionale(interventi);
   const superficieMq = profile?.superficie_mq ?? null;
@@ -127,6 +134,10 @@ export default function CalendarioLavori({ profile, session }) {
       await syncControlliMensili(userId).catch(() => 0);
       const list = await loadInterventi(userId);
       setInterventi(list);
+      const stored = loadTimelineBisogni(userId);
+      setTimelineBisogni(
+        stored || (list.length ? timelineDaInterventi(list, new Date().toISOString().slice(0, 10)) : null),
+      );
     } catch (e) {
       setError(e.message);
     } finally {
@@ -157,11 +168,11 @@ export default function CalendarioLavori({ profile, session }) {
     setError("");
     try {
       const result = await generaPianoAnnuale();
-      const extra =
-        result.catalogoAggiunti > 0
-          ? ` (+${result.catalogoAggiunti} voci da catalogo prodotti, priorità media/bassa).`
-          : "";
-      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda.${extra}`);
+      if (result.timeline_bisogni) {
+        saveTimelineBisogni(userId, result.timeline_bisogni);
+        setTimelineBisogni(result.timeline_bisogni);
+      }
+      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda (diagnostica Solum, senza catalogo brand).`);
       await refresh();
     } catch (e) {
       const msg =
@@ -236,8 +247,8 @@ export default function CalendarioLavori({ profile, session }) {
       <section className="dash-calendar">
         <div className="dash-calendar__head">
           <p className="dash-calendar__lead">
-            Piano giorno per giorno. I fitofarmaci (diserbi, fungicidi, insetticidi) non hanno dose automatica: usa
-            «Mantieni al rigenera» per i lavori da non cancellare.
+            Piano predittivo giorno per giorno: necessità molecolari e fisiologiche (NPK, biostimolanti, principi attivi).
+            Nessun catalogo commerciale. Usa «Mantieni al rigenera» per i lavori da conservare alla rigenerazione.
           </p>
           <div className="dash-calendar__actions">
             <button
@@ -266,6 +277,8 @@ export default function CalendarioLavori({ profile, session }) {
             generato. Clicca «Genera piano annuale completo» per concimi, diserbi e lavori strategici stagionali.
           </p>
         ) : null}
+
+        {hasPiano && timelineBisogni ? <TimelineBisogni timeline={timelineBisogni} /> : null}
 
         <CalendarioFiltri
           tipo={calTipo}

@@ -475,7 +475,12 @@ export async function arricchisciInterventoTrattamento(
 /** Per API/UI: formato pubblico del dettaglio. */
 export function dettaglioTrattamentoPubblico(row) {
   if (row?.dettaglio_trattamento && typeof row.dettaglio_trattamento === "object") {
-    return row.dettaglio_trattamento;
+    const det = row.dettaglio_trattamento;
+    return {
+      ...det,
+      esigenze_molecolari: det.esigenze_molecolari ?? row.esigenze_molecolari ?? [],
+      fabbisogno_fisiologico: det.fabbisogno_fisiologico ?? row.fabbisogno_fisiologico,
+    };
   }
   if (row?.spiegazione_semplice || row?.messaggio_ux) {
     return {

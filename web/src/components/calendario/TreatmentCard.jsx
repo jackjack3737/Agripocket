@@ -155,13 +155,21 @@ export function TreatmentCard({
   showFitofarmacoAvviso = false,
   sospeso = false,
 }) {
-  if (!treatment?.tipo_intervento && !treatment?.spiegazione_semplice) return null;
+  if (
+    !treatment?.tipo_intervento &&
+    !treatment?.spiegazione_semplice &&
+    !(treatment?.esigenze_molecolari?.length > 0)
+  ) {
+    return null;
+  }
 
   const adattamento = treatment.adattamento_dinamico;
   const isSospeso = sospeso || treatment.stato === "sospeso" || adattamento?.tipo === "sospeso_fungo";
 
   const prodotti = treatment.prodotti_consigliati ?? [];
+  const esigenze = treatment.esigenze_molecolari ?? [];
   const n = prodotti.length;
+  const nEsigenze = esigenze.length;
   const mqLabel = superficieMq ? ` (${superficieMq} m²)` : "";
   const notaScelta =
     treatment.nota_scelta_prodotti ||
@@ -184,6 +192,22 @@ export function TreatmentCard({
         <MeteoCalcoloBadge contestoMeteo={treatment.contesto_meteo} />
         <SpiegazioneBlocchi testo={treatment.spiegazione_semplice} />
       </section>
+
+      {nEsigenze > 0 ? (
+        <section className="treatment-card__soluzione" aria-label="Esigenze molecolari">
+          <h4 className="treatment-card__soluzione-title">Necessità fisiologiche (Solum)</h4>
+          <ul className="treatment-card__esigenze">
+            {esigenze.map((e, idx) => (
+              <li key={idx} className="treatment-card__esigenza-item">
+                {e}
+              </li>
+            ))}
+          </ul>
+          <p className="treatment-card__nota-scelta" role="note">
+            Diagnostica predittiva: molecole e principi attivi generici — senza raccomandazione commerciale.
+          </p>
+        </section>
+      ) : null}
 
       {n > 0 ? (
         <section className="treatment-card__soluzione" aria-label="Prodotti suggeriti">
@@ -242,6 +266,8 @@ export function treatmentFromIntervento(item) {
     return {
       tipo_intervento: det.tipo_intervento || item.titolo,
       spiegazione_semplice: det.spiegazione_semplice || item.spiegazione_semplice || item.messaggio_ux,
+      fabbisogno_fisiologico: det.fabbisogno_fisiologico || item.fabbisogno_fisiologico,
+      esigenze_molecolari: det.esigenze_molecolari ?? item.esigenze_molecolari ?? [],
       nota_scelta_prodotti: det.nota_scelta_prodotti ?? null,
       prodotti_consigliati: det.prodotti_consigliati ?? [],
       contesto_meteo: det.contesto_meteo ?? null,
@@ -253,6 +279,8 @@ export function treatmentFromIntervento(item) {
     return {
       tipo_intervento: item.titolo,
       spiegazione_semplice: item.spiegazione_semplice || item.messaggio_ux,
+      fabbisogno_fisiologico: item.fabbisogno_fisiologico,
+      esigenze_molecolari: item.esigenze_molecolari ?? [],
       nota_scelta_prodotti: null,
       prodotti_consigliati: [],
     };

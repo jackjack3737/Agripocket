@@ -4,7 +4,6 @@
  * Antigerminanti (pre-emergenza) ammessi nel calendario stagionale.
  */
 
-import { PREFERENZA_BOTTOS_FITO } from "./bottosFitofarmaci.mjs";
 import {
   isProfiloUsoConsumer,
   filtraProdottiConsumerStrict,
@@ -108,5 +107,5 @@ export const REGOLE_FITOFARMACI_PROMPT = `REGOLE FITOFARMACI (obbligatorie):
 - NON inserire fungicidi, insetticidi né diserbi post-emergenza preventivi nel calendario senza evidenza (foto o problemi dichiarati).
 - Inserisci trattamenti curativi (categoria trattamento) SOLO se malattie, parassiti, danni visibili o problemi dichiarati (funghi, larve, erbacce gravi).
 - Sono SEMPRE ammessi: diserbi PRE-EMERGENZA / antigerminanti (es. setaria, digitaria) nelle finestre meteo.
-- ${PREFERENZA_BOTTOS_FITO}
-- Preferisci anche concimi, ferro, biostimolanti, taglio, irrigazione, arieggiatura e rinnovo ombra da mappa.`;
+- Output SOLO in termini di principi attivi e molecole (es. Acetamiprid SL, Propiconazolo, Pendimetalin, Trichoderma spp.) — MAI nomi commerciali o marchi.
+- Preferisci concimi NPK, ferro chelato, biostimolanti (umici/fulvici), arieggiatura e rinnovo ombra da mappa.`;

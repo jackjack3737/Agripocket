@@ -221,6 +221,39 @@ export function MeseAccordion({ mese, open, onToggle, onToggleIntervento, onPinI
   );
 }
 
+export function TimelineBisogni({ timeline }) {
+  if (!timeline) return null;
+  const finestre = timeline.finestre_stagionali ?? [];
+  return (
+    <section className="dash-timeline-bisogni" aria-label="Timeline predittiva dei bisogni">
+      <h3 className="dash-timeline-bisogni__title">Timeline dei bisogni</h3>
+      <p className="dash-timeline-bisogni__lead">
+        Piano predittivo Solum: emergenze, prossimo mese e finestre stagionali (solo agronomia pura).
+      </p>
+      <div className="dash-timeline-bisogni__grid">
+        <article className="dash-timeline-bisogni__card dash-timeline-bisogni__card--oggi">
+          <p className="dash-timeline-bisogni__label">{timeline.oggi_label || "OGGI"}</p>
+          <p className="dash-timeline-bisogni__testo">{timeline.oggi}</p>
+        </article>
+        <article className="dash-timeline-bisogni__card">
+          <p className="dash-timeline-bisogni__label">{timeline.prossimo_mese_label || "PROSSIMO MESE"}</p>
+          <p className="dash-timeline-bisogni__testo">{timeline.prossimo_mese}</p>
+        </article>
+      </div>
+      {finestre.length ? (
+        <ul className="dash-timeline-bisogni__finestre">
+          {finestre.map((f) => (
+            <li key={f.periodo} className="dash-timeline-bisogni__finestra">
+              <span className="dash-timeline-bisogni__periodo">{f.periodo}</span>
+              <span className="dash-timeline-bisogni__esigenza">{f.esigenza}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function CalendarioFiltri({ tipo, ambito, meseLabel, conteggi, onTipo, onAmbito }) {
   return (
     <div className="dash-cal-filters">

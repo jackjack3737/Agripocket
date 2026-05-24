@@ -47,7 +47,7 @@ const REGIONI = [
   {
     id: "nord_padana",
     pattern: /lombard|venet|emilia|piemont|friuli|trent|padana|bologna|milano|torino|padova|verona|venezia|trieste/i,
-    note: "Nord / pianura padana: popillia (larve mag-giu), otiorrinco (autunno), afidi primavera. Per popillia: insetticida Fly (Bottos) su larve sotto il tappeto.",
+    note: "Nord / pianura padana: popillia (larve mag-giu), otiorrinco (autunno), afidi primavera. Per popillia: insetticida sistemico su larve sotto il tappeto (es. Acetamiprid SL, solo PFNPO).",
   },
   {
     id: "centro",
@@ -110,14 +110,14 @@ export function analizzaParassiti({ vision, intervento, report, localita } = {})
     lines.push(`Parassiti/insetti rilevati: ${rilevati.map((r) => r.label).join("; ")}.`);
     if (popillia) {
       lines.push(
-        "Popillia: trattamento mirato contro larve sotto il tappeto (es. insetticida Fly Bottos nel catalogo). Categoria trattamento, priorità alta se danni visibili.",
+        "Popillia: trattamento mirato contro larve sotto il tappeto (insetticida sistemico, es. Acetamiprid SL). Categoria trattamento, priorità alta se danni visibili.",
       );
     }
   }
   if (regione) lines.push(`Contesto regionale (${regione.id}): ${regione.note}`);
   else if (localita) {
     lines.push(
-      "Valuta larve sotto prato (popillia mag-giu al Nord), otiorrinco in autunno, afidi in primavera — abbinare insetticida idoneo dal catalogo.",
+      "Valuta larve sotto prato (popillia mag-giu al Nord), otiorrinco in autunno, afidi in primavera — principio attivo insetticida da etichetta PFNPO.",
     );
   }
 

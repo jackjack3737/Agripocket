@@ -13,6 +13,7 @@ const TIER_BONUS = {
 export function classifyKbChunk(soluzione) {
   const s = String(soluzione || "");
   if (s.startsWith("[libro_universitario:")) return "libro";
+  if (s.startsWith("[fonte_scientifica_openalex:")) return "libro";
   if (s.startsWith("CALENDARIO VERDE BOTTOS")) return "calendario";
   if (s.includes("PRODOTTO COMMERCIALE BOTTOS") || s.includes("Fonte catalogo: Bottos")) {
     return "catalogo";
