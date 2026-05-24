@@ -21,6 +21,7 @@ import {
   arricchisciInterventoEsigenze,
   buildTimelineBisogni,
 } from "./esigenzeAgronomiche.mjs";
+import { generaCalendarioDeterministico } from "./calendarioBase.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -118,178 +119,170 @@ function addDays(iso, n) {
   return d.toISOString().slice(0, 10);
 }
 
-export async function buildPianoInterventi(profilo, env, admin, { vision = null, parametriRag = null } = {}) {
+/** Voce accademica Gemini su matrice già datata (non modifica date né molecole). */
+async function arricchisciVoceBiochimica(matrice, profilo, env, { admin, vision, parametriRag, weatherBundle } = {}) {
   const geminiKey = env.GEMINI_API_KEY?.trim();
   if (!geminiKey) throw new Error("Manca GEMINI_API_KEY");
 
   const oggi = new Date().toISOString().slice(0, 10);
-  const fine = addDays(oggi, 365);
-
-  let weatherBlock = "";
-  let preEmergenzaBlock = "";
-  if (profilo?.localita?.trim()) {
-    try {
-      const bundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY);
-      weatherBlock = formatWeatherForPrompt(bundle);
-      const val = valutaPreEmergenzaAnnuali(bundle);
-      preEmergenzaBlock = val.testoPrompt;
-    } catch {
-      weatherBlock = "Meteo: non disponibile.";
-    }
-  }
+  const cfgLivello = configLivelloImpegno(profilo);
+  const interventiBase = matrice.interventi.slice(0, cfgLivello.maxInterventi);
 
   const searchText = [
-    "calendario verde prato tappeto erboso",
-    "concimi NPK autunno primavera slow release ferro",
-    "diserbo pre emergenza setaria digitaria annuali estive pianura padana maggio",
-    "diserbo pre emergenza post emergenza",
-    "arieggiatura scarifica feltro",
-    "taglio altezza frequenza stagione",
-    "biostimolante stress caldo",
-    "agente umettante irrigazione",
+    "fisiologia tappeto erboso GDD ET0 osmoprotezione",
     profilo?.note,
-    profilo?.marca_seme,
     profilo?.localita,
   ]
     .filter(Boolean)
     .join("\n");
 
-  const ragParams =
-    parametriRag ||
-    (await recuperaParametriRag("calendario", { admin, geminiKey, profilo }));
-
-  const emb = await geminiEmbed(searchText.slice(0, 6000), geminiKey);
-  const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
-    matchCount: 8,
-    fetchCount: 36,
-    minLibri: 4,
-  });
-  const kb = chunks
-    .map((c, i) => {
-      const tier = c.soluzione?.startsWith("[libro_universitario:")
-        ? "libro"
-        : c.soluzione?.startsWith("CALENDARIO VERDE")
-          ? "calendario"
-          : "catalogo/altro";
-      return `[${i + 1}|${tier}] ${c.patologia || ""}\n${c.soluzione || ""}`;
-    })
-    .join("\n\n");
-
-  const mese = new Date().toLocaleString("it-IT", { month: "long", year: "numeric" });
-  const cfgLivello = configLivelloImpegno(profilo);
-
-  let focolaiBlock = "";
+  let kb = "";
   try {
-    focolaiBlock = await buildFocolaiPromptBlock(admin, profilo);
+    const emb = await geminiEmbed(searchText.slice(0, 4000), geminiKey);
+    const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
+      matchCount: 4,
+      fetchCount: 16,
+      minLibri: 2,
+    });
+    kb = chunks.map((c, i) => `[${i + 1}] ${c.soluzione || ""}`).join("\n\n");
   } catch {
-    focolaiBlock = "";
+    kb = "";
   }
 
-  const prompt = `Sei il miglior agronomo di tappeto erboso in Italia. Crea un CALENDARIO LAVORI strategico, giorno per giorno (date precise), per i prossimi 12 mesi.
+  const weatherBlock = weatherBundle ? formatWeatherForPrompt(weatherBundle) : "";
+  const delta = matrice.delta_meteo;
 
-Oggi: ${oggi} (${mese})
-Periodo piano: da ${oggi} a ${fine}
+  const prompt = `Sei un biochimico del tappeto erboso (tono accademico, severo, italiano).
 
-Profilo sito:
+## RUOLO
+NON inventare interventi, date, dosi o prodotti commerciali.
+Ricevi una MATRICE DETERMINISTICA già calcolata da Solum (DB + adattamento meteo).
+Il tuo compito è SOLO arricchire la "descrizione" operativa e la "timeline_bisogni" narrando la matrice.
+
+## VINCOLI ASSOLUTI
+- Ogni data_prevista nell'output DEVE essere IDENTICA all'input (stesso ordine, stesso numero di righe).
+- titolo, fabbisogno_fisiologico, esigenze_molecolari, categoria, priorita: NON modificare il significato; puoi rifinire descrizione.
+- Vietati marchi commerciali.
+
+Profilo:
 ${formatProfileForPrompt(profilo)}
 
 ${testoLivelloPerPrompt(profilo)}
 
+Zona climatica: ${matrice.zona_climatica}
+Delta meteo: GDD primavera ${Math.round((delta.gdd_primavera_delta_pct || 0) * 100)}% vs norma; ET0 picco estivo: ${delta.et0_picco_estivo ? "sì" : "no"}.
+
 ${weatherBlock}
 
-${preEmergenzaBlock ? `${preEmergenzaBlock}\n` : ""}
-
-${hintParassitiRegionali(profilo?.localita)}
-
-${focolaiBlock}
-
-Knowledge base (priorità: manuali universitari > calendari agronomici > schede tecniche generiche; tag [N|libro] = fonte):
-${kb || "(usa best practice italiane per prato da giardino)"}
-
-Parametri RAG (fonte: ${ragParams.fonte}): Kc mensili; rispetta finestre fisiologiche.
-
-## FILOSOFIA SOLUM — PURE AGRONOMY & PREDICTIVE NEED
-NON sei un catalogo commerciale. NON citare MAI marchi, nomi commerciali, SKU o prodotti specifici (es. niente Bottos, Barenbrug, Scotts, Fly, Trichoderma come brand).
-Restituisci SOLO necessità molecolari, nutrizionali e fisiologiche in linguaggio tecnico:
-- N-P-K con cessione rapida/lenta e dose indicativa in g/m² quando utile
-- Acidi umici, acidi fulvici, amminoacidi
-- Microelementi (Ferro chelato, Magnesio, Zinco…)
-- Principi attivi fitosanitari/biologici generici (es. Propiconazolo, Acetamiprid SL, Trichoderma spp., Pendimetalin) — mai come prodotto commerciale
-
-Esempio corretto: "Il prato è in stress termico (ET0 alto): necessita di biostimolazione con Acidi Umici e Fulvici + agente umettante."
-Esempio VIETATO: "Usa concime X" o "Applica Tryko Plus".
-
-## MATRICE N-P-K STAGIONALE (corsetto fisiologico)
-- Primavera (mar–mag) e autunno (set–ott): **N** a lenta o rapida cessione secondo temperatura
-- Estate (giu–lug): **K** antistress; VIETATO N classico in pieno caldo
-- Autunno (set–nov): **P** per radici + eventuale overseeding
-- Distanza minima 30 gg tra stesso macroelemento salvo frazionamento esplicito
-
-Obiettivo: lavori STRATEGICI (NO taglio/irrigazione generica — gestiti come abitudini), date YYYY-MM-DD:
-- Nutrizione NPK, microelementi, biostimolanti, umettanti
-- Diserbo pre/post emergenza (principio attivo generico)
-- Trattamenti solo con evidenza patologia/parassiti
-- Arieggiazione, overseeding abbinato ad arieggiatura (regola TRASEMINA)
-
 ${REGOLE_FITOFARMACI_PROMPT}
+
+Knowledge base (contesto, non inventare):
+${kb || "(nessun chunk)"}
+
+MATRICE INPUT (${interventiBase.length} righe):
+${JSON.stringify(
+  interventiBase.map((i) => ({
+    titolo: i.titolo,
+    fabbisogno_fisiologico: i.fabbisogno_fisiologico,
+    esigenze_molecolari: i.esigenze_molecolari,
+    categoria: i.categoria,
+    priorita: i.priorita,
+    data_prevista: i.data_prevista,
+    adattamento_dinamico: i.adattamento_dinamico,
+  })),
+)}
 
 Rispondi SOLO JSON:
 {
   "timeline_bisogni": {
-    "oggi": "frase emergenza/oggi (es. stress idrico → umettanti + umici/fulvici)",
-    "prossimo_mese": "previsione bisogni entro 30 giorni (es. 20 g/m² N a lenta cessione)",
-    "finestre_stagionali": [
-      { "periodo": "SETTEMBRE", "esigenza": "finestra overseeding + fosforo radicale" }
-    ]
+    "oggi": "sintesi emergenza da delta meteo e prossimi interventi",
+    "prossimo_mese": "bisogni entro 30 giorni",
+    "finestre_stagionali": [{ "periodo": "MESE", "esigenza": "..." }]
   },
   "interventi": [
     {
-      "titolo": "macro-azione fisiologica (MAI marchi)",
-      "fabbisogno_fisiologico": "spiegazione causa-effetto (meteo, GDD, stress)",
-      "esigenze_molecolari": ["N a lenta cessione 20 g/m²", "Acidi umici"],
-      "descrizione": "sintesi operativa per il giardiniere",
-      "categoria": "concime|trattamento|diserbo|arieggiatura|biostimolante|umettante|rinnovo|pulizia|altro",
-      "priorita": "alta|media|bassa",
-      "data_prevista": "YYYY-MM-DD"
+      "data_prevista": "YYYY-MM-DD (identica input)",
+      "titolo": "identico input",
+      "fabbisogno_fisiologico": "identico input",
+      "esigenze_molecolari": ["identico input"],
+      "categoria": "identico input",
+      "priorita": "identico input",
+      "descrizione": "2-4 frasi accademiche che spiegano il razionale fisiologico"
     }
   ]
-}
+}`;
 
-REGOLE TASSATIVE:
-1. LIVELLO: ${testoLivelloPerPrompt(profilo)}. Max ${cfgLivello.maxInterventi} interventi.
-2. NO taglio/irrigazione generica nel piano.
-3. TANK-MIX: più applicazioni liquide compatibili nello stesso mese → UN intervento "Miscela fogliare" con elenco molecole in esigenze_molecolari (no nomi commerciali).
-4. TRASEMINA: rinnovo solo nello stesso mese di arieggiatura/scarifica.
-5. Date tra ${oggi} e ${fine}; distribuite sull'anno.
-6. Completa timeline_bisogni con almeno 3 finestre_stagionali (mesi in maiuscolo italiano).`;
-
-  const raw = await geminiGenerate(geminiKey, prompt, { maxTokens: 16384 });
+  const raw = await geminiGenerate(geminiKey, prompt, { maxTokens: 12000, temperature: 0.2 });
   let parsed;
   try {
     parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
   } catch {
-    throw new Error("Piano stagionale: JSON non valido da Gemini");
+    return { interventi: interventiBase, timeline_bisogni: null };
   }
 
-  const list = Array.isArray(parsed?.interventi) ? parsed.interventi : [];
-  const timelineLlm = parsed?.timeline_bisogni || null;
-  const seen = new Set();
+  const llmByDate = new Map(
+    (parsed.interventi || []).map((i) => [String(i.data_prevista), i]),
+  );
 
-  let parsedList = list
-    .filter((i) => i?.titolo?.trim() || i?.esigenze_molecolari?.length)
+  const merged = interventiBase.map((base, idx) => {
+    const llm = llmByDate.get(base.data_prevista) || {};
+    return {
+      ...base,
+      descrizione: String(llm.descrizione || base.fabbisogno_fisiologico || "").trim(),
+      ordine: idx,
+    };
+  });
+
+  return { interventi: merged, timeline_bisogni: parsed.timeline_bisogni || null };
+}
+
+export async function buildPianoInterventi(
+  profilo,
+  env,
+  admin,
+  { vision = null, parametriRag = null, weatherBundle = null } = {},
+) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  const fine = addDays(oggi, 365);
+
+  let bundle = weatherBundle;
+  if (!bundle && profilo?.localita?.trim()) {
+    try {
+      bundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY, {
+        lat: profilo.lat,
+        lon: profilo.lng ?? profilo.lon,
+      });
+    } catch {
+      bundle = null;
+    }
+  }
+
+  const matrice = await generaCalendarioDeterministico(profilo, bundle, { admin });
+  const { interventi: conVoce, timeline_bisogni: timelineLlm } = await arricchisciVoceBiochimica(
+    matrice,
+    profilo,
+    env,
+    { admin, vision, parametriRag, weatherBundle: bundle },
+  );
+
+  const seen = new Set();
+  let parsedList = conVoce
     .map((item, idx) => {
       const data = parseIsoDate(item.data_prevista, addDays(oggi, Math.min(idx * 3, 360)));
       const base = arricchisciInterventoEsigenze({
         titolo: String(item.titolo || "").trim(),
-        descrizione: String(item.descrizione || "").trim(),
+        descrizione: String(item.descrizione || item.fabbisogno_fisiologico || "").trim(),
         fabbisogno_fisiologico: String(item.fabbisogno_fisiologico || "").trim(),
         esigenze_molecolari: item.esigenze_molecolari,
         priorita: ["alta", "media", "bassa"].includes(String(item.priorita).toLowerCase())
           ? String(item.priorita).toLowerCase()
           : "media",
         categoria: normalizeCategoria(item.categoria),
+        macro_categoria: item.macro_categoria ?? null,
         data_prevista: data >= oggi && data <= fine ? data : oggi,
         ordine: idx,
+        adattamento_dinamico: item.adattamento_dinamico ?? null,
+        fonte: item.fonte || "calendario_base",
       });
       const key = `${base.data_prevista}|${String(base.titolo).slice(0, 40)}`;
       if (seen.has(key)) return null;
@@ -299,9 +292,8 @@ REGOLE TASSATIVE:
     .filter(Boolean)
     .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista) || a.ordine - b.ordine);
 
-  if (profilo?.localita?.trim()) {
+  if (bundle) {
     try {
-      const bundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY);
       const val = valutaPreEmergenzaAnnuali(bundle);
       parsedList = ensurePreEmergenzaAnnuali(parsedList, val, oggi, addDays);
     } catch {
@@ -314,6 +306,11 @@ REGOLE TASSATIVE:
   parsedList = ensureOmbraOverseedInterventi(parsedList, profilo?.prato_zone, profilo, oggi, addDays);
   parsedList = applicaRegolaTrasemina(parsedList);
   parsedList._timelineLlm = timelineLlm;
+  parsedList._matriceDeterministica = {
+    zona_climatica: matrice.zona_climatica,
+    delta_meteo: matrice.delta_meteo,
+    template_count: matrice.template_count,
+  };
 
   return parsedList;
 }
@@ -444,19 +441,23 @@ export async function generaPianoStagionale({ authHeader, env }) {
     profilo,
   });
 
-  const interventiGrezziRaw = await buildPianoInterventi(profiloPerPrompt, env, admin, {
-    vision,
-    parametriRag,
-  });
-  const timelineLlm = interventiGrezziRaw._timelineLlm;
-  const interventiGrezzi = interventiGrezziRaw;
-
   let weatherBundle = null;
   try {
-    weatherBundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY);
+    weatherBundle = await fetchWeatherBundle(profilo.localita, env.OPENWEATHER_API_KEY, {
+      lat: profilo.lat,
+      lon: profilo.lng ?? profilo.lon,
+    });
   } catch {
     /* meteo opzionale per pipeline */
   }
+
+  const interventiGrezziRaw = await buildPianoInterventi(profiloPerPrompt, env, admin, {
+    vision,
+    parametriRag,
+    weatherBundle,
+  });
+  const timelineLlm = interventiGrezziRaw._timelineLlm;
+  const interventiGrezzi = interventiGrezziRaw;
 
   const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(interventiGrezzi, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);

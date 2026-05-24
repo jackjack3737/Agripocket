@@ -17,7 +17,11 @@
     "dedupe:kb-libri": "node scripts/dedupe_kb_libri.mjs",
     "kb:libri:prepare": "node scripts/dedupe_kb_libri.mjs && node scripts/cleanup_kb_libri.mjs",
     "cacciatore:scienza": "node server/scripts/cacciatore_scienza.mjs",
-    "iniettore:scienza": "node server/scripts/iniettore_scienza.mjs"
+    "iniettore:scienza": "node server/scripts/iniettore_scienza.mjs",
+    "seed:calendario-base": "node server/scripts/seed_calendario_base.mjs",
+    "seed:calendario-base:dry": "node server/scripts/seed_calendario_base.mjs --dry-run",
+    "mine:prodotti": "node server/scripts/data/product_miner.mjs",
+    "mine:prodotti:dry": "node server/scripts/data/product_miner.mjs --dry-run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
