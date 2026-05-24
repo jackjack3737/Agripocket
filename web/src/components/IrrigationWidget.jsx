@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchIrrigazioneGiornaliera,
+  registraIrrigazioneUtente,
   AZIONE_IRRIGAZIONE_LABEL,
   IRRIGAZIONE_REFRESH_EVENT,
 } from "../lib/irrigazioneClient";
@@ -185,11 +186,13 @@ function IrrigationSerbatoioBar({ bilancio }) {
   const sat = b.saturazione_suolo;
 
   const fab = Number(b.fabbisogno_oggi_mm) || 0;
-  let hint = "Nessun deficit oggi";
-  if (sat) hint = "Suolo saturo (pioggia recente)";
-  else if (fab > 0) hint = `Irriga ${fab} mm (sotto soglia)`;
-  else if (mm > 0) hint = `Mancano ${mm} mm alla soglia`;
-  else if (pct <= 55) hint = "Vicino alla soglia di stress";
+  let hint = b.riepilogo || "Nessun deficit oggi";
+  if (!b.irrigazione_utente) {
+    if (sat) hint = "Suolo saturo (pioggia recente)";
+    else if (fab > 0) hint = `Irriga ${fab} mm (sotto soglia)`;
+    else if (mm > 0) hint = `Mancano ${mm} mm alla soglia`;
+    else if (pct <= 55) hint = "Vicino alla soglia di stress";
+  }
 
   return (
     <div className="irrigation-widget__serbatoio" role="status" aria-label={`Serbatoio idrico al ${pct} per cento`}>
@@ -204,6 +207,158 @@ function IrrigationSerbatoioBar({ bilancio }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+    </div>
+  );
+}
+
+function IrrigationRegistraForm({ data, onRegistrato, disabled }) {
+  const log = data?.irrigazione_utente;
+  const zone = data?.programma_zone?.zone || [];
+  const [minutiLinee, setMinutiLinee] = useState(() => {
+    const m = {};
+    for (const z of zone) {
+      m[z.zona_numero] = z.minuti_totali_linea ?? z.minuti_per_ciclo ?? 0;
+    }
+    if (!zone.length && data?.dati_tecnici?.minuti_totali_consigliati) {
+      m[1] = data.dati_tecnici.minuti_totali_consigliati;
+    }
+    return m;
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function invia(usaConsigliati) {
+    setBusy(true);
+    setErr("");
+    try {
+      const linee = usaConsigliati
+        ? undefined
+        : Object.entries(minutiLinee)
+            .map(([n, min]) => ({ zona_numero: Number(n), minuti: Number(min) }))
+            .filter((l) => l.minuti > 0);
+      const res = await registraIrrigazioneUtente({
+        usa_consigliati: usaConsigliati,
+        linee,
+      });
+      onRegistrato(res);
+    } catch (e) {
+      setErr(e.message || "Errore");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function annulla() {
+    setBusy(true);
+    setErr("");
+    try {
+      await registraIrrigazioneUtente({ annulla: true });
+      onRegistrato(null);
+      await fetchIrrigazioneGiornaliera({ force: true }).then(onRegistrato);
+    } catch (e) {
+      setErr(e.message || "Errore");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (log?.data) {
+    const ore = log.registrato_il
+      ? new Date(log.registrato_il).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+      : "";
+    return (
+      <div className="irrigation-widget__reg irrigation-widget__reg--done">
+        <p className="irrigation-widget__reg-ok">
+          <strong>Irrigato oggi</strong>
+          {ore ? ` alle ${ore}` : ""}
+          {" · "}
+          +{log.mm_totali_stimati} mm stimati · serbatoio {log.suolo_dopo_pct}%
+        </p>
+        {log.linee?.length > 0 ? (
+          <ul className="irrigation-widget__reg-linee">
+            {log.linee.map((l) => (
+              <li key={l.zona_numero}>
+                Linea {l.zona_numero}: <strong>{l.minuti} min</strong>
+                {l.mm_stimati != null ? ` (~${l.mm_stimati} mm)` : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <button type="button" className="btn btn-outline btn-sm" disabled={busy || disabled} onClick={annulla}>
+          Annulla registrazione
+        </button>
+        {err ? <p className="irrigation-widget__reg-err">{err}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="irrigation-widget__reg">
+      <h3 className="irrigation-widget__reg-title">Ho irrigato</h3>
+      <p className="irrigation-widget__reg-hint">
+        Registra i minuti impostati in centralina: il serbatoio si aggiorna con l&apos;acqua che hai dato.
+      </p>
+      {zone.length > 0 ? (
+        <ul className="irrigation-widget__reg-inputs">
+          {zone.map((z) => (
+            <li key={z.zona_numero}>
+              <label className="irrigation-widget__reg-label">
+                Linea {z.zona_numero}
+                <input
+                  type="number"
+                  min={0}
+                  max={180}
+                  className="irrigation-widget__reg-input"
+                  value={minutiLinee[z.zona_numero] ?? 0}
+                  disabled={busy || disabled}
+                  onChange={(e) =>
+                    setMinutiLinee((prev) => ({
+                      ...prev,
+                      [z.zona_numero]: Math.min(180, Math.max(0, Number(e.target.value) || 0)),
+                    }))
+                  }
+                />
+                <span className="irrigation-widget__reg-unit">min</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <label className="irrigation-widget__reg-label irrigation-widget__reg-label--single">
+          Minuti totali
+          <input
+            type="number"
+            min={0}
+            max={180}
+            className="irrigation-widget__reg-input"
+            value={minutiLinee[1] ?? 0}
+            disabled={busy || disabled}
+            onChange={(e) =>
+              setMinutiLinee({ 1: Math.min(180, Math.max(0, Number(e.target.value) || 0)) })
+            }
+          />
+          <span className="irrigation-widget__reg-unit">min</span>
+        </label>
+      )}
+      <div className="irrigation-widget__reg-actions">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={busy || disabled}
+          onClick={() => invia(false)}
+        >
+          {busy ? "Salvo…" : "Conferma irrigazione"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          disabled={busy || disabled}
+          onClick={() => invia(true)}
+        >
+          Usa minuti consigliati
+        </button>
+      </div>
+      {err ? <p className="irrigation-widget__reg-err">{err}</p> : null}
     </div>
   );
 }
@@ -393,6 +548,27 @@ export default function IrrigationWidget({ profile, enabled = true }) {
               ET0 {tecnici.et0_mm} mm · Kc {tecnici.kc} · oggi {tecnici.fabbisogno_calcolato_mm} mm
               {tecnici.precipitazioni_mm != null ? ` · pioggia ${tecnici.precipitazioni_mm} mm` : ""}
             </p>
+          ) : null}
+
+          <IrrigationRegistraForm
+            data={data}
+            disabled={loading}
+            onRegistrato={(res) => {
+              if (!res) {
+                loadIrrigazione(true);
+                return;
+              }
+              if (res.annullato) {
+                loadIrrigazione(true);
+                return;
+              }
+              const { ok, messaggio_ux_append, ...payload } = res;
+              setData({ ...payload, messaggio_ux_append });
+            }}
+          />
+
+          {data.messaggio_ux_append ? (
+            <p className="irrigation-widget__reg-nota">{data.messaggio_ux_append}</p>
           ) : null}
 
           <button

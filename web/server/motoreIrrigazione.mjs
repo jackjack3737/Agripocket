@@ -6,6 +6,7 @@ import {
   normalizzaInputIrrigazione,
   upgradePendenzaUnLivello,
 } from "./irrigazioneInput.mjs";
+import { applicaLogUtenteSuRisultato, estraiLogIrrigazioneOggi } from "./irrigazioneUtente.mjs";
 import {
   IRRIGATOR_MODES,
   normalizeIrrigatorModalita,
@@ -939,7 +940,7 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     riepilogo: riepilogoSerbatoioUx(bilancio)?.stato,
   };
 
-  return {
+  const out = {
     azione_irrigazione: azione,
     bilancio_serbatoio,
     dati_tecnici: {
@@ -983,6 +984,9 @@ export function calcolaIrrigazioneGiornaliera(profilo, weatherBundle, opts = {})
     meteo_snapshot: snapshotMeteoIrrigazione(weatherBundle, meteo),
     calcolato_il: new Date().toISOString(),
   };
+
+  const logUtente = estraiLogIrrigazioneOggi(profilo);
+  return applicaLogUtenteSuRisultato(out, logUtente);
 }
 
 export async function kcDaKnowledgeBase(admin, geminiEmbed, queryKnowledgeBasePrioritized) {

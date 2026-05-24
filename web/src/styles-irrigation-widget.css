@@ -690,6 +690,105 @@
   font-style: italic;
 }
 
+/* Registrazione «Ho irrigato» */
+.irrigation-widget__reg {
+  margin: 0.85rem 0 0.65rem;
+  padding: 0.75rem 0.8rem;
+  border-radius: 10px;
+  background: #e8f4fc;
+  border: 1px solid rgba(21, 101, 192, 0.22);
+}
+
+.irrigation-widget__reg--done {
+  background: #e8f5e9;
+  border-color: rgba(46, 125, 50, 0.28);
+}
+
+.irrigation-widget__reg-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1565c0;
+}
+
+.irrigation-widget__reg-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #455a64;
+}
+
+.irrigation-widget__reg-ok {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #2e7d32;
+  line-height: 1.45;
+}
+
+.irrigation-widget__reg-linee {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: #37474f;
+}
+
+.irrigation-widget__reg-inputs {
+  margin: 0 0 0.55rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.irrigation-widget__reg-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #37474f;
+}
+
+.irrigation-widget__reg-label--single {
+  flex-wrap: wrap;
+}
+
+.irrigation-widget__reg-input {
+  width: 3.5rem;
+  padding: 0.25rem 0.35rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.irrigation-widget__reg-unit {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #78909c;
+}
+
+.irrigation-widget__reg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.irrigation-widget__reg-err {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: #c62828;
+}
+
+.irrigation-widget__reg-nota {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: #2e7d32;
+  line-height: 1.4;
+}
+
 @media (max-width: 380px) {
   .irrigation-widget__griglia {
     grid-template-columns: repeat(4, 1fr);

@@ -106,7 +106,11 @@ export default async function handler(req, res) {
       /* colonne opzionali — patch SQL */
     }
 
-    res.status(200).json({ ...risultato, data_consiglio: oggi });
+    res.status(200).json({
+      ...risultato,
+      data_consiglio: oggi,
+      irrigazione_utente: risultato.irrigazione_utente ?? null,
+    });
   } catch (e) {
     console.error("[irrigazione-giornaliera]", e);
     res.status(500).json({ error: e.message || String(e) });

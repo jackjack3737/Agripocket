@@ -62,6 +62,45 @@ export async function fetchIrrigazioneGiornaliera(opts = {}) {
   return data;
 }
 
+/**
+ * Registra irrigazione eseguita oggi (minuti per linea).
+ * @param {{ linee?: { zona_numero: number, minuti: number }[], usa_consigliati?: boolean, annulla?: boolean }} body
+ */
+export async function registraIrrigazioneUtente(body = {}) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Accedi per registrare l'irrigazione.");
+
+  const res = await fetch("/api/irrigazione-registra", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Registrazione non riuscita");
+
+  if (!body.annulla && data.ok) {
+    try {
+      const { ok, messaggio_ux_append, ...payload } = data;
+      sessionStorage.setItem(cacheKeyForToday(), JSON.stringify({ at: Date.now(), payload }));
+    } catch {
+      /* ignore */
+    }
+  } else if (body.annulla) {
+    try {
+      sessionStorage.removeItem(cacheKeyForToday());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  window.dispatchEvent(new CustomEvent(IRRIGAZIONE_REFRESH_EVENT));
+  return data;
+}
+
 export const AZIONE_IRRIGAZIONE_LABEL = {
   IRRIGA: { label: "Irriga oggi", tone: "ok" },
   AUMENTA: { label: "Irriga — aumenta i minuti", tone: "up" },
