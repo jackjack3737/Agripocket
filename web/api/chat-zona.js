@@ -53,6 +53,13 @@ export default async function handler(req, res) {
       .eq("user_id", userData.user.id)
       .maybeSingle();
 
+    if (body?.azione === "scienza_trattamento") {
+      const { scienzaTrattamentoHandler } = await import("../server/scienzaTrattamento.mjs");
+      const result = await scienzaTrattamentoHandler(auth, env, body);
+      res.status(200).json(result);
+      return;
+    }
+
     const result = await rispondiChatZona(admin, userData.user.id, body?.domanda, {
       zonaId: body?.zonaId || body?.zona_id,
       profilo,

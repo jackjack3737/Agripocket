@@ -22,6 +22,7 @@ web/server/scripts/knowledge_base_raw.json
 # Sorgenti PNG pesanti: in repo solo WebP (npm run optimize:onboarding in web/)
 web/public/onboarding/*.png
 crawler/sources_drive/
+crawler/bottos_calendari_raw/
 Ground/
 preventivo/
 .vercel

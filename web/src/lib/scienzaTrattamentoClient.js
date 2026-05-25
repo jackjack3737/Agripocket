@@ -6,13 +6,13 @@ export async function fetchScienzaTrattamento(intervento) {
   const token = session?.session?.access_token;
   if (!token) throw new Error("Accedi per vedere la scienza del trattamento.");
 
-  const res = await fetch("/api/scienza-trattamento", {
+  const res = await fetch("/api/chat-zona", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ intervento }),
+    body: JSON.stringify({ azione: "scienza_trattamento", intervento }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Recupero scienza non riuscito");
