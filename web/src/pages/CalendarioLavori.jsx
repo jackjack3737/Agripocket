@@ -207,7 +207,7 @@ export default function CalendarioLavori({ profile, session }) {
         </p>
       ) : null}
 
-      <section className="dash-calendar dash-calendar--solum">
+      <section className="dash-calendar dash-calendar--solum bg-slate-50/50">
         <CalendarioSolum
           interventi={interventiCalendario}
           onComplete={toggleIntervento}

@@ -8,25 +8,31 @@
   --color-solum-green: #2d6a4f;
   --color-solum-green-light: #d8f3dc;
   --color-solum-green-muted: #52b788;
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
 }
 
-/* Accordion morbido (grid 0fr → 1fr) */
-.solum-accordion-grid {
+/* Pannello scienza: espansione fluida senza scatti (grid 0fr → 1fr + fade) */
+.solum-scienza-reveal {
   display: grid;
-  transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    grid-template-rows 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.28s ease;
 }
-.solum-accordion-grid[data-open="true"] {
+.solum-scienza-reveal[data-open="true"] {
   grid-template-rows: 1fr;
+  opacity: 1;
 }
-.solum-accordion-grid[data-open="false"] {
+.solum-scienza-reveal[data-open="false"] {
   grid-template-rows: 0fr;
+  opacity: 0;
 }
-.solum-accordion-grid > .solum-accordion-inner {
+.solum-scienza-reveal > .solum-scienza-reveal__inner {
   overflow: hidden;
+  min-height: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .solum-accordion-grid {
+  .solum-scienza-reveal {
     transition: none;
   }
 }

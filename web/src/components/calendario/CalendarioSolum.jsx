@@ -14,6 +14,14 @@ import "../../styles/calendario-solum.css";
 const TAB_SETTIMANA = "settimana";
 const TAB_DISPENSA = "dispensa";
 
+const tabClass = (active) =>
+  [
+    "flex-1 rounded-full py-2.5 px-3 text-sm font-medium transition-all duration-200",
+    active
+      ? "bg-white text-slate-900 shadow-xs"
+      : "text-slate-400 hover:text-slate-600 transition-colors",
+  ].join(" ");
+
 export default function CalendarioSolum({
   interventi = [],
   onComplete,
@@ -45,36 +53,39 @@ export default function CalendarioSolum({
   }
 
   return (
-    <div className="calendario-solum min-h-0 py-2 sm:py-4">
-      <div className="max-w-lg mx-auto px-1 sm:px-0">
-        <header className="flex items-start justify-between gap-4 mb-8">
+    <div className="calendario-solum min-h-full bg-slate-50/50">
+      <div className="max-w-lg mx-auto px-6 sm:px-8 py-10 sm:py-14">
+        <header className="flex items-start justify-between gap-6 mb-12">
           <div className="min-w-0">
-            <h2 className="text-2xl font-semibold text-gray-800 tracking-tight">Il tuo calendario</h2>
-            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+            <h2 className="text-2xl sm:text-[1.65rem] font-semibold text-slate-900 tracking-tight">
+              Il tuo calendario
+            </h2>
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed max-w-[18rem]">
               Solo ciò che conta oggi. La scienza resta a un tap di distanza.
             </p>
           </div>
           {onAggiornaPiano ? (
             <button
               type="button"
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 hover:border-gray-300 transition-colors disabled:opacity-40"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/90 px-2.5 py-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:border-slate-300 shadow-xs transition-colors disabled:opacity-40"
               onClick={onAggiornaPiano}
               disabled={generatingPiano || !canAggiornaPiano}
-              title={generatingPiano ? "Generazione in corso" : "Aggiorna piano annuale"}
-              aria-label="Aggiorna piano annuale"
+              title={generatingPiano ? "Sincronizzazione in corso" : "Sincronizza piano annuale"}
+              aria-label="Sincronizza piano annuale"
             >
-              <span className={generatingPiano ? "inline-block animate-spin" : ""} aria-hidden>
+              <span
+                className={`text-sm leading-none ${generatingPiano ? "inline-block animate-spin" : ""}`}
+                aria-hidden
+              >
                 🔄
               </span>
-              <span className="hidden sm:inline">
-                {generatingPiano ? "…" : "Aggiorna"}
-              </span>
+              <span>{generatingPiano ? "…" : "Sincronizza"}</span>
             </button>
           ) : null}
         </header>
 
         <nav
-          className="flex p-1 rounded-xl bg-gray-100 mb-8"
+          className="flex p-1 rounded-full bg-slate-100/80 mb-12"
           role="tablist"
           aria-label="Sezioni calendario"
         >
@@ -82,11 +93,7 @@ export default function CalendarioSolum({
             type="button"
             role="tab"
             aria-selected={tab === TAB_SETTIMANA}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-              tab === TAB_SETTIMANA
-                ? "bg-white text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={tabClass(tab === TAB_SETTIMANA)}
             onClick={() => setTab(TAB_SETTIMANA)}
           >
             Questa settimana
@@ -95,11 +102,7 @@ export default function CalendarioSolum({
             type="button"
             role="tab"
             aria-selected={tab === TAB_DISPENSA}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-              tab === TAB_DISPENSA
-                ? "bg-white text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={tabClass(tab === TAB_DISPENSA)}
             onClick={() => setTab(TAB_DISPENSA)}
           >
             La tua dispensa
@@ -107,9 +110,9 @@ export default function CalendarioSolum({
         </nav>
 
         {loading ? (
-          <p className="text-center text-sm text-gray-500 py-16">Caricamento…</p>
+          <p className="text-center text-sm text-slate-400 py-24 tracking-wide">Caricamento…</p>
         ) : (
-          <div role="tabpanel">
+          <div role="tabpanel" className="pb-8">
             {tab === TAB_SETTIMANA ? (
               <>
                 <WeeklyView
@@ -120,10 +123,10 @@ export default function CalendarioSolum({
                   completingId={completingId}
                 />
                 {haPianoFuturo ? (
-                  <div className="mt-10 text-center">
+                  <div className="mt-14 text-center">
                     <button
                       type="button"
-                      className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                      className="text-sm font-medium text-slate-400 hover:text-slate-700 transition-colors"
                       onClick={() => setPianoFuturoOpen(true)}
                     >
                       Vedi tutti gli interventi futuri

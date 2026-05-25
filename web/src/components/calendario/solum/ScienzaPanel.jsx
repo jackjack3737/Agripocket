@@ -3,17 +3,29 @@ export default function ScienzaPanel({ titoloTecnico, fabbisogno, open }) {
 
   return (
     <div
-      className="solum-accordion-grid mt-3"
+      className="solum-scienza-reveal col-span-full"
       data-open={open ? "true" : "false"}
       aria-hidden={!open}
     >
-      <div className="solum-accordion-inner">
-        <div className="mt-3 rounded-xl bg-gray-50 px-4 py-4 space-y-3">
+      <div className="solum-scienza-reveal__inner">
+        <div
+          className={`border-t border-slate-100/80 transition-[padding] duration-300 ${
+            open ? "pt-5 mt-1" : "pt-0"
+          }`}
+        >
           {titoloTecnico ? (
-            <h4 className="font-serif text-base text-gray-800 leading-snug">{titoloTecnico}</h4>
+            <h4 className="font-serif text-[15px] text-slate-800 leading-snug tracking-tight">
+              {titoloTecnico}
+            </h4>
           ) : null}
           {fabbisogno ? (
-            <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{fabbisogno}</div>
+            <div
+              className={`text-sm text-slate-600 leading-relaxed whitespace-pre-line break-words ${
+                titoloTecnico ? "mt-3" : ""
+              }`}
+            >
+              {fabbisogno}
+            </div>
           ) : null}
         </div>
       </div>

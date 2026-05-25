@@ -1,6 +1,8 @@
 import { useId, useState } from "react";
 import ScienzaPanel from "./ScienzaPanel.jsx";
 
+const cardShadow = "shadow-[0_8px_30px_rgb(0,0,0,0.02)]";
+
 export default function TaskCard({ task, onComplete, completingId }) {
   const [scienzaOpen, setScienzaOpen] = useState(false);
   const panelId = useId();
@@ -10,35 +12,42 @@ export default function TaskCard({ task, onComplete, completingId }) {
 
   return (
     <article
-      className={`py-5 border-b border-gray-100 last:border-0 ${done ? "opacity-50" : ""}`}
+      className={[
+        "rounded-3xl bg-white p-6 sm:p-7",
+        cardShadow,
+        "transition-opacity duration-300",
+        done ? "opacity-50" : "",
+      ].join(" ")}
     >
       <div className="flex gap-4 items-start">
-        <span className="text-2xl shrink-0 mt-0.5" aria-hidden>
+        <span className="text-2xl shrink-0 mt-0.5 select-none" aria-hidden>
           {task.icona}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 grid grid-cols-1">
           <h3
-            className={`text-base font-semibold text-gray-800 leading-snug ${done ? "line-through decoration-gray-300" : ""}`}
+            className={`text-base font-semibold text-slate-900 leading-snug tracking-tight break-words ${
+              done ? "line-through decoration-slate-300" : ""
+            }`}
           >
             {task.titolo_semplice}
           </h3>
-          <p className="mt-1.5 text-sm text-gray-500 leading-relaxed line-clamp-2">
+          <p className="mt-2 text-sm text-slate-500 leading-relaxed break-words line-clamp-2">
             {task.descrizione_semplice}
           </p>
 
           {task.prodotti?.length ? (
-            <ul className="mt-4 space-y-2" aria-label="Prodotti consigliati">
+            <ul className="mt-5 space-y-2.5" aria-label="Prodotti consigliati">
               {task.prodotti.slice(0, 3).map((p, idx) => (
                 <li
                   key={p.id ?? `${p.nome_commerciale}-${idx}`}
-                  className="text-sm text-gray-600 flex gap-2"
+                  className="text-sm text-slate-600 flex gap-2 min-w-0"
                 >
-                  <span className="shrink-0 text-gray-400" aria-hidden>
+                  <span className="shrink-0 text-slate-300" aria-hidden>
                     ·
                   </span>
-                  <span className="min-w-0">
-                    <span className="font-medium text-gray-800">{p.nome_commerciale}</span>
-                    {p.marca ? <span className="text-gray-400"> — {p.marca}</span> : null}
+                  <span className="min-w-0 break-words">
+                    <span className="font-medium text-slate-800">{p.nome_commerciale}</span>
+                    {p.marca ? <span className="text-slate-400"> — {p.marca}</span> : null}
                   </span>
                 </li>
               ))}
@@ -48,7 +57,7 @@ export default function TaskCard({ task, onComplete, completingId }) {
           {haScienza ? (
             <button
               type="button"
-              className="mt-3 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              className="mt-4 text-sm text-slate-400 hover:text-slate-700 transition-colors text-left w-fit"
               onClick={() => setScienzaOpen((v) => !v)}
               aria-expanded={scienzaOpen}
               aria-controls={panelId}
@@ -57,7 +66,7 @@ export default function TaskCard({ task, onComplete, completingId }) {
             </button>
           ) : null}
 
-          <div id={panelId}>
+          <div id={panelId} className="col-span-full">
             <ScienzaPanel
               titoloTecnico={task.titolo_tecnico}
               fabbisogno={task.fabbisogno_fisiologico}
@@ -68,10 +77,10 @@ export default function TaskCard({ task, onComplete, completingId }) {
       </div>
 
       {!done && onComplete ? (
-        <div className="mt-4 flex justify-end">
+        <div className="mt-6 pt-5 border-t border-slate-100/60 flex justify-end">
           <button
             type="button"
-            className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-40"
+            className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors disabled:opacity-40"
             onClick={() => onComplete(task.id)}
             disabled={busy}
           >
@@ -79,7 +88,7 @@ export default function TaskCard({ task, onComplete, completingId }) {
           </button>
         </div>
       ) : done ? (
-        <p className="mt-3 text-xs text-gray-400">Completato</p>
+        <p className="mt-5 text-xs text-slate-400 tracking-wide">Completato</p>
       ) : null}
     </article>
   );
