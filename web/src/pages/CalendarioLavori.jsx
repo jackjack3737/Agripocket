@@ -19,6 +19,7 @@ import {
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { arricchisciProdottiCalendario, CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
 import { supabase } from "../lib/supabase";
+import { parseMqInput } from "../lib/parseMq";
 
 export default function CalendarioLavori({ profile, session }) {
   const location = useLocation();
@@ -225,7 +226,7 @@ export default function CalendarioLavori({ profile, session }) {
           onAggiornaPiano={handleGeneraPiano}
           generatingPiano={generatingPiano}
           canAggiornaPiano={!!profile?.localita}
-          userMq={profile?.superficie_mq ?? 150}
+          userMq={parseMqInput(profile?.superficie_mq) ?? profile?.superficie_mq ?? null}
           meseCorrente={meseCorrente}
         />
       </section>

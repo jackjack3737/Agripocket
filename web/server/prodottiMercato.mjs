@@ -30,6 +30,20 @@ export function interventoTemplateKey({ categoria, macro_categoria, titolo }) {
   return `${String(categoria || "").toLowerCase()}|${String(macro_categoria || "").toUpperCase()}|${t}`;
 }
 
+const DOSE_MQ_MACRO_MERCATO = {
+  K: 30,
+  N: 20,
+  P: 25,
+  Biostimolante: 2.5,
+  Correttivo: 40,
+  Bagnante: 1,
+};
+
+function doseMqMercatoDefault(macro) {
+  const m = String(macro || "").trim();
+  return DOSE_MQ_MACRO_MERCATO[m] ?? DOSE_MQ_MACRO_MERCATO.K;
+}
+
 export function mercatoToCatalogRow(row) {
   if (!row?.prodotto) return null;
   const catAg = row.categoria_agronomica || "Altro";
@@ -38,6 +52,11 @@ export function mercatoToCatalogRow(row) {
     ? row.composizione_molecolare_dichiarata.join("; ")
     : "";
   const targets = Array.isArray(row.target_fisiologico) ? row.target_fisiologico.join("; ") : "";
+  const macro = row.macro_categoria || null;
+  const doseMq =
+    Number(row.dosaggio_standard_mq) > 0
+      ? Number(row.dosaggio_standard_mq)
+      : doseMqMercatoDefault(macro);
 
   return {
     id: `mercato:${row.id}`,
@@ -49,12 +68,12 @@ export function mercatoToCatalogRow(row) {
     composizione: comp,
     principio_attivo: comp.split(";")[0]?.trim() || null,
     descrizione: targets || row.raw_text_excerpt?.slice(0, 200) || "",
-    macro_categoria: row.macro_categoria || null,
+    macro_categoria: macro,
     periodo_uso: null,
     periodo_ideale: null,
-    unita_misura: "g",
-    dosaggio_standard_mq: null,
-    dose_fogliare: null,
+    unita_misura: macro === "Bagnante" ? "ml" : "g",
+    dosaggio_standard_mq: doseMq,
+    dose_fogliare: doseMq,
     dose_radicale: null,
     is_bio: row.is_bio,
     _from_mercato: true,

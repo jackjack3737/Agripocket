@@ -337,6 +337,7 @@ function catalogoRigaAConsigliato(p, profilo, intervento) {
     Array.isArray(p.target_fisiologico) && p.target_fisiologico.length
       ? p.target_fisiologico.join("; ")
       : null;
+  const perMqNum = Number(perMq) > 0 ? Number(perMq) : null;
   return {
     id: p.id,
     nome_commerciale: p.nome,
@@ -344,12 +345,16 @@ function catalogoRigaAConsigliato(p, profilo, intervento) {
     principio_attivo: p.principio_attivo || p.composizione?.slice(0, 120) || null,
     macro_categoria: inferMacroCategoriaProdotto(p, intervento),
     a_cosa_serve: edu?.a_cosa_serve ?? target ?? p.descrizione?.slice(0, 160) ?? null,
+    dose_mq: perMqNum,
+    dosaggio_standard_mq: perMqNum,
+    unita_misura: p.unita_misura || "g",
+    formato_vendita: p.formato_vendita ?? p.formato_confezione ?? null,
     dose_totale_calcolata: dose
       ? `${dose.dose_display} da distribuire su ${mq} m²`
       : mq
         ? null
         : "Imposta i m² del prato nel profilo per calcolare la dose",
-    dose_per_mq: dose?.dose_per_mq_display || (perMq ? `${perMq} ${p.unita_misura || "g"}/m²` : null),
+    dose_per_mq: dose?.dose_per_mq_display || (perMqNum ? `${perMqNum} ${p.unita_misura || "g"}/m²` : null),
     istruzioni_uso: edu?.come_si_usa
       ? `${edu.come_si_usa} ${istruzioniEtichetta}`.trim()
       : istruzioniEtichetta,
