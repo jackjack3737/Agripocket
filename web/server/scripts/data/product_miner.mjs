@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Product Mining — etichette PDF/immagine → JSON strutturato → Supabase prodotti_mercato
  *
@@ -340,11 +339,10 @@ export async function analyzeCatalogText(rawText, fileName, apiKey, defaultBrand
       );
       const parsed = parseCatalogJson(out);
       const list = Array.isArray(parsed?.prodotti) ? parsed.prodotti : [];
-      return list
-        .map((p) => normalizeProductJson(p))
-        .map((p) => prepareProductFromWeb(p, defaultBrand))
-        .filter((p) => p.prodotto?.length >= 2);
-    } catch (e) {
+  return list
+    .map((p) => prepareProductFromWeb(normalizeProductJson(p), defaultBrand))
+    .filter((p) => p.prodotto?.length >= 2);
+} catch (e) {
       lastErr = e;
       if (attempt === 0) await sleep(2000);
     }
