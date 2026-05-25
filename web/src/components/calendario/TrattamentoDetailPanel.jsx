@@ -5,22 +5,29 @@ import { formatDataIt, CATEGORIA_LABEL } from "../../lib/dashboard.js";
 import { fetchScienzaTrattamento } from "../../lib/scienzaTrattamentoClient.js";
 import PrescrizioneProdottoCard from "./solum/PrescrizioneProdottoCard.jsx";
 
+function renderInlineBold(text) {
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, j) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={j}>{part.slice(2, -2)}</strong>
+    ) : (
+      <span key={j}>{part}</span>
+    ),
+  );
+}
+
 function renderTestoScienza(testo) {
-  const blocks = String(testo || "").split(/\n\n+/).filter(Boolean);
-  return blocks.map((block, i) => {
-    const parts = block.split(/(\*\*[^*]+\*\*)/g);
-    return (
-      <p key={i} className="cal-dettaglio__testo cal-dettaglio__scienza-p">
-        {parts.map((part, j) =>
-          part.startsWith("**") && part.endsWith("**") ? (
-            <strong key={j}>{part.slice(2, -2)}</strong>
-          ) : (
-            <span key={j}>{part}</span>
-          ),
-        )}
-      </p>
-    );
-  });
+  const raw = String(testo || "").trim();
+  if (!raw) return null;
+  const lines = raw.split(/\n+/).filter((l) => l.trim());
+  if (lines.length <= 1) {
+    return <p className="cal-dettaglio__testo cal-dettaglio__scienza-p">{renderInlineBold(raw)}</p>;
+  }
+  return lines.map((line, i) => (
+    <p key={i} className="cal-dettaglio__testo cal-dettaglio__scienza-p">
+      {renderInlineBold(line.trim())}
+    </p>
+  ));
 }
 
 export default function TrattamentoDetailPanel({

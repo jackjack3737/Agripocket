@@ -30,6 +30,26 @@ function meseIt(iso) {
   }
 }
 
+function keywordMacro(intervento) {
+  const macro = String(intervento?.macro_categoria || "").toUpperCase();
+  const blob = [
+    intervento?.titolo,
+    intervento?.titolo_semplice_azione,
+    intervento?.titolo_tecnico,
+    intervento?.fabbisogno_fisiologico,
+    ...(intervento?.esigenze_molecolari || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (macro === "K" || /potass|kalium|\bk2o\b|0-0-/.test(blob)) {
+    return "potassio K2O concime potassico tappeto erboso osmoprozione";
+  }
+  if (macro === "N" || /azoto|urea|npk/.test(blob)) return "azoto concime nitrogeno prato";
+  if (macro === "P" || /fosfor/.test(blob)) return "fosforo fosforico radici prato";
+  if (macro === "Biostimolante") return "biostimolante stress prato alghe aminoacidi";
+  return "";
+}
+
 export function buildQueryScienzaTrattamento(intervento, profilo = {}) {
   const titolo =
     intervento?.titolo_semplice_azione ||
@@ -39,8 +59,10 @@ export function buildQueryScienzaTrattamento(intervento, profilo = {}) {
   const esigenze = Array.isArray(intervento?.esigenze_molecolari)
     ? intervento.esigenze_molecolari.join(" ")
     : "";
+  const kw = keywordMacro(intervento);
   return [
     "fisiologia tappeto erboso turfgrass trattamento agronomico",
+    kw,
     titolo,
     intervento?.titolo_tecnico,
     intervento?.fabbisogno_fisiologico,
@@ -56,44 +78,71 @@ export function buildQueryScienzaTrattamento(intervento, profilo = {}) {
     .join("\n");
 }
 
-async function geminiSintesiScienza(apiKey, { intervento, kbBlock, profilo }) {
+function sintesiSembraTroncata(testo) {
+  const t = String(testo || "").trim();
+  if (!t || t.length < 60) return true;
+  if (/[.!?…][\s"']*$/.test(t)) return false;
+  const ultime = t.slice(-24);
+  if (/\s(di|del|della|de|a|al|alla|il|la|le|in|con|per|pot|fosf|azot)\s*$/i.test(ultime)) return true;
+  if (/[a-zàèéìòù]{2,}$/i.test(t) && !/[.!?…]$/.test(t)) return true;
+  return false;
+}
+
+async function geminiSintesiScienza(apiKey, { intervento, kbBlock, profilo }, { breve = false } = {}) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${CHAT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const titolo =
     intervento?.titolo_semplice_azione || intervento?.titolo || intervento?.tipo_intervento || "Trattamento";
+  const focus = keywordMacro(intervento) || intervento?.macro_categoria || "";
 
-  const prompt = `Sei un agronomo del tappeto erboso. Scrivi in italiano chiaro ma autorevole.
+  const prompt = `Sei un agronomo del tappeto erboso. Rispondi in italiano, tono autorevole e diretto (niente preamboli tipo "Certamente").
 
-L'utente ha chiesto la SCIENZA dietro questo intervento in calendario:
+Intervento in calendario:
 - Titolo: ${titolo}
-- Data prevista: ${intervento?.data_prevista || "n/d"}
-- Categoria: ${intervento?.categoria || "n/d"}
-- Esigenze molecolari: ${(intervento?.esigenze_molecolari || []).join("; ") || "n/d"}
-- Profilo: ${profilo?.localita || ""} ${profilo?.superficie_mq ? `${profilo.superficie_mq} m²` : ""}
+- Data: ${intervento?.data_prevista || "n/d"}
+- Categoria: ${intervento?.categoria || "n/d"}${focus ? `\n- Focus nutriente/tema: ${focus}` : ""}
+- Esigenze: ${(intervento?.esigenze_molecolari || []).join("; ") || "n/d"}
 
-USA SOLO gli estratti della knowledge base sotto. NON inventare dati, dosi o marchi non presenti negli estratti.
-Se gli estratti sono scarsi, dillo e limita la risposta a ciò che è documentato.
+USA SOLO gli estratti KB sotto. Se parli di un nutriente, usa quello del titolo/intervento (es. potassio se concime potassico), non altri a caso.
+Completa SEMPRE tutte e 3 le sezioni con frasi intere che finiscono con punto.
 
-Struttura (markdown leggero, senza titoli enormi):
-1) **Perché in questa fase** — legame stagione/fisiologia (2–4 frasi)
-2) **Meccanismo** — cosa succede nella pianta (2–4 frasi)
-3) **In pratica sul tuo prato** — collegamento operativo (2–3 frasi)
+Formato obbligatorio (rispetta esattamente queste righe di intestazione):
 
-Max 220 parole totali.
+**Perché in questa fase**
+(2-4 frasi)
 
-ESTRATTI KNOWLEDGE BASE:
-${kbBlock}`;
+**Meccanismo**
+(2-4 frasi)
+
+**In pratica sul tuo prato**
+(2-3 frasi)
+
+${breve ? "Massimo 160 parole." : "Massimo 280 parole."}
+
+ESTRATTI KB:
+${kbBlock.slice(0, 12000)}`;
 
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.25, maxOutputTokens: 1024 },
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+        candidateCount: 1,
+      },
     }),
   });
   if (!res.ok) throw new Error(`Gemini sintesi: ${res.status}`);
   const data = await res.json();
-  return data?.candidates?.[0]?.content?.parts?.map((p) => p?.text ?? "").join("")?.trim() || "";
+  const cand = data?.candidates?.[0];
+  const parts = cand?.content?.parts ?? [];
+  const text = parts
+    .filter((p) => typeof p?.text === "string" && !p.thought)
+    .map((p) => p.text)
+    .join("")
+    .trim();
+  return text || "";
 }
 
 /**
@@ -123,6 +172,20 @@ export async function recuperaScienzaTrattamento(intervento, { admin, geminiKey,
     });
   } catch (e) {
     console.warn("[scienza-trattamento] KB:", e.message);
+  }
+
+  const blobKw = keywordMacro(intervento);
+  if (blobKw.includes("potass")) {
+    chunks = [...chunks].sort((a, b) => {
+      const score = (c) => {
+        const t = pulisciTestoKb(c.soluzione).toLowerCase();
+        let s = Number(c.somiglianza ?? 0);
+        if (/potass|k2o|kalium|0-0-/.test(t)) s += 0.2;
+        if (/fosfor|\bp2o5?\b/.test(t)) s -= 0.15;
+        return s;
+      };
+      return score(b) - score(a);
+    });
   }
 
   const estratti = chunks.map((c, i) => {
@@ -157,12 +220,22 @@ export async function recuperaScienzaTrattamento(intervento, { admin, geminiKey,
   let sintesi = "";
   try {
     sintesi = await geminiSintesiScienza(geminiKey, { intervento, kbBlock, profilo });
+    if (sintesiSembraTroncata(sintesi)) {
+      const retry = await geminiSintesiScienza(geminiKey, { intervento, kbBlock, profilo }, { breve: true });
+      if (retry && (!sintesiSembraTroncata(retry) || retry.length > sintesi.length)) {
+        sintesi = retry;
+      }
+    }
   } catch (e) {
     console.warn("[scienza-trattamento] sintesi:", e.message);
     sintesi = estratti
       .slice(0, 3)
-      .map((e) => `**${e.fonte}** — ${e.testo.slice(0, 480)}…`)
+      .map((e) => `**${e.fonte}** — ${e.testo.slice(0, 900)}`)
       .join("\n\n");
+  }
+
+  if (sintesiSembraTroncata(sintesi) && estratti.length) {
+    sintesi = `${sintesi.trim()}\n\n**Approfondimento dalle fonti**\n${estratti[0].testo.slice(0, 1200)}`;
   }
 
   return {
