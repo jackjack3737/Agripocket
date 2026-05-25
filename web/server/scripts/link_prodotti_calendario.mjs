@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Collega prodotti_mercato ↔ calendario_base_intervento (match molecolare/fisiologico).
- * Rigenera anche l'indice usato dal calendario per i prodotti consigliati.
+ * Rigenera collegamenti prodotti_mercato ↔ calendario_base_intervento
+ * usando il motore matchmaking Solum (server/link_prodotti_calendario.mjs).
  *
- * Uso (da web/): node server/scripts/link_prodotti_calendario.mjs
+ * Uso (da web/): npm run link:prodotti:calendario
  *                 node server/scripts/link_prodotti_calendario.mjs --dry-run
  */
 
@@ -11,16 +11,9 @@ import { readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
-import {
-  fetchInterventiTemplate,
-  matchInterventi,
-} from "./data/product_miner.mjs";
-import {
-  interventoTemplateKey,
-  loadProdottiMercatoRows,
-  mercatoAsMatchShape,
-  rankMercatoPerIntervento,
-} from "../prodottiMercato.mjs";
+import { fetchInterventiTemplate } from "./data/product_miner.mjs";
+import { loadProdottiMercatoRows } from "../prodottiMercato.mjs";
+import { linksPerInterventoTemplate, MIN_MATCH_SCORE } from "../link_prodotti_calendario.mjs";
 import { invalidateProdottiCache } from "../prodottiCache.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,77 +54,47 @@ async function main() {
 
   console.log(`Template interventi: ${interventi.length}`);
   console.log(`Prodotti mercato attivi: ${mercatoRows.length}`);
-
-  if (!dryRun) {
-    const { error: delErr } = await admin
-      .from("prodotti_mercato_intervento")
-      .delete()
-      .eq("match_auto", true);
-    if (delErr) throw new Error(`delete links: ${delErr.message}`);
-    console.log("Collegamenti auto precedenti rimossi.");
-  }
+  console.log(`Soglia matchmaking: ${MIN_MATCH_SCORE} punti (TOP 3 per template)`);
 
   const pairKeys = new Set();
   const links = [];
-  let fromProducts = 0;
 
-  for (const row of mercatoRows) {
-    const product = mercatoAsMatchShape(row);
-    const matches = matchInterventi(product, interventi, { minScore: 0.34, maxMatches: 10 });
-    for (const m of matches) {
-      const pk = `${row.id}|${m.intervento_id}`;
-      if (pairKeys.has(pk)) continue;
-      pairKeys.add(pk);
-      links.push({
-        prodotto_mercato_id: row.id,
-        calendario_base_intervento_id: m.intervento_id,
-        match_score: m.match_score,
-        match_reason: m.match_reason,
-        match_auto: true,
-      });
-      fromProducts++;
-    }
-  }
-
-  let fromTemplates = 0;
   for (const t of interventi) {
-    const key = interventoTemplateKey(t);
-    const existing = links.filter((l) => l.calendario_base_intervento_id === t.id).length;
-    if (existing >= 3) continue;
-
-    const ranked = rankMercatoPerIntervento(t, mercatoRows, { max: 8, minScore: 0.32 });
-    for (const cat of ranked) {
-      const pid = cat.mercato_id;
-      if (!pid) continue;
-      const pk = `${pid}|${t.id}`;
+    const batch = linksPerInterventoTemplate(t, mercatoRows, { max: 3 });
+    for (const link of batch) {
+      const pk = `${link.prodotto_mercato_id}|${link.calendario_base_intervento_id}`;
       if (pairKeys.has(pk)) continue;
       pairKeys.add(pk);
-      links.push({
-        prodotto_mercato_id: pid,
-        calendario_base_intervento_id: t.id,
-        match_score: cat._match_score ?? 0.4,
-        match_reason: cat._match_reason || `fill_template:${key}`,
-        match_auto: true,
-      });
-      fromTemplates++;
+      links.push(link);
     }
   }
 
-  console.log(`Collegamenti da prodotti → template: ${fromProducts}`);
-  console.log(`Collegamenti aggiuntivi template → prodotti: ${fromTemplates}`);
+  const conMatch = new Set(links.map((l) => l.calendario_base_intervento_id)).size;
+  console.log(`Template con almeno 1 prodotto: ${conMatch} / ${interventi.length}`);
   console.log(`Totale collegamenti: ${links.length}`);
 
   if (dryRun) {
+    const sample = links.slice(0, 5);
+    for (const s of sample) {
+      console.log(`  · ${s.match_reason}`);
+    }
     console.log("(dry-run) Nessuna scrittura su DB.");
     return;
   }
 
-  const batch = 200;
-  for (let i = 0; i < links.length; i += batch) {
-    const chunk = links.slice(i, i + batch);
+  const { error: delErr } = await admin
+    .from("prodotti_mercato_intervento")
+    .delete()
+    .eq("match_auto", true);
+  if (delErr) throw new Error(`delete links: ${delErr.message}`);
+  console.log("Collegamenti auto precedenti rimossi.");
+
+  const batchSize = 200;
+  for (let i = 0; i < links.length; i += batchSize) {
+    const chunk = links.slice(i, i + batchSize);
     const { error } = await admin.from("prodotti_mercato_intervento").insert(chunk);
     if (error) throw new Error(`insert batch ${i}: ${error.message}`);
-    console.log(`  inseriti ${Math.min(i + batch, links.length)} / ${links.length}`);
+    console.log(`  inseriti ${Math.min(i + batchSize, links.length)} / ${links.length}`);
   }
 
   invalidateProdottiCache();

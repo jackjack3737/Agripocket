@@ -194,6 +194,7 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
     weatherBundle,
     pureAgronomy = false,
     indiceProdottiIntervento = null,
+    mercatoRows = null,
   } = opts;
   if (pureAgronomy) {
     list = list.map((i) => arricchisciInterventoEsigenze(i, { weatherBundle }));
@@ -206,6 +207,7 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
     weatherBundle,
     pureAgronomy,
     indiceProdottiIntervento,
+    mercatoRows,
     oggi: oggi || new Date().toISOString().slice(0, 10),
   });
   if (bloccati > 0 || deduped > 0) {

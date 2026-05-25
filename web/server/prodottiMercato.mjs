@@ -2,7 +2,10 @@
  * Vetrina prodotti_mercato → formato catalogo + indice collegamenti calendario_base_intervento.
  */
 
-import { scoreInterventoMatch } from "./scripts/data/product_miner.mjs";
+import {
+  matchProdottiPerIntervento,
+  normalizzaMatchScorePerDb,
+} from "./link_prodotti_calendario.mjs";
 
 const AGR_TO_LEGACY_CAT = {
   "Concime NPK": "CONCIME GRANULARE",
@@ -130,28 +133,24 @@ export async function loadIndiceProdottiPerIntervento(admin) {
 }
 
 /**
- * Prodotti mercato idonei per un intervento (match inverso su tutto il catalogo mercato).
+ * Prodotti mercato idonei per un intervento (motore matchmaking Solum).
  */
-export function rankMercatoPerIntervento(intervento, mercatoRows, { max = 12, minScore = 0.3 } = {}) {
-  const template = {
-    titolo: intervento.titolo,
-    categoria: intervento.categoria,
-    macro_categoria: intervento.macro_categoria,
-    fabbisogno_fisiologico: intervento.fabbisogno_fisiologico,
-    esigenze_molecolari: intervento.esigenze_molecolari || [],
-  };
-
-  return mercatoRows
-    .map((row) => {
-      const { score, reason } = scoreInterventoMatch(mercatoAsMatchShape(row), template);
-      return { row, score, reason };
+export function rankMercatoPerIntervento(intervento, mercatoRows, { max = 12, minScore } = {}) {
+  const matches = matchProdottiPerIntervento(intervento, mercatoRows, {
+    max,
+    minScore: minScore ?? undefined,
+  });
+  return matches
+    .map((m) => {
+      const row = mercatoRows.find((r) => r.id === m.id_prodotto);
+      if (!row) return null;
+      return mercatoToCatalogRow({
+        ...row,
+        _match_score: m.match_score_db ?? normalizzaMatchScorePerDb(m.match_score),
+        _match_reason: m.motivo_suggerimento,
+        _match_score_punti: m.match_score,
+      });
     })
-    .filter((x) => x.score >= minScore)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, max)
-    .map(({ row, score, reason }) =>
-      mercatoToCatalogRow({ ...row, _match_score: score, _match_reason: reason }),
-    )
     .filter(Boolean);
 }
 

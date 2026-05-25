@@ -23,7 +23,7 @@ import {
 } from "./esigenzeAgronomiche.mjs";
 import { generaCalendarioDeterministico } from "./calendarioBase.mjs";
 import { loadProdotti } from "./prodottiCatalogo.mjs";
-import { loadIndiceProdottiPerIntervento } from "./prodottiMercato.mjs";
+import { loadIndiceProdottiPerIntervento, loadProdottiMercatoRows } from "./prodottiMercato.mjs";
 import { applicaSolumVoceADettaglio } from "./solumVoce.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
@@ -493,9 +493,10 @@ export async function generaPianoStagionale({ authHeader, env }) {
   const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(interventiGrezzi, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
   const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
-  const [prodotti, indiceProdottiIntervento] = await Promise.all([
+  const [prodotti, indiceProdottiIntervento, mercatoRows] = await Promise.all([
     loadProdotti(admin),
     loadIndiceProdottiPerIntervento(admin),
+    loadProdottiMercatoRows(admin),
   ]);
   const sanitizzatiRaw = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
     storico,
@@ -504,6 +505,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     weatherBundle,
     pureAgronomy: false,
     indiceProdottiIntervento,
+    mercatoRows,
   });
   const sanitizzati = applicaSolumVoceADettaglio(sanitizzatiRaw);
   const timeline_bisogni = buildTimelineBisogni(sanitizzati, oggi, {

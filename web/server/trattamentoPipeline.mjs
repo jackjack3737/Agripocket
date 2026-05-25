@@ -9,7 +9,7 @@ import {
   rankProdotti,
   isPreEmergenzaAnnualiIntervento,
 } from "./prodottiCatalogo.mjs";
-import { prodottiDaIndiceCalendario } from "./prodottiMercato.mjs";
+import { prodottiDaIndiceCalendario, rankMercatoPerIntervento } from "./prodottiMercato.mjs";
 import {
   isInterventoFitofarmaco,
   isProdottoFitofarmaco,
@@ -357,6 +357,8 @@ function catalogoRigaAConsigliato(p, profilo, intervento) {
     avviso_fitofarmaco: fito,
     fonte_vetrina: p._from_mercato ? "prodotti_mercato" : "catalogo",
     match_score: p._match_score ?? null,
+    match_score_punti: p._match_score_punti ?? null,
+    motivo_suggerimento: p._match_reason ?? null,
   };
 }
 
@@ -393,7 +395,15 @@ export function suggerisciProdottiConsigliati(azione, prodotti, profilo, interve
  */
 export function buildDettaglioTrattamento(
   intervento,
-  { profilo, prodotti, vision, weatherBundle, includeProdotti = true, indiceProdottiIntervento } = {},
+  {
+    profilo,
+    prodotti,
+    vision,
+    weatherBundle,
+    includeProdotti = true,
+    indiceProdottiIntervento,
+    mercatoRows = null,
+  } = {},
 ) {
   const dataIso = intervento?.data_prevista;
   const meteo = contestoMeteo(weatherBundle, dataIso);
@@ -404,12 +414,18 @@ export function buildDettaglioTrattamento(
   const meteoUsato = meteoDisponibilePerCalcolo(weatherBundle);
   const nota_meteo_utente = meteoUsato ? buildNotaMeteoTrattamento(meteo, weatherBundle, profilo) : null;
 
-  const preselezionati =
+  let preselezionati =
     includeProdotti && indiceProdottiIntervento?.size
       ? prodottiDaIndiceCalendario(intervento, indiceProdottiIntervento, {
           max: MAX_PRODOTTI_CONSIGLIATI,
         })
       : [];
+
+  if (includeProdotti && !preselezionati.length && mercatoRows?.length) {
+    preselezionati = rankMercatoPerIntervento(intervento, mercatoRows, {
+      max: MAX_PRODOTTI_CONSIGLIATI,
+    });
+  }
 
   const prodotti_consigliati = includeProdotti
     ? suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision, { preselezionati })
@@ -454,7 +470,7 @@ export async function arricchisciInterventoTrattamento(
   weatherBundle,
   opts = {},
 ) {
-  const { indiceProdottiIntervento } = opts;
+  const { indiceProdottiIntervento, mercatoRows = null } = opts;
   const cat = String(intervento?.categoria || "").toLowerCase();
   if (!TRATTAMENTO_CATEGORIE.has(cat)) {
     return {
@@ -476,6 +492,7 @@ export async function arricchisciInterventoTrattamento(
       weatherBundle,
       includeProdotti: opts.includeProdotti !== false,
       indiceProdottiIntervento,
+      mercatoRows,
     });
   }
 

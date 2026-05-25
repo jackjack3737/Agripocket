@@ -62,6 +62,22 @@ In `crawler/product_sites_italia.yaml` sono preparati (disabilitati finché non 
 
 Attivarli: `enabled: true` + `npm run discover:prodotti` + ingest.
 
+## Matchmaking interventi ↔ prodotti
+
+Modulo: `web/server/link_prodotti_calendario.mjs`
+
+| Regola | Punti |
+|--------|-------|
+| Macro/categoria compatibile | +50 |
+| Esigenza molecolare in composizione/descrizione | +20 ciascuna |
+| Parola chiave esigenza nel nome prodotto | +10 |
+| Macro incompatibili (es. Diserbante ↔ Biostimolante) | scarto (0) |
+
+- Restituisce **TOP 3** ordinati per `match_score` decrescente.
+- Soglia minima **50 punti** — sotto soglia array vuoto (pure agronomy).
+- Integrato in `genera-piano` via `trattamentoPipeline` + `rankMercatoPerIntervento`.
+- Rigenera link DB template: `npm run link:prodotti:calendario`
+
 ## Copertura «tutti i prodotti vendibili in Italia»
 
 Per **fitofarmaci registrati** (lista ufficiale completa) serve integrare la **Banca Dati FITO** (Ministero della Salute) — migliaia di registrazioni nazionali, oltre i cataloghi e-commerce.
