@@ -576,16 +576,21 @@ export function analizzaPratoPlugin() {
           return;
         }
 
-        try {
-          const body = await readJsonBody(req);
-          const result = await scienzaTrattamentoHandler(auth, env, body);
-          res.statusCode = 200;
-          res.end(JSON.stringify(result));
-        } catch (e) {
-          console.error("[scienza-trattamento]", e);
-          res.statusCode = 500;
-          res.end(JSON.stringify({ error: e.message || String(e) }));
-        }
+        const chunks = [];
+        req.on("data", (c) => chunks.push(c));
+        req.on("end", async () => {
+          try {
+            const raw = Buffer.concat(chunks).toString();
+            const body = raw ? JSON.parse(raw) : {};
+            const result = await scienzaTrattamentoHandler(auth, env, body);
+            res.statusCode = 200;
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            console.error("[scienza-trattamento]", e);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: e.message || String(e) }));
+          }
+        });
       });
 
       server.middlewares.use(async (req, res, next) => {
