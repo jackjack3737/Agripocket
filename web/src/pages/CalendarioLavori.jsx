@@ -176,31 +176,6 @@ export default function CalendarioLavori({ profile, session }) {
     window.location.href = "/";
   }
 
-  const actionsSlot = (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <button
-        type="button"
-        className="inline-flex justify-center rounded-2xl bg-solum-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-solum-green/90 disabled:opacity-50 transition-all"
-        disabled={generatingPiano || !profile?.localita}
-        onClick={handleGeneraPiano}
-      >
-        {generatingPiano
-          ? "Generazione… (1-2 min)"
-          : hasPiano
-            ? "Aggiorna piano annuale"
-            : "Crea piano annuale"}
-      </button>
-      {!profile?.localita ? (
-        <p className="text-xs text-gray-500">
-          <Link to="/onboarding" className="text-solum-green underline">
-            Imposta la località
-          </Link>{" "}
-          nel profilo.
-        </p>
-      ) : null}
-    </div>
-  );
-
   return (
     <div className="page dashboard dashboard--calendario">
       <DashPageHeader active="calendario" profile={profile} onLogout={logout} />
@@ -223,12 +198,23 @@ export default function CalendarioLavori({ profile, session }) {
         </p>
       ) : null}
 
+      {!profile?.localita ? (
+        <p className="text-sm text-gray-500 px-4 mb-4">
+          <Link to="/onboarding" className="underline text-gray-700">
+            Imposta la località
+          </Link>{" "}
+          nel profilo per generare il piano.
+        </p>
+      ) : null}
+
       <section className="dash-calendar dash-calendar--solum">
         <CalendarioSolum
           interventi={interventiCalendario}
           onComplete={toggleIntervento}
           loading={loading || generatingPiano}
-          actionsSlot={actionsSlot}
+          onAggiornaPiano={handleGeneraPiano}
+          generatingPiano={generatingPiano}
+          canAggiornaPiano={!!profile?.localita}
         />
       </section>
     </div>

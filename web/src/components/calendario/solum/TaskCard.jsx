@@ -10,42 +10,36 @@ export default function TaskCard({ task, onComplete, completingId }) {
 
   return (
     <article
-      className={`rounded-3xl bg-white border border-gray-100 shadow-sm transition-shadow hover:shadow-md p-5 ${
-        done ? "opacity-60" : ""
-      }`}
+      className={`py-5 border-b border-gray-100 last:border-0 ${done ? "opacity-50" : ""}`}
     >
       <div className="flex gap-4 items-start">
-        <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-solum-green-light text-2xl"
-          aria-hidden
-        >
+        <span className="text-2xl shrink-0 mt-0.5" aria-hidden>
           {task.icona}
         </span>
         <div className="min-w-0 flex-1">
           <h3
-            className={`text-lg font-semibold text-gray-800 leading-tight ${done ? "line-through decoration-gray-300" : ""}`}
+            className={`text-base font-semibold text-gray-800 leading-snug ${done ? "line-through decoration-gray-300" : ""}`}
           >
             {task.titolo_semplice}
           </h3>
-          <p className="mt-1 text-sm text-gray-500 leading-relaxed">{task.descrizione_semplice}</p>
+          <p className="mt-1.5 text-sm text-gray-500 leading-relaxed line-clamp-2">
+            {task.descrizione_semplice}
+          </p>
 
           {task.prodotti?.length ? (
-            <ul className="mt-3 space-y-2" aria-label="Prodotti consigliati">
+            <ul className="mt-4 space-y-2" aria-label="Prodotti consigliati">
               {task.prodotti.slice(0, 3).map((p, idx) => (
                 <li
                   key={p.id ?? `${p.nome_commerciale}-${idx}`}
-                  className="flex items-start gap-2 rounded-xl bg-solum-green-light/40 px-3 py-2 text-sm"
+                  className="text-sm text-gray-600 flex gap-2"
                 >
-                  <span className="shrink-0" aria-hidden>
-                    🧴
+                  <span className="shrink-0 text-gray-400" aria-hidden>
+                    ·
                   </span>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 leading-snug">{p.nome_commerciale}</p>
-                    {p.marca ? <p className="text-xs text-gray-500">{p.marca}</p> : null}
-                    {p.dose_totale_calcolata ? (
-                      <p className="text-xs text-solum-green mt-0.5">{p.dose_totale_calcolata}</p>
-                    ) : null}
-                  </div>
+                  <span className="min-w-0">
+                    <span className="font-medium text-gray-800">{p.nome_commerciale}</span>
+                    {p.marca ? <span className="text-gray-400"> — {p.marca}</span> : null}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -54,13 +48,12 @@ export default function TaskCard({ task, onComplete, completingId }) {
           {haScienza ? (
             <button
               type="button"
-              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-solum-green hover:text-solum-green/80 transition-colors rounded-lg px-0 py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-solum-green/40"
+              className="mt-3 text-sm text-gray-500 hover:text-gray-800 transition-colors"
               onClick={() => setScienzaOpen((v) => !v)}
               aria-expanded={scienzaOpen}
               aria-controls={panelId}
             >
-              <span aria-hidden>💡</span>
-              {scienzaOpen ? "Nascondi" : "Perché lo facciamo?"}
+              {scienzaOpen ? "Nascondi perché" : "Perché lo facciamo?"}
             </button>
           ) : null}
 
@@ -75,18 +68,18 @@ export default function TaskCard({ task, onComplete, completingId }) {
       </div>
 
       {!done && onComplete ? (
-        <div className="mt-4 pt-4 border-t border-gray-50 flex justify-end">
+        <div className="mt-4 flex justify-end">
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-2xl bg-solum-green px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-solum-green/90 active:scale-[0.98] transition-all disabled:opacity-50"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-40"
             onClick={() => onComplete(task.id)}
             disabled={busy}
           >
-            {busy ? "Salvo…" : "Fatto ✓"}
+            {busy ? "Salvo…" : "Segna fatto"}
           </button>
         </div>
       ) : done ? (
-        <p className="mt-3 text-xs font-medium text-solum-green-muted uppercase tracking-wide">Completato</p>
+        <p className="mt-3 text-xs text-gray-400">Completato</p>
       ) : null}
     </article>
   );

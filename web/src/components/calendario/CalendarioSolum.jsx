@@ -18,8 +18,9 @@ export default function CalendarioSolum({
   interventi = [],
   onComplete,
   loading = false,
-  headerSlot = null,
-  actionsSlot = null,
+  onAggiornaPiano = null,
+  generatingPiano = false,
+  canAggiornaPiano = true,
 }) {
   const [tab, setTab] = useState(TAB_SETTIMANA);
   const [completingId, setCompletingId] = useState(null);
@@ -44,21 +45,36 @@ export default function CalendarioSolum({
   }
 
   return (
-    <div className="calendario-solum min-h-0 bg-gray-50 rounded-3xl p-4 sm:p-6 -mx-1 sm:mx-0">
-      <div className="max-w-lg mx-auto">
-        {headerSlot ? <div className="mb-4">{headerSlot}</div> : (
-          <header className="mb-6">
+    <div className="calendario-solum min-h-0 py-2 sm:py-4">
+      <div className="max-w-lg mx-auto px-1 sm:px-0">
+        <header className="flex items-start justify-between gap-4 mb-8">
+          <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-gray-800 tracking-tight">Il tuo calendario</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
               Solo ciò che conta oggi. La scienza resta a un tap di distanza.
             </p>
-          </header>
-        )}
-
-        {actionsSlot ? <div className="mb-5">{actionsSlot}</div> : null}
+          </div>
+          {onAggiornaPiano ? (
+            <button
+              type="button"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 hover:border-gray-300 transition-colors disabled:opacity-40"
+              onClick={onAggiornaPiano}
+              disabled={generatingPiano || !canAggiornaPiano}
+              title={generatingPiano ? "Generazione in corso" : "Aggiorna piano annuale"}
+              aria-label="Aggiorna piano annuale"
+            >
+              <span className={generatingPiano ? "inline-block animate-spin" : ""} aria-hidden>
+                🔄
+              </span>
+              <span className="hidden sm:inline">
+                {generatingPiano ? "…" : "Aggiorna"}
+              </span>
+            </button>
+          ) : null}
+        </header>
 
         <nav
-          className="flex gap-1 p-1 rounded-2xl bg-white border border-gray-100 shadow-sm mb-6"
+          className="flex p-1 rounded-xl bg-gray-100 mb-8"
           role="tablist"
           aria-label="Sezioni calendario"
         >
@@ -66,10 +82,10 @@ export default function CalendarioSolum({
             type="button"
             role="tab"
             aria-selected={tab === TAB_SETTIMANA}
-            className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
               tab === TAB_SETTIMANA
-                ? "bg-solum-green text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                ? "bg-white text-gray-800 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
             }`}
             onClick={() => setTab(TAB_SETTIMANA)}
           >
@@ -79,10 +95,10 @@ export default function CalendarioSolum({
             type="button"
             role="tab"
             aria-selected={tab === TAB_DISPENSA}
-            className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all ${
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
               tab === TAB_DISPENSA
-                ? "bg-solum-green text-white shadow-sm"
-                : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                ? "bg-white text-gray-800 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
             }`}
             onClick={() => setTab(TAB_DISPENSA)}
           >
@@ -91,7 +107,7 @@ export default function CalendarioSolum({
         </nav>
 
         {loading ? (
-          <p className="text-center text-sm text-gray-500 py-12">Caricamento…</p>
+          <p className="text-center text-sm text-gray-500 py-16">Caricamento…</p>
         ) : (
           <div role="tabpanel">
             {tab === TAB_SETTIMANA ? (
@@ -104,10 +120,10 @@ export default function CalendarioSolum({
                   completingId={completingId}
                 />
                 {haPianoFuturo ? (
-                  <div className="mt-8 text-center">
+                  <div className="mt-10 text-center">
                     <button
                       type="button"
-                      className="text-sm font-semibold text-solum-green hover:text-solum-green/80 transition-colors px-4 py-2 rounded-xl hover:bg-solum-green-light/50"
+                      className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors"
                       onClick={() => setPianoFuturoOpen(true)}
                     >
                       Vedi tutti gli interventi futuri

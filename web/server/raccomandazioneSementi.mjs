@@ -292,7 +292,7 @@ export async function arricchisciRinnovoConSemina(intervento, profilo, prodotti,
     raccomandazione_semina: raccomandazione,
     contesto_meteo: {
       temperatura_suolo_media_c: raccomandazione.temperatura_rilevata,
-      percentuale_ombra: ombraPct,
+      percentuale_ombra: raccomandazione.percentuale_ombra ?? 0,
       status_semina: raccomandazione.status_semina,
       essenza: raccomandazione.essenza,
     },

@@ -8,10 +8,7 @@ export default function ScienzaPanel({ titoloTecnico, fabbisogno, open }) {
       aria-hidden={!open}
     >
       <div className="solum-accordion-inner">
-        <div
-          className="rounded-2xl bg-gray-50 border border-gray-100 px-4 py-4 space-y-3"
-          id={open ? undefined : undefined}
-        >
+        <div className="mt-3 rounded-xl bg-gray-50 px-4 py-4 space-y-3">
           {titoloTecnico ? (
             <h4 className="font-serif text-base text-gray-800 leading-snug">{titoloTecnico}</h4>
           ) : null}
