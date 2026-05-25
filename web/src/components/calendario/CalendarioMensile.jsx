@@ -11,7 +11,6 @@ import {
 import { interventoToSolum } from "../../lib/mapInterventoSolum.js";
 import { CalendarioFiltri } from "./CalendarioInterventi.jsx";
 import TrattamentoDetailPanel from "./TrattamentoDetailPanel.jsx";
-import "../../styles-dashboard.css";
 
 function TrattamentoRiga({ item, selected, onSelect }) {
   const task = interventoToSolum(item);
@@ -227,14 +226,16 @@ export default function CalendarioMensile({
           )}
         </div>
 
-        <TrattamentoDetailPanel
-          item={selected}
-          userMq={userMq}
-          onClose={() => setSelected(null)}
-          onComplete={handleComplete}
-          onPin={onPin}
-          completing={completingId === selected?.id}
-        />
+        <div className="cal-layout__dettaglio">
+          <TrattamentoDetailPanel
+            item={selected}
+            userMq={userMq}
+            onClose={() => setSelected(null)}
+            onComplete={handleComplete}
+            onPin={onPin}
+            completing={completingId === selected?.id}
+          />
+        </div>
       </div>
     </div>
   );

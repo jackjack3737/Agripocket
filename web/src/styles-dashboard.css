@@ -12,6 +12,19 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.page.dashboard {
+  max-width: none;
+  width: 100%;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.dashboard.dashboard--calendario {
+  max-width: 76rem;
+  padding-left: clamp(1rem, 3vw, 2rem);
+  padding-right: clamp(1rem, 3vw, 2rem);
+}
+
 .dashboard button,
 .dashboard input,
 .dashboard textarea,
@@ -2884,36 +2897,63 @@
   width: 100%;
 }
 
-/* Calendario: lista mesi + pannello dettaglio affiancato */
+/* Calendario: lista mesi (sinistra) + pannello prodotti (destra) */
 .cal-layout {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
 }
 
-@media (max-width: 899px) {
-  .cal-layout:has(.cal-dettaglio:not(.cal-dettaglio--vuoto)) {
-    display: flex;
-    flex-direction: column;
-  }
+.cal-layout__lista {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
 
-  .cal-layout:has(.cal-dettaglio:not(.cal-dettaglio--vuoto)) .cal-dettaglio {
-    order: -1;
+.cal-layout__dettaglio {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .cal-dettaglio--vuoto {
+    display: none;
   }
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .cal-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    flex-direction: row;
+    align-items: flex-start;
     gap: 1.5rem;
   }
 
-  .cal-layout__dettaglio,
-  .cal-dettaglio {
+  .cal-layout__lista {
+    flex: 1 1 58%;
+    min-width: 0;
+  }
+
+  .cal-layout__dettaglio {
+    flex: 0 0 340px;
+    width: 340px;
+    max-width: 42%;
+  }
+
+  .cal-layout__dettaglio .cal-dettaglio {
     position: sticky;
     top: 0.75rem;
     max-height: calc(100vh - 6rem);
   }
+}
+
+.dash-calendar--wide {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .cal-trattamento-riga--selected {
