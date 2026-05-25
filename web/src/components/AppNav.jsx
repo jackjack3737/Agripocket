@@ -4,6 +4,7 @@ import DashRotatingWord from "./DashRotatingWord";
 const LINKS = [
   { key: "dashboard", to: "/dashboard", label: "Dashboard" },
   { key: "calendario", to: "/calendario", label: "Calendario" },
+  { key: "farmacia", to: "/farmacia", label: "Farmacia" },
 ];
 
 export default function AppNav({ active, profile }) {
