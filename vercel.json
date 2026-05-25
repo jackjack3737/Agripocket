@@ -1,0 +1,39 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci --prefix web",
+  "buildCommand": "npm run build --prefix web",
+  "outputDirectory": "web/dist",
+  "framework": "vite",
+  "functions": {
+    "web/api/analizza-prato.js": { "maxDuration": 120 },
+    "web/api/genera-piano.js": { "maxDuration": 120 },
+    "web/api/chat-zona.js": { "maxDuration": 120 },
+    "web/api/job-status.js": { "maxDuration": 10 },
+    "web/api/reset-profilo.js": { "maxDuration": 30 },
+    "web/api/enrich-prodotti-calendario.js": { "maxDuration": 120 },
+    "web/api/raccomandazione-semina.js": { "maxDuration": 60 },
+    "web/api/adatta-calendario-meteo.js": { "maxDuration": 60 },
+    "web/api/irrigazione-giornaliera.js": { "maxDuration": 60 },
+    "web/api/irrigazione-registra.js": { "maxDuration": 30 },
+    "web/api/meteo.js": { "maxDuration": 30 },
+    "web/api/foto-url.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/onboarding/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    }
+  ]
+}

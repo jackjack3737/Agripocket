@@ -1,0 +1,9 @@
+{
+  "name": "agripocket",
+  "private": true,
+  "description": "Root wrapper — app Vite in web/",
+  "scripts": {
+    "build": "npm run build --prefix web",
+    "vercel-build": "npm run build --prefix web"
+  }
+}
