@@ -113,10 +113,19 @@ function coppiaIncompatibile(macroInt, macroProd) {
   return MACRO_INCOMPATIBILI.has(a) || MACRO_INCOMPATIBILI.has(b);
 }
 
+const NPK_MACROS = new Set(["N", "P", "K"]);
+
 function categoriaCombacia(intervento, prodottoNorm) {
   const macroInt = macroIntervento(intervento);
   const macroProd = prodottoNorm.macro_categoria;
   if (macroInt === macroProd) return true;
+  if (
+    prodottoNorm.categoria === "Concime NPK" &&
+    NPK_MACROS.has(macroInt) &&
+    (NPK_MACROS.has(macroProd) || macroProd === "N")
+  ) {
+    return true;
+  }
   const catInt = String(intervento?.categoria || "").toLowerCase();
   const catProd = String(prodottoNorm.categoria_intervento || "").toLowerCase();
   if (catInt && catProd && catInt === catProd) return true;

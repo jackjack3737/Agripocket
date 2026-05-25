@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { loadCrawlerEnv } from "./server/loadEnv.mjs";
 import { analizzaPrato } from "./server/analizzaPratoCore.mjs";
 import { generaPianoStagionale } from "./server/pianoStagionale.mjs";
+import { enrichProdottiCalendarioHandler } from "./server/enrichProdottiInterventi.mjs";
 import { resetProfiloUtente } from "./server/resetProfilo.mjs";
 import { fetchWeatherBundle } from "./server/weatherCore.mjs";
 import { rispondiChatZona } from "./server/chatZonaRAG.mjs";
@@ -499,6 +500,51 @@ export function analizzaPratoPlugin() {
           res.end(JSON.stringify(result));
         } catch (e) {
           console.error("[raccomandazione-semina]", e);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: e.message || String(e) }));
+        }
+      });
+
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api/enrich-prodotti-calendario")) return next();
+
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Content-Type", "application/json");
+        if (req.method === "OPTIONS") {
+          res.statusCode = 204;
+          res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+          res.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+          res.end();
+          return;
+        }
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        const auth = req.headers.authorization || "";
+        if (!auth) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: "Non autenticato" }));
+          return;
+        }
+
+        try {
+          const result = await enrichProdottiCalendarioHandler(auth, env);
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              ok: true,
+              messaggio:
+                result.updated > 0
+                  ? `Collegati prodotti commerciali a ${result.updated} lavori in calendario.`
+                  : "Nessun nuovo collegamento prodotto.",
+              ...result,
+            }),
+          );
+        } catch (e) {
+          console.error("[enrich-prodotti]", e);
           res.statusCode = 500;
           res.end(JSON.stringify({ error: e.message || String(e) }));
         }

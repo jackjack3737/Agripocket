@@ -16,7 +16,7 @@ import {
   sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
-import { CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
+import { arricchisciProdottiCalendario, CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
 import { supabase } from "../lib/supabase";
 
 export default function CalendarioLavori({ profile, session }) {
@@ -60,7 +60,43 @@ export default function CalendarioLavori({ profile, session }) {
     setError("");
     try {
       await syncControlliMensili(userId).catch(() => 0);
-      const list = await loadInterventi(userId);
+      let list = await loadInterventi(userId);
+
+      const trattamentoCats = new Set([
+        "concime",
+        "biostimolante",
+        "umettante",
+        "trattamento",
+        "diserbo",
+        "rinnovo",
+      ]);
+      const senzaProdotti = list.some((i) => {
+        if (i.stato !== "pianificato" || !trattamentoCats.has(String(i.categoria || "").toLowerCase())) {
+          return false;
+        }
+        let det = i.dettaglio_trattamento;
+        if (typeof det === "string") {
+          try {
+            det = JSON.parse(det);
+          } catch {
+            det = null;
+          }
+        }
+        return !(det?.prodotti_consigliati?.length > 0);
+      });
+
+      if (senzaProdotti && haCalendarioStagionale(list)) {
+        try {
+          const enrich = await arricchisciProdottiCalendario();
+          if (enrich.updated > 0) {
+            list = await loadInterventi(userId);
+            setBanner(enrich.messaggio || `Prodotti collegati a ${enrich.updated} lavori.`);
+          }
+        } catch (enrichErr) {
+          console.warn("[calendario] enrich prodotti:", enrichErr.message);
+        }
+      }
+
       setInterventi(list);
       const stored = loadTimelineBisogni(userId);
       if (!stored && list.length) {

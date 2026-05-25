@@ -29,6 +29,28 @@ export default function TaskCard({ task, onComplete, completingId }) {
           </h3>
           <p className="mt-1 text-sm text-gray-500 leading-relaxed">{task.descrizione_semplice}</p>
 
+          {task.prodotti?.length ? (
+            <ul className="mt-3 space-y-2" aria-label="Prodotti consigliati">
+              {task.prodotti.slice(0, 3).map((p, idx) => (
+                <li
+                  key={p.id ?? `${p.nome_commerciale}-${idx}`}
+                  className="flex items-start gap-2 rounded-xl bg-solum-green-light/40 px-3 py-2 text-sm"
+                >
+                  <span className="shrink-0" aria-hidden>
+                    🧴
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 leading-snug">{p.nome_commerciale}</p>
+                    {p.marca ? <p className="text-xs text-gray-500">{p.marca}</p> : null}
+                    {p.dose_totale_calcolata ? (
+                      <p className="text-xs text-solum-green mt-0.5">{p.dose_totale_calcolata}</p>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
           {haScienza ? (
             <button
               type="button"

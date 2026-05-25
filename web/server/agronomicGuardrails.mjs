@@ -332,11 +332,30 @@ export function strutturaEducazioneSenzaProdotti(intervento, profilo, opts = {})
 /**
  * Struttura output Educazione → Soluzione (dopo guardrail: educazione + 1–2 prodotti).
  */
+function dettaglioHaProdotti(det) {
+  const d =
+    typeof det === "string"
+      ? (() => {
+          try {
+            return JSON.parse(det);
+          } catch {
+            return null;
+          }
+        })()
+      : det;
+  return (d?.prodotti_consigliati?.length ?? 0) > 0;
+}
+
 export async function strutturaOutputCalendario(intervento, _prodotto, profilo, opts = {}) {
-  if (intervento?.dettaglio_trattamento?.tipo_intervento) {
+  const detRaw = intervento?.dettaglio_trattamento;
+  const detObj = typeof detRaw === "object" ? detRaw : null;
+  if (
+    (detObj?.tipo_intervento || detObj?.titolo_semplice_azione) &&
+    dettaglioHaProdotti(detRaw)
+  ) {
     return {
       ...intervento,
-      macro_categoria: intervento.macro_categoria || intervento.dettaglio_trattamento.macro_categoria,
+      macro_categoria: intervento.macro_categoria || detObj.macro_categoria,
     };
   }
   const { prodotti = [], vision, weatherBundle, pureAgronomy, indiceProdottiIntervento, mercatoRows = null } =

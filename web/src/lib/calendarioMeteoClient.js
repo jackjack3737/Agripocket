@@ -22,3 +22,22 @@ export async function adattaCalendarioMeteo() {
   window.dispatchEvent(new CustomEvent(CALENDARIO_REFRESH_EVENT, { detail: data }));
   return data;
 }
+
+/** Collega prodotti_mercato agli interventi già in calendario (senza rigenerare il piano). */
+export async function arricchisciProdottiCalendario() {
+  const { data: session } = await supabase.auth.getSession();
+  const token = session?.session?.access_token;
+  if (!token) throw new Error("Accedi per aggiornare i prodotti.");
+
+  const res = await fetch("/api/enrich-prodotti-calendario", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: "{}",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Collegamento prodotti non riuscito");
+  return data;
+}
