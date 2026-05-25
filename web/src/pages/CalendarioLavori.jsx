@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import DashPageHeader from "../components/DashPageHeader";
-import {
-  CalendarioFiltri,
-  InterventoSection,
-  MeseAccordion,
-  TimelineBisogni,
-} from "../components/calendario/CalendarioInterventi";
+import CalendarioSolum from "../components/calendario/CalendarioSolum";
 import {
   loadTimelineBisogni,
   saveTimelineBisogni,
@@ -14,18 +9,11 @@ import {
 } from "../lib/timelineBisogni";
 import { abitudiniDaProfilo } from "../lib/abitudiniPrato.js";
 import {
-  contaLavoriPianificatiFiltrati,
   filtraInterventiPerCalendario,
-  groupInterventi,
-  interventiInRitardo,
-  formatMeseIt,
-  groupInterventiPerMese,
   haCalendarioStagionale,
-  prossimiInterventi,
   loadInterventi,
   syncControlliMensili,
   setInterventoCompletato,
-  setInterventoManualOverride,
   sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
@@ -72,59 +60,26 @@ export default function CalendarioLavori({ profile, session }) {
       const parts = [];
       if (p.inseritiCalendario) parts.push(`${p.inseritiCalendario} lavori aggiunti al calendario`);
       if (p.aggiornatiCalendario) parts.push(`${p.aggiornatiCalendario} aggiornati`);
-      return `Analisi foto: ${parts.join(", ")}. Calendario aggiornato (fitofarmaci senza dose automatica).`;
+      return `Analisi foto: ${parts.join(", ")}. Calendario aggiornato.`;
     }
     const n = location.state.interventiCount;
     return n
-      ? `Analisi foto: ${n} interventi in agenda. I fitofarmaci mostrano solo riferimenti di catalogo.`
+      ? `Analisi foto: ${n} interventi in agenda.`
       : "Piano aggiornato dall'ultima analisi foto.";
   });
   const [generatingPiano, setGeneratingPiano] = useState(false);
-  const [timelineBisogni, setTimelineBisogni] = useState(null);
 
   const hasPiano = haCalendarioStagionale(interventi);
-  const superficieMq = profile?.superficie_mq ?? null;
   const autoPianoStarted = useRef(false);
   const meseCorrente = new Date().toISOString().slice(0, 7);
-  const [mesiAperti, setMesiAperti] = useState(() => new Set([meseCorrente]));
-  const [calTipo, setCalTipo] = useState("tutti");
-  const [calAmbito, setCalAmbito] = useState("anno");
-
-  const filtroOpts = useMemo(
-    () => ({ tipo: calTipo, ambito: calAmbito, meseCorrente }),
-    [calTipo, calAmbito, meseCorrente],
-  );
 
   const interventiCalendario = useMemo(
-    () => filtraInterventiPerCalendario(interventi, filtroOpts),
-    [interventi, filtroOpts],
+    () => filtraInterventiPerCalendario(interventi, { tipo: "tutti", ambito: "anno", meseCorrente }),
+    [interventi, meseCorrente],
   );
-
-  const groups = useMemo(() => groupInterventi(interventiCalendario), [interventiCalendario]);
-  const mesi = useMemo(() => groupInterventiPerMese(interventiCalendario), [interventiCalendario]);
-  const prossimi = useMemo(() => prossimiInterventi(interventiCalendario), [interventiCalendario]);
-  const inRitardo = useMemo(() => interventiInRitardo(interventiCalendario), [interventiCalendario]);
-
-  const conteggiFiltri = useMemo(() => {
-    const base = { tipo: calTipo, meseCorrente };
-    return {
-      tutti: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "tutti", ambito: "anno" }),
-      trattamenti: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "trattamenti", ambito: "anno" }),
-      giardino: contaLavoriPianificatiFiltrati(interventi, { ...base, tipo: "giardino", ambito: "anno" }),
-    };
-  }, [interventi, calTipo, meseCorrente]);
 
   const soloControlliFoto =
     !hasPiano && interventi.some((i) => i.fonte === "controllo_mensile" && i.stato === "pianificato");
-
-  function toggleMese(monthKey) {
-    setMesiAperti((prev) => {
-      const next = new Set(prev);
-      if (next.has(monthKey)) next.delete(monthKey);
-      else next.add(monthKey);
-      return next;
-    });
-  }
 
   async function refresh() {
     if (!userId) return;
@@ -135,9 +90,9 @@ export default function CalendarioLavori({ profile, session }) {
       const list = await loadInterventi(userId);
       setInterventi(list);
       const stored = loadTimelineBisogni(userId);
-      setTimelineBisogni(
-        stored || (list.length ? timelineDaInterventi(list, new Date().toISOString().slice(0, 10)) : null),
-      );
+      if (!stored && list.length) {
+        saveTimelineBisogni(userId, timelineDaInterventi(list, new Date().toISOString().slice(0, 10)));
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -168,16 +123,15 @@ export default function CalendarioLavori({ profile, session }) {
     setError("");
     try {
       const result = await generaPianoAnnuale();
-      if (result.timeline_bisogni) {
+      if (result.timeline_bisogni && userId) {
         saveTimelineBisogni(userId, result.timeline_bisogni);
-        setTimelineBisogni(result.timeline_bisogni);
       }
-      setBanner(`Calendario annuale creato: ${result.count} lavori in agenda (diagnostica Solum, senza catalogo brand).`);
+      setBanner(`Piano creato: ${result.count} lavori in agenda.`);
       await refresh();
     } catch (e) {
       const msg =
         e.name === "AbortError"
-          ? "Generazione troppo lunga. Riprova con «Genera piano annuale»."
+          ? "Generazione troppo lunga. Riprova con «Aggiorna piano»."
           : e.message;
       setError(msg);
       autoPianoStarted.current = false;
@@ -204,21 +158,7 @@ export default function CalendarioLavori({ profile, session }) {
       );
     } catch (e) {
       setError(e.message);
-    }
-  }
-
-  async function togglePinIntervento(id, manualOverride) {
-    try {
-      const updated = await setInterventoManualOverride(id, manualOverride);
-      if (!updated) {
-        setError("Aggiorna il database (sql/patch_sicurezza_beta.sql) per usare «Mantieni al rigenera».");
-        return;
-      }
-      setInterventi((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, manual_override: !!manualOverride } : i)),
-      );
-    } catch (e) {
-      setError(e.message);
+      throw e;
     }
   }
 
@@ -226,6 +166,31 @@ export default function CalendarioLavori({ profile, session }) {
     await supabase.auth.signOut();
     window.location.href = "/";
   }
+
+  const actionsSlot = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        className="inline-flex justify-center rounded-2xl bg-solum-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-solum-green/90 disabled:opacity-50 transition-all"
+        disabled={generatingPiano || !profile?.localita}
+        onClick={handleGeneraPiano}
+      >
+        {generatingPiano
+          ? "Generazione… (1-2 min)"
+          : hasPiano
+            ? "Aggiorna piano annuale"
+            : "Crea piano annuale"}
+      </button>
+      {!profile?.localita ? (
+        <p className="text-xs text-gray-500">
+          <Link to="/onboarding" className="text-solum-green underline">
+            Imposta la località
+          </Link>{" "}
+          nel profilo.
+        </p>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="page dashboard dashboard--calendario">
@@ -244,153 +209,20 @@ export default function CalendarioLavori({ profile, session }) {
 
       <AbitudiniPratoCard profile={profile} />
 
-      <section className="dash-calendar">
-        <div className="dash-calendar__head">
-          <p className="dash-calendar__lead">
-            Piano predittivo giorno per giorno: necessità molecolari e fisiologiche (NPK, biostimolanti, principi attivi).
-            Nessun catalogo commerciale. Usa «Mantieni al rigenera» per i lavori da conservare alla rigenerazione.
-          </p>
-          <div className="dash-calendar__actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={generatingPiano || !profile?.localita}
-              onClick={handleGeneraPiano}
-            >
-              {generatingPiano
-                ? "Generazione calendario… (1-2 min)"
-                : hasPiano
-                  ? "Rigenera piano annuale"
-                  : "Genera piano annuale completo"}
-            </button>
-            {!profile?.localita ? (
-              <p className="dash-calendar__warn">
-                <Link to="/onboarding">Imposta la località</Link> nel profilo.
-              </p>
-            ) : null}
-          </div>
-        </div>
+      {soloControlliFoto ? (
+        <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
+          Solo i <strong>controlli foto mensili</strong> sono visibili. Usa «Crea piano annuale» per il programma
+          completo.
+        </p>
+      ) : null}
 
-        {soloControlliFoto ? (
-          <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
-            Vedi solo i <strong>controlli foto mensili</strong> perché il piano annuale lavori non è ancora stato
-            generato. Clicca «Genera piano annuale completo» per concimi, diserbi e lavori strategici stagionali.
-          </p>
-        ) : null}
-
-        {hasPiano && timelineBisogni ? <TimelineBisogni timeline={timelineBisogni} /> : null}
-
-        <CalendarioFiltri
-          tipo={calTipo}
-          ambito={calAmbito}
-          meseLabel={formatMeseIt(meseCorrente)}
-          conteggi={conteggiFiltri}
-          onTipo={setCalTipo}
-          onAmbito={setCalAmbito}
+      <section className="dash-calendar dash-calendar--solum">
+        <CalendarioSolum
+          interventi={interventiCalendario}
+          onComplete={toggleIntervento}
+          loading={loading || generatingPiano}
+          actionsSlot={actionsSlot}
         />
-
-        {loading || generatingPiano ? (
-          <p className="dash-card__loading">
-            {generatingPiano ? "Creazione piano annuale in corso… 1-2 minuti" : "Caricamento piano…"}
-          </p>
-        ) : (
-          <>
-            {inRitardo.length ? (
-              <InterventoSection
-                title="Interventi in sospeso / in ritardo"
-                hint="Date passate: completa o aggiorna il piano. Il Radar tiene conto di questi lavori."
-                items={inRitardo}
-                superficieMq={superficieMq}
-                onToggle={toggleIntervento}
-                onPin={togglePinIntervento}
-              />
-            ) : null}
-
-            {groups.daFoto.length && calTipo === "tutti" ? (
-              <InterventoSection
-                title="Urgenti dall'analisi foto"
-                hint="Dall'ultima foto."
-                items={groups.daFoto}
-                superficieMq={superficieMq}
-                onToggle={toggleIntervento}
-              />
-            ) : null}
-
-            {mesi.length ? (
-              <div className="dash-month-timeline">
-                <h3 className="dash-calendar-section__title">Piano mese per mese</h3>
-                <p className="dash-calendar-section__hint">
-                  {prossimi.length} lavori · apri un mese per vedere i giorni e le attività.
-                </p>
-                {mesi.map((mese) => (
-                  <MeseAccordion
-                    key={mese.monthKey}
-                    mese={mese}
-                    open={mesiAperti.has(mese.monthKey)}
-                    superficieMq={superficieMq}
-                    onToggle={() => toggleMese(mese.monthKey)}
-                    onToggleIntervento={toggleIntervento}
-                    onPinIntervento={togglePinIntervento}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {!mesi.length && !prossimi.length && !groups.daFoto.length && !groups.senzaData.length && hasPiano ? (
-              <p className="dash-calendar-section__empty">
-                Nessun lavoro con questo filtro
-                {calAmbito === "mese" ? ` per ${formatMeseIt(meseCorrente)}` : ""}. Prova «Tutto l&apos;anno» o un altro
-                tipo.
-              </p>
-            ) : null}
-
-            {!mesi.length && prossimi.length ? (
-              <InterventoSection
-                title="Prossimi lavori"
-                hint="Piano in agenda."
-                items={prossimi}
-                superficieMq={superficieMq}
-                onToggle={toggleIntervento}
-                onPin={togglePinIntervento}
-              />
-            ) : null}
-
-            {!mesi.length && !prossimi.length && groups.senzaData.length ? (
-              <InterventoSection
-                title="Prossimi interventi"
-                items={groups.senzaData}
-                superficieMq={superficieMq}
-                onToggle={toggleIntervento}
-                onPin={togglePinIntervento}
-              />
-            ) : null}
-
-            <InterventoSection
-              title="Completati"
-              items={groups.completati}
-              superficieMq={superficieMq}
-              onToggle={toggleIntervento}
-              onPin={togglePinIntervento}
-            />
-
-            {!groups.pianificati.length && !groups.completati.length ? (
-              <div className="dash-calendar__empty-block">
-                <p>Nessun lavoro in calendario.</p>
-                <button
-                  type="button"
-                  className="btn btn-primary dash-calendar__cta"
-                  disabled={generatingPiano || !profile?.localita}
-                  onClick={handleGeneraPiano}
-                >
-                  Genera piano annuale
-                </button>
-                <Link className="btn btn-outline btn-sm" to="/dashboard#carica-foto-prato">
-                  Oppure carica foto del prato
-                </Link>
-              </div>
-            ) : null}
-          </>
-        )}
       </section>
     </div>
   );

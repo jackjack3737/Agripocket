@@ -1,0 +1,32 @@
+@config "../../tailwind.config.js";
+@import "tailwindcss";
+
+@source "../components/calendario/solum";
+@source "../components/calendario/CalendarioSolum.jsx";
+
+@theme {
+  --color-solum-green: #2d6a4f;
+  --color-solum-green-light: #d8f3dc;
+  --color-solum-green-muted: #52b788;
+}
+
+/* Accordion morbido (grid 0fr → 1fr) */
+.solum-accordion-grid {
+  display: grid;
+  transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.solum-accordion-grid[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.solum-accordion-grid[data-open="false"] {
+  grid-template-rows: 0fr;
+}
+.solum-accordion-grid > .solum-accordion-inner {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solum-accordion-grid {
+    transition: none;
+  }
+}
