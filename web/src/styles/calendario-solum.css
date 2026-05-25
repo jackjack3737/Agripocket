@@ -3,7 +3,6 @@
 
 @source "../components/calendario/solum";
 @source "../components/calendario/CalendarioSolum.jsx";
-@source "../lib/calcolaDosePrescrizione.js";
 
 @theme {
   --color-solum-green: #2d6a4f;

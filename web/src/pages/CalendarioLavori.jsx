@@ -18,7 +18,6 @@ import {
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { arricchisciProdottiCalendario, CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
-import { getOggiIso, risolviOggi } from "../lib/oggiSimulato.js";
 import { supabase } from "../lib/supabase";
 
 export default function CalendarioLavori({ profile, session }) {
@@ -46,11 +45,7 @@ export default function CalendarioLavori({ profile, session }) {
 
   const hasPiano = haCalendarioStagionale(interventi);
   const autoPianoStarted = useRef(false);
-  const { iso: oggiIso, simulato: oggiSimulato } = useMemo(
-    () => risolviOggi(location.search),
-    [location.search],
-  );
-  const meseCorrente = oggiIso.slice(0, 7);
+  const meseCorrente = new Date().toISOString().slice(0, 7);
 
   const interventiCalendario = interventi;
 
@@ -103,7 +98,7 @@ export default function CalendarioLavori({ profile, session }) {
       setInterventi(list);
       const stored = loadTimelineBisogni(userId);
       if (!stored && list.length) {
-        saveTimelineBisogni(userId, timelineDaInterventi(list, getOggiIso(location.search)));
+        saveTimelineBisogni(userId, timelineDaInterventi(list, new Date().toISOString().slice(0, 10)));
       }
     } catch (e) {
       setError(e.message);
@@ -231,8 +226,6 @@ export default function CalendarioLavori({ profile, session }) {
           generatingPiano={generatingPiano}
           canAggiornaPiano={!!profile?.localita}
           userMq={profile?.superficie_mq ?? 150}
-          oggiIso={oggiIso}
-          oggiSimulato={oggiSimulato}
           meseCorrente={meseCorrente}
         />
       </section>

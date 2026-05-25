@@ -9,7 +9,6 @@ import {
   groupInterventiPerMese,
 } from "../../lib/dashboard.js";
 import { interventoToSolum } from "../../lib/mapInterventoSolum.js";
-import { formatOggiIt } from "../../lib/oggiSimulato.js";
 import { CalendarioFiltri } from "./CalendarioInterventi.jsx";
 import TrattamentoDetailSheet from "./TrattamentoDetailSheet.jsx";
 import "../../styles-dashboard.css";
@@ -98,11 +97,9 @@ export default function CalendarioMensile({
   generatingPiano = false,
   canAggiornaPiano = true,
   userMq = 150,
-  oggiIso = null,
-  oggiSimulato = false,
   meseCorrente,
 }) {
-  const oggi = oggiIso || new Date().toISOString().slice(0, 10);
+  const oggi = new Date().toISOString().slice(0, 10);
   const [tipo, setTipo] = useState("tutti");
   const [ambito, setAmbito] = useState("anno");
   const [selected, setSelected] = useState(null);
@@ -178,12 +175,6 @@ export default function CalendarioMensile({
           ) : null}
         </div>
       </div>
-
-      {oggiSimulato ? (
-        <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
-          Vista simulata — oggi è il {formatOggiIt(oggi)}
-        </p>
-      ) : null}
 
       <CalendarioFiltri
         tipo={tipo}
