@@ -3,6 +3,7 @@ import { treatmentFromIntervento } from "./TreatmentCard.jsx";
 import { interventoToSolum } from "../../lib/mapInterventoSolum.js";
 import { formatDataIt, CATEGORIA_LABEL } from "../../lib/dashboard.js";
 import { fetchScienzaTrattamento } from "../../lib/scienzaTrattamentoClient.js";
+import { messaggioOperativoPerUi } from "../../lib/messaggioOperativo.js";
 import PrescrizioneProdottoCard from "./solum/PrescrizioneProdottoCard.jsx";
 
 function renderInlineBold(text) {
@@ -62,8 +63,18 @@ export default function TrattamentoDetailPanel({
     );
   }
 
-  const task = interventoToSolum(item);
   const treatment = treatmentFromIntervento(item);
+  let det = item?.dettaglio_trattamento;
+  if (typeof det === "string") {
+    try {
+      det = JSON.parse(det);
+    } catch {
+      det = null;
+    }
+  }
+  const task = interventoToSolum(item);
+  const cosaFare =
+    messaggioOperativoPerUi(item, det, treatment) || task.descrizione_semplice;
   const prodotti = treatment?.prodotti_consigliati ?? task.prodotti ?? [];
   const checklist = treatment?.prescrizione_kb?.checklist_operativa ?? [];
   const done = item.stato === "completato";
@@ -124,7 +135,7 @@ export default function TrattamentoDetailPanel({
       <div className="cal-dettaglio__scroll">
         <section className="cal-dettaglio__sezione">
           <h3 className="cal-dettaglio__label">Cosa fare</h3>
-          <p className="cal-dettaglio__testo">{task.descrizione_semplice}</p>
+          <p className="cal-dettaglio__testo cal-dettaglio__cosa-fare">{cosaFare}</p>
           <button
             type="button"
             className="cal-dettaglio__btn-scienza"

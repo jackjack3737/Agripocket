@@ -1,5 +1,9 @@
 /** Applica campi voce Solum (Gemini) nel JSON `dettaglio_trattamento` persistito. */
 
+const MAX_MESSAGGIO_OPERATIVO = 360;
+const MAX_TITOLO_SEMPLICE = 80;
+const MAX_TITOLO_TECNICO = 220;
+
 function clip(s, max) {
   const t = String(s || "").trim();
   if (!t) return "";
@@ -26,12 +30,12 @@ export function applicaSolumVoceADettaglio(interventi) {
     }
 
     const titoloSemplice =
-      clip(v?.titolo_semplice_azione || i.titolo_semplice_azione, 80) || i.titolo;
+      clip(v?.titolo_semplice_azione || i.titolo_semplice_azione, MAX_TITOLO_SEMPLICE) || i.titolo;
     const messaggioOperativo = clip(
       v?.messaggio_operativo_breve || i.messaggio_operativo_breve || i.messaggio_ux,
-      120,
+      MAX_MESSAGGIO_OPERATIVO,
     );
-    const titoloTecnico = clip(v?.titolo_tecnico || i.titolo_tecnico_solum, 200);
+    const titoloTecnico = clip(v?.titolo_tecnico || i.titolo_tecnico_solum, MAX_TITOLO_TECNICO);
     const fabbisognoAccademico = String(
       v?.fabbisogno_fisiologico || i.fabbisogno_fisiologico || "",
     ).trim();

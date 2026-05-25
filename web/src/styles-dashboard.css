@@ -3075,6 +3075,11 @@
   color: var(--text);
 }
 
+.cal-dettaglio__cosa-fare {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .cal-dettaglio__muted {
   color: var(--muted);
 }

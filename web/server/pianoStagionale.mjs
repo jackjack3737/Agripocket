@@ -216,7 +216,7 @@ Rispondi SOLO JSON:
       "id_riferimento": "ID originale passato in input (stringa)",
       "data_prevista": "YYYY-MM-DD identica input",
       "titolo_semplice_azione": "Breve e orientato all'azione (es. 'Rinforzo Estivo' o 'Taglio e Pulizia'). MAX 4 parole.",
-      "messaggio_operativo_breve": "Istruzione pratica per l'utente (es. 'Spargi il prodotto su prato asciutto prima di sera'). NIENTE gergo. MAX 120 caratteri.",
+      "messaggio_operativo_breve": "Istruzione pratica chiara (2-4 frasi complete con punto finale). Spiega cosa fare sul prato, senza gergo tecnico. Circa 200-320 caratteri, NON troncare a metà frase.",
       "titolo_tecnico": "L'esigenza molecolare o fenologica (es. 'Mitigazione stress da ROS').",
       "fabbisogno_fisiologico": "La spiegazione accademica dettagliata del PERCHÉ facciamo questo intervento. Tono scientifico e autorevole.",
       "prodotti_consigliati": ["Nome generico 1", "Nome generico 2"]

@@ -1,5 +1,6 @@
 import { treatmentFromIntervento } from "../components/calendario/TreatmentCard.jsx";
 import { formatDataIt } from "./dashboard.js";
+import { MAX_MESSAGGIO_OPERATIVO_UI, messaggioOperativoPerUi } from "./messaggioOperativo.js";
 
 const ICONA_CATEGORIA = {
   irrigazione: "💧",
@@ -87,12 +88,7 @@ export function interventoToSolum(item) {
     item?.titolo ||
     "Lavoro in programma";
 
-  const descrizioneSemplice =
-    det?.messaggio_operativo_breve ||
-    treatment?.messaggio_operativo_breve ||
-    item?.messaggio_operativo_breve ||
-    item?.messaggio_ux ||
-    "Un passo semplice per tenere il prato in forma.";
+  const descrizioneSemplice = messaggioOperativoPerUi(item, det, treatment);
 
   const cat = (item?.categoria || "altro").toLowerCase();
   const icona = ICONA_CATEGORIA[cat] || ICONA_CATEGORIA.altro;
@@ -103,7 +99,7 @@ export function interventoToSolum(item) {
     id: item.id,
     titolo_semplice: titoloSemplice,
     titolo_tecnico: titoloTecnicoFallback(item, treatment, det),
-    descrizione_semplice: descrizioneSemplice.slice(0, 120),
+    descrizione_semplice: descrizioneSemplice.slice(0, MAX_MESSAGGIO_OPERATIVO_UI),
     fabbisogno_fisiologico: fabbisogno || descrizioneSemplice,
     data_prevista: item.data_prevista,
     stato: completato ? "completato" : "da fare",
