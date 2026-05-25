@@ -9,6 +9,7 @@ import {
   rankProdotti,
   isPreEmergenzaAnnualiIntervento,
 } from "./prodottiCatalogo.mjs";
+import { prodottiDaIndiceCalendario } from "./prodottiMercato.mjs";
 import {
   isInterventoFitofarmaco,
   isProdottoFitofarmaco,
@@ -318,17 +319,62 @@ export function generaSpiegazioneSemplice(azione, ctx, weatherBundle = null) {
   return `${prefisso}${corpo}`.slice(0, 950);
 }
 
-const MAX_PRODOTTI_CONSIGLIATI = 2;
+const MAX_PRODOTTI_CONSIGLIATI = 3;
+
+function catalogoRigaAConsigliato(p, profilo, intervento) {
+  const mq = superficieMqVerificata(profilo);
+  const fito = isProdottoFitofarmaco(p);
+  const dose = !fito && mq ? calcolaDose(p, mq) : null;
+  const perMq = p.dosaggio_standard_mq ?? p.dose_fogliare ?? p.dose_radicale;
+  const edu = spiegazioneProdottoPerUtente({
+    nome: p.nome,
+    composizione: p.composizione,
+    principio_attivo: p.principio_attivo,
+    macro_categoria: inferMacroCategoriaProdotto(p, intervento),
+  });
+  const istruzioniEtichetta = istruzioniUsoProdotto(p, intervento, stagioneDaData(intervento?.data_prevista));
+  const target =
+    Array.isArray(p.target_fisiologico) && p.target_fisiologico.length
+      ? p.target_fisiologico.join("; ")
+      : null;
+  return {
+    id: p.id,
+    nome_commerciale: p.nome,
+    marca: p.marca || "",
+    principio_attivo: p.principio_attivo || p.composizione?.slice(0, 120) || null,
+    macro_categoria: inferMacroCategoriaProdotto(p, intervento),
+    a_cosa_serve: edu?.a_cosa_serve ?? target ?? p.descrizione?.slice(0, 160) ?? null,
+    dose_totale_calcolata: dose
+      ? `${dose.dose_display} da distribuire su ${mq} m²`
+      : mq
+        ? null
+        : "Imposta i m² del prato nel profilo per calcolare la dose",
+    dose_per_mq: dose?.dose_per_mq_display || (perMq ? `${perMq} ${p.unita_misura || "g"}/m²` : null),
+    istruzioni_uso: edu?.come_si_usa
+      ? `${edu.come_si_usa} ${istruzioniEtichetta}`.trim()
+      : istruzioniEtichetta,
+    periodo_ideale: p.periodo_ideale || p.periodo_uso || null,
+    avviso_fitofarmaco: fito,
+    fonte_vetrina: p._from_mercato ? "prodotti_mercato" : "catalogo",
+    match_score: p._match_score ?? null,
+  };
+}
 
 /**
- * Fase 3: 1–2 prodotti idonei con dose calcolata sui m² (solo dopo educazione e guardrail).
+ * Fase 3: fino a 3 prodotti idonei con dose calcolata sui m².
  */
-export function suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision) {
-  const mq = superficieMqVerificata(profilo);
-  const categoria = azione.categoria || intervento?.categoria;
-  const opts = { categoriaIntervento: categoria, vision, intervento, profilo };
+export function suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision, opts = {}) {
+  const { preselezionati = [] } = opts;
+  if (preselezionati.length) {
+    return preselezionati
+      .slice(0, MAX_PRODOTTI_CONSIGLIATI)
+      .map((p) => catalogoRigaAConsigliato(p, profilo, intervento));
+  }
 
-  let ranked = rankProdotti(prodotti, opts);
+  const categoria = azione.categoria || intervento?.categoria;
+  const rankOpts = { categoriaIntervento: categoria, vision, intervento, profilo };
+
+  let ranked = rankProdotti(prodotti, rankOpts);
 
   ranked = ranked.filter(({ p }) => {
     const macroP = inferMacroCategoriaProdotto(p, intervento);
@@ -336,40 +382,9 @@ export function suggerisciProdottiConsigliati(azione, prodotti, profilo, interve
     return macroP === azione.macro;
   });
 
-  const top = ranked.slice(0, MAX_PRODOTTI_CONSIGLIATI).map(({ p }) => {
-    const fito = isProdottoFitofarmaco(p);
-    const dose = !fito && mq ? calcolaDose(p, mq) : null;
-    const perMq =
-      p.dosaggio_standard_mq ?? p.dose_fogliare ?? p.dose_radicale;
-    const edu = spiegazioneProdottoPerUtente({
-      nome: p.nome,
-      composizione: p.composizione,
-      principio_attivo: p.principio_attivo,
-      macro_categoria: inferMacroCategoriaProdotto(p, intervento),
-    });
-    const istruzioniEtichetta = istruzioniUsoProdotto(p, intervento, stagioneDaData(intervento?.data_prevista));
-    return {
-      id: p.id,
-      nome_commerciale: p.nome,
-      marca: p.marca || "",
-      principio_attivo: p.principio_attivo || p.composizione?.slice(0, 120) || null,
-      macro_categoria: inferMacroCategoriaProdotto(p, intervento),
-      a_cosa_serve: edu?.a_cosa_serve ?? null,
-      dose_totale_calcolata: dose
-        ? `${dose.dose_display} da distribuire su ${mq} m²`
-        : mq
-          ? null
-          : "Imposta i m² del prato nel profilo per calcolare la dose",
-      dose_per_mq: dose?.dose_per_mq_display || (perMq ? `${perMq} ${p.unita_misura || "g"}/m²` : null),
-      istruzioni_uso: edu?.come_si_usa
-        ? `${edu.come_si_usa} ${istruzioniEtichetta}`.trim()
-        : istruzioniEtichetta,
-      periodo_ideale: p.periodo_ideale || p.periodo_uso || null,
-      avviso_fitofarmaco: fito,
-    };
-  });
-
-  return top;
+  return ranked
+    .slice(0, MAX_PRODOTTI_CONSIGLIATI)
+    .map(({ p }) => catalogoRigaAConsigliato(p, profilo, intervento));
 }
 
 /**
@@ -378,7 +393,7 @@ export function suggerisciProdottiConsigliati(azione, prodotti, profilo, interve
  */
 export function buildDettaglioTrattamento(
   intervento,
-  { profilo, prodotti, vision, weatherBundle, includeProdotti = true } = {},
+  { profilo, prodotti, vision, weatherBundle, includeProdotti = true, indiceProdottiIntervento } = {},
 ) {
   const dataIso = intervento?.data_prevista;
   const meteo = contestoMeteo(weatherBundle, dataIso);
@@ -388,15 +403,29 @@ export function buildDettaglioTrattamento(
   const spiegazione_semplice = generaSpiegazioneSemplice(azione, ctx, weatherBundle);
   const meteoUsato = meteoDisponibilePerCalcolo(weatherBundle);
   const nota_meteo_utente = meteoUsato ? buildNotaMeteoTrattamento(meteo, weatherBundle, profilo) : null;
+
+  const preselezionati =
+    includeProdotti && indiceProdottiIntervento?.size
+      ? prodottiDaIndiceCalendario(intervento, indiceProdottiIntervento, {
+          max: MAX_PRODOTTI_CONSIGLIATI,
+        })
+      : [];
+
   const prodotti_consigliati = includeProdotti
-    ? suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision)
+    ? suggerisciProdottiConsigliati(azione, prodotti, profilo, intervento, vision, { preselezionati })
     : [];
+
+  const daVetrina = prodotti_consigliati.some((p) => p.fonte_vetrina === "prodotti_mercato");
+  const notaVetrina = daVetrina
+    ? "Scelti dalla vetrina commerciale AgriPocket (collegati al bisogno fisiologico del prato e al calendario Solum)."
+    : null;
 
   return {
     tipo_intervento: azione.tipo_intervento,
     macro_categoria: azione.macro,
     spiegazione_semplice,
     nota_scelta_prodotti:
+      notaVetrina ||
       notaConfrontoBiostimolanti(prodotti_consigliati) ||
       (prodotti_consigliati.length > 1
         ? NOTA_SCELTA_PRODOTTI
@@ -425,6 +454,7 @@ export async function arricchisciInterventoTrattamento(
   weatherBundle,
   opts = {},
 ) {
+  const { indiceProdottiIntervento } = opts;
   const cat = String(intervento?.categoria || "").toLowerCase();
   if (!TRATTAMENTO_CATEGORIE.has(cat)) {
     return {
@@ -445,6 +475,7 @@ export async function arricchisciInterventoTrattamento(
       vision,
       weatherBundle,
       includeProdotti: opts.includeProdotti !== false,
+      indiceProdottiIntervento,
     });
   }
 

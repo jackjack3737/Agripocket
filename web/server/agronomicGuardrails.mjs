@@ -339,7 +339,7 @@ export async function strutturaOutputCalendario(intervento, _prodotto, profilo, 
       macro_categoria: intervento.macro_categoria || intervento.dettaglio_trattamento.macro_categoria,
     };
   }
-  const { prodotti = [], vision, weatherBundle, pureAgronomy } = opts;
+  const { prodotti = [], vision, weatherBundle, pureAgronomy, indiceProdottiIntervento } = opts;
   if (pureAgronomy) {
     const det = dettaglioPureAgronomy(intervento, { profilo, weatherBundle });
     return {
@@ -357,7 +357,9 @@ export async function strutturaOutputCalendario(intervento, _prodotto, profilo, 
     };
   }
   if (prodotti.length) {
-    return arricchisciInterventoTrattamento(intervento, profilo, prodotti, vision, weatherBundle);
+    return arricchisciInterventoTrattamento(intervento, profilo, prodotti, vision, weatherBundle, {
+      indiceProdottiIntervento,
+    });
   }
   const macro = macroDaIntervento(intervento, new Map());
   const tpl = TEMPLATE_UX[macro] || TEMPLATE_UX.default;
@@ -385,6 +387,7 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
     weatherBundle,
     oggi = new Date().toISOString().slice(0, 10),
     pureAgronomy = false,
+    indiceProdottiIntervento = null,
   } = opts;
   const prodottiById = new Map(prodotti.map((p) => [p.id, p]));
 
@@ -422,7 +425,7 @@ export async function applicaGuardrailsCalendario(interventi, opts = {}) {
       { ...i, macro_categoria: val.macro || i.macro_categoria },
       null,
       profilo,
-      { prodotti, vision, weatherBundle, pureAgronomy },
+      { prodotti, vision, weatherBundle, pureAgronomy, indiceProdottiIntervento },
     );
     ctx.pianoAccettati.push(strutturato);
     accettati.push(strutturato);

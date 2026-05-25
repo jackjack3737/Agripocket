@@ -1,0 +1,206 @@
+# Cataloghi prodotti prato / giardino — Italia (ingest → prodotti_mercato)
+
+sites:
+  - id: best_prato
+    label: Best Prato
+    default_brand: Best Prato
+    url_list: urls_bestprato.txt
+    also_lists:
+      - urls_bestprato_fito.txt
+
+  - id: bottos
+    label: Bottos 1848
+    default_brand: BOTTOS
+    sitemap: https://www.bottos1848.com/sitemap_index.xml
+    path_must_contain:
+      - bottos1848.com
+      - /categorie/
+      - fungic
+      - bioattiv
+      - concim
+      - prato
+      - sement
+    seed_urls:
+      - https://www.bottos1848.com/categorie/bioattivati/
+
+  - id: agrieuro_prato
+    label: Agrieuro
+    default_brand: Agrieuro
+    domain: agrieuro.com
+    crawl_max_pages: 200
+    product_url_regex: "agrieuro\\.com/[a-z0-9-]+/\\d{3,}-[a-z0-9-]+\\.html"
+    seed_urls:
+      - https://www.agrieuro.com/categoria/37-prato-giardino.html
+      - https://www.agrieuro.com/categoria/38-concimi-fertilizzanti.html
+      - https://www.agrieuro.com/categoria/39-seminatrici.html
+      - https://www.agrieuro.com/categoria/40-irrigazione-giardino.html
+      - https://www.agrieuro.com/categoria/41-attrezzi-giardino.html
+
+  - id: zapi
+    label: Zapi Garden
+    default_brand: ZAPI
+    domain: zapi.it
+    crawl_max_pages: 120
+    product_url_regex: "zapi\\.it/(it/)?[a-z0-9-]+/(prato|diserb|concim|fungic|insettic|erbic|nutriz|prodott)"
+    seed_urls:
+      - https://www.zapi.it/
+      - https://www.zapi.it/it/prodotti-per-il-giardino
+      - https://www.zapi.it/it/prato
+      - https://www.zapi.it/it/diserbanti
+      - https://www.zapi.it/it/concimi
+
+  - id: compo_expert
+    label: COMPO Expert
+    default_brand: COMPO Expert
+    domain: compo-expert.com
+    crawl_max_pages: 150
+    product_url_regex: "compo-expert\\.com/it-IT/(prodotti|colture|gruppi-di-prodotti)"
+    seed_urls:
+      - https://compo-expert.com/it-IT/colture/tappeti-erbosi-manutenzione-del-verde
+      - https://compo-expert.com/it-IT/gruppi-di-prodotti
+      - https://compo-expert.com/it-IT/colture/tappeti-erbosi-manutenzione-del-verde/paesaggistica-e-spazi-verdi
+      - https://compo-expert.com/it-IT/colture/tappeti-erbosi-manutenzione-del-verde/tappeti-erbosi-sportivi
+
+  - id: barenbrug
+    label: Barenbrug
+    default_brand: BARENBRUG
+    domain: barenbrug.it
+    crawl_max_pages: 150
+    product_url_regex: "barenbrug\\.it/.+/products/"
+    seed_urls:
+      - https://www.barenbrug.it/
+      - https://www.barenbrug.it/tappeto-erboso
+      - https://www.barenbrug.it/tappeto-erboso/products
+
+  - id: geogreen
+    label: Geogreen (Greenhas)
+    default_brand: GEOGREEN
+    domain: geogreensrl.com
+    sitemap: https://www.geogreensrl.com/sitemap_index.xml
+    crawl_max_pages: 150
+    product_url_regex: "geogreensrl\\.com/prodotti/"
+    seed_urls:
+      - https://www.geogreensrl.com/
+      - https://www.geogreensrl.com/tappeti-erbosi/
+      - https://www.geogreensrl.com/prodotti/
+
+  - id: herbatech
+    label: Herbatech
+    default_brand: HERBATECH
+    domain: herbatech.com
+    sitemap: https://www.herbatech.com/sitemap.xml
+    crawl_max_pages: 150
+    product_url_regex: "herbatech\\.com/(prodotti|prodotti-speciali)/"
+    seed_urls:
+      - https://www.herbatech.com/
+      - https://www.herbatech.com/prodotti/miscugli-di-semi-per-prato
+      - https://www.herbatech.com/prodotti/concimi-granulari-microgranulari-per-prato
+      - https://www.herbatech.com/prodotti/ammendanti-terricci-per-prato
+
+  - id: padana_sementi
+    label: Padana Sementi
+    default_brand: PADANA
+    domain: padanasementi.com
+    crawl_max_pages: 150
+    product_url_regex: "padanasementi\\.com/prodotto/"
+    seed_urls:
+      - https://www.padanasementi.com/
+      - https://www.padanasementi.com/categoria-prodotto/sementi-per-lagricoltura/miscugli-prato-stabile/
+      - https://www.padanasementi.com/categoria-prodotto/sementi-per-lagricoltura/
+
+  - id: icl_grow
+    label: ICL Growing Solutions
+    default_brand: ICL
+    domain: icl-growingsolutions.com
+    sitemap: https://icl-growingsolutions.com/sitemap.xml
+    crawl_max_pages: 150
+    product_url_regex: "icl-growingsolutions\\.com/(it-it/)?turf-landscape/products/"
+    seed_urls:
+      - https://icl-growingsolutions.com/it-it/turf-landscape/
+      - https://icl-growingsolutions.com/it-it/turf-landscape/products/
+      - https://icl-growingsolutions.com/turf-landscape/products/
+
+  - id: icl_everis
+    label: Everis / ICL Consumer
+    default_brand: ICL
+    domain: everis.it
+    crawl_max_pages: 100
+    product_url_regex: "everis\\.it/.+"
+    seed_urls:
+      - https://www.everis.it/
+      - https://www.everis.it/prodotti-prato
+
+  - id: icl_sf
+    label: ICL Speciality Fertilizers
+    default_brand: ICL
+    domain: icl-sf.com
+    crawl_max_pages: 100
+    product_url_regex: "icl-sf\\.com/.+"
+    seed_urls:
+      - https://www.icl-sf.com/it-it
+
+  - id: sbm_garden
+    label: SBM Piante
+    default_brand: SBM
+    domain: sbmpiante.it
+    crawl_max_pages: 100
+    product_url_regex: "sbmpiante\\.it/.+"
+    seed_urls:
+      - https://www.sbmpiante.it/
+      - https://www.sbmpiante.it/prodotti
+
+  - id: valagro
+    label: Valagro (biostimolanti)
+    default_brand: Valagro
+    domain: valagro.com
+    crawl_max_pages: 80
+    product_url_regex: "valagro\\.com/it/.+"
+    seed_urls:
+      - https://www.valagro.com/it/
+
+  - id: biogarden
+    label: BioGarden / Bayer Garden IT
+    default_brand: Bayer Garden
+    domain: biogarden.it
+    crawl_max_pages: 100
+    product_url_regex: "biogarden\\.it/.+"
+    seed_urls:
+      - https://www.biogarden.it/
+      - https://www.biogarden.it/prodotti
+
+  - id: agraria
+    label: Agraria Commercio
+    default_brand: Agraria
+    domain: agraria.com
+    crawl_max_pages: 150
+    product_url_regex: "agraria\\.com/.+\\.html"
+    seed_urls:
+      - https://www.agraria.com/
+      - https://www.agraria.com/concimi-prato-c-123.html
+      - https://www.agraria.com/fitofarmaci-c-45.html
+
+  - id: farmalux
+    label: Farmalux
+    default_brand: Farmalux
+    domain: farmalux.it
+    crawl_max_pages: 120
+    product_url_regex: "farmalux\\.it/.+"
+    seed_urls:
+      - https://www.farmalux.it/
+      - https://www.farmalux.it/prato-giardino
+
+  - id: growshop_bologna
+    label: Grow Shop / giardinaggio pro
+    default_brand: Grow Shop
+    domain: growshop.it
+    crawl_max_pages: 80
+    product_url_regex: "growshop\\.it/.+"
+    seed_urls:
+      - https://www.growshop.it/categoria-prodotto/giardinaggio/
+
+  # Registro nazionale fitofarmaci (fase catalogo ufficiale)
+  - id: fito_registro
+    label: Banca Dati FITO (Min. Salute)
+    default_brand: FITO
+    enabled: false
+    note: "Richiede scraper dedicato fito_registro.mjs — migliaia di registrazioni"

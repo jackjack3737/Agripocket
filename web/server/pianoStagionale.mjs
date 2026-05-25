@@ -22,6 +22,8 @@ import {
   buildTimelineBisogni,
 } from "./esigenzeAgronomiche.mjs";
 import { generaCalendarioDeterministico } from "./calendarioBase.mjs";
+import { loadProdotti } from "./prodottiCatalogo.mjs";
+import { loadIndiceProdottiPerIntervento } from "./prodottiMercato.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -462,12 +464,17 @@ export async function generaPianoStagionale({ authHeader, env }) {
   const conFitoFiltrati = filtraInterventiFitofarmacoCurativo(interventiGrezzi, { vision, profilo });
   const conControlli = mergeControlliMensili(conFitoFiltrati, oggi);
   const storico = await loadStoricoTrattamenti(admin, userData.user.id, oggi);
+  const [prodotti, indiceProdottiIntervento] = await Promise.all([
+    loadProdotti(admin),
+    loadIndiceProdottiPerIntervento(admin),
+  ]);
   const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
     storico,
-    prodotti: [],
+    prodotti,
     vision,
     weatherBundle,
-    pureAgronomy: true,
+    pureAgronomy: false,
+    indiceProdottiIntervento,
   });
   const timeline_bisogni = buildTimelineBisogni(sanitizzati, oggi, {
     llmTimeline: timelineLlm,

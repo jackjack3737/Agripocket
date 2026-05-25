@@ -20,8 +20,21 @@
     "iniettore:scienza": "node server/scripts/iniettore_scienza.mjs",
     "seed:calendario-base": "node server/scripts/seed_calendario_base.mjs",
     "seed:calendario-base:dry": "node server/scripts/seed_calendario_base.mjs --dry-run",
+    "seed:prodotti-mercato": "node server/scripts/seed_prodotti_mercato.mjs",
+    "discover:prodotti": "node server/scripts/discover_product_urls.mjs --site all",
+    "ingest:prodotti:italia": "node server/scripts/ingest_prodotti_italia.mjs --site all",
+    "ingest:prodotti:extra": "node server/scripts/ingest_prodotti_italia.mjs --site extra",
+    "ingest:prodotti:marche": "node server/scripts/ingest_prodotti_italia.mjs --site marche",
+    "ingest:prodotti:padana": "node server/scripts/ingest_prodotti_italia.mjs --site padana_sementi",
+    "ingest:prodotti:herbatech": "node server/scripts/ingest_prodotti_italia.mjs --site herbatech",
+    "discover:prodotti:marche": "cd ../crawler && python discover_italia_retailers.py --site barenbrug && python discover_italia_retailers.py --site geogreen && python discover_italia_retailers.py --site herbatech && python discover_italia_retailers.py --site padana_sementi && python discover_italia_retailers.py --site icl_grow && python discover_italia_retailers.py --site icl_everis",
+    "ingest:prodotti:bestprato": "node server/scripts/ingest_prodotti_italia.mjs --site best_prato",
+    "ingest:prodotti:bottos-web": "node server/scripts/ingest_prodotti_italia.mjs --site bottos",
     "mine:prodotti": "node server/scripts/data/product_miner.mjs",
-    "mine:prodotti:dry": "node server/scripts/data/product_miner.mjs --dry-run"
+    "mine:prodotti:dry": "node server/scripts/data/product_miner.mjs --dry-run",
+    "mine:prodotti:bottos": "node server/scripts/data/product_miner.mjs --catalog --dir ../crawler/bottos_calendari_raw",
+    "mine:prodotti:herbatech": "node server/scripts/data/product_miner.mjs --catalog --brand HERBATECH --file scripts/libri/faceb8_7f91cf8bb7424422b05de7ffc8ade885.pdf",
+    "link:prodotti:calendario": "node server/scripts/link_prodotti_calendario.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -187,7 +187,14 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
   list = ensureMatriceNPKObbligatoria(list, oggi, prodottiById);
   list = capInterventiPerLivello(list, profilo);
 
-  const { storico = [], prodotti = [], vision, weatherBundle, pureAgronomy = false } = opts;
+  const {
+    storico = [],
+    prodotti = [],
+    vision,
+    weatherBundle,
+    pureAgronomy = false,
+    indiceProdottiIntervento = null,
+  } = opts;
   if (pureAgronomy) {
     list = list.map((i) => arricchisciInterventoEsigenze(i, { weatherBundle }));
   }
@@ -198,6 +205,7 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
     vision,
     weatherBundle,
     pureAgronomy,
+    indiceProdottiIntervento,
     oggi: oggi || new Date().toISOString().slice(0, 10),
   });
   if (bloccati > 0 || deduped > 0) {

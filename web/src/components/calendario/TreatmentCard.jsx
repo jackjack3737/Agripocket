@@ -212,7 +212,7 @@ export function TreatmentCard({
       {n > 0 ? (
         <section className="treatment-card__soluzione" aria-label="Prodotti suggeriti">
           <h4 className="treatment-card__soluzione-title">
-            Prodotti suggeriti per i tuoi m²{mqLabel}
+            Prodotti idonei dalla vetrina{mqLabel}
           </h4>
           {notaScelta ? (
             <p className="treatment-card__nota-scelta" role="note">

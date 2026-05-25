@@ -30,6 +30,7 @@ import {
   superficieMqVerificata,
 } from "./sicurezzaProdotti.mjs";
 import { getProdottiCached } from "./prodottiCache.mjs";
+import { loadProdottiMercatoRows, mercatoToCatalogRow } from "./prodottiMercato.mjs";
 
 const MAP_CATEGORIA_INTERVENTO = {
   diserbo: ["DISERBANTE SELETTIVO", "DISERBANTE", "DISERBANTE PRE-EMERGENZA", "DISERBANTE PFnPE"],
@@ -56,10 +57,13 @@ export function consenteTutteMarche(prodotto) {
   return CATEGORIE_TUTTE_MARCHE.has(String(prodotto?.categoria || "").toUpperCase());
 }
 
-/** Concimi, biostimolanti, umettanti, sementi: solo BOTTOS. Fungicidi/diserbanti/insetticidi: tutte le marche. */
+/** Fitofarmaci: tutte le marche. Nutrizione/sementi: vetrina completa + Bottos legacy. */
 export function filtraPoolMarca(pool) {
   return pool.filter((p) => {
     if (consenteTutteMarche(p)) return true;
+    if (p._from_mercato) return true;
+    const cat = String(p.categoria || "").toUpperCase();
+    if (/CONCIME|BIOSTIM|SEMENT|BAGNANT|CORRETTIV|AMMEND/.test(cat)) return true;
     return String(p.marca || "").toUpperCase() === "BOTTOS";
   });
 }
@@ -93,10 +97,10 @@ export function periodoCompatibile(periodoUso, meseCode = meseCorrenteCode()) {
   return p.includes(tri);
 }
 
-async function loadProdottiRaw(admin) {
+async function loadProdottiLegacy(admin) {
   const { data, error } = await admin.from("Prodotti").select("*").order("nome");
   if (error) {
-    console.warn("[prodotti] load:", error.message);
+    console.warn("[prodotti] load legacy:", error.message);
     return [];
   }
   const enriched = (data ?? []).map((p) => ({
@@ -109,7 +113,28 @@ async function loadProdottiRaw(admin) {
   return filtraProdottiConsumer(enriched);
 }
 
-/** Catalogo con cache TTL (default 10 min). */
+async function loadProdottiRaw(admin) {
+  const legacy = await loadProdottiLegacy(admin);
+  let mercato = [];
+  try {
+    const rows = await loadProdottiMercatoRows(admin);
+    mercato = rows.map(mercatoToCatalogRow).filter(Boolean);
+  } catch (e) {
+    console.warn("[prodotti] mercato:", e.message);
+  }
+
+  const seen = new Set();
+  const out = [];
+  for (const p of [...legacy, ...mercato]) {
+    const k = `${String(p.marca || "").toLowerCase()}|${String(p.nome || "").toLowerCase()}`;
+    if (!k || k === "|" || seen.has(k)) continue;
+    seen.add(k);
+    out.push(p);
+  }
+  return out;
+}
+
+/** Catalogo unificato (legacy + prodotti_mercato) con cache TTL. */
 export async function loadProdotti(admin) {
   return getProdottiCached(admin, loadProdottiRaw);
 }

@@ -134,7 +134,7 @@ function mimeForExt(ext) {
 // Gemini
 // ---------------------------------------------------------------------------
 
-async function geminiGenerate(apiKey, parts, { json = true, temperature = 0.2 } = {}) {
+async function geminiGenerate(apiKey, parts, { json = true, temperature = 0.2, maxOutputTokens = 4096 } = {}) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${CHAT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     method: "POST",
@@ -143,7 +143,7 @@ async function geminiGenerate(apiKey, parts, { json = true, temperature = 0.2 } 
       contents: [{ role: "user", parts }],
       generationConfig: {
         temperature,
-        maxOutputTokens: 4096,
+        maxOutputTokens,
         ...(json ? { responseMimeType: "application/json" } : {}),
       },
     }),
@@ -182,6 +182,68 @@ Rispondi SOLO JSON valido con questa forma esatta:
 }
 
 is_bio: true solo se etichetta indica bio, CE bio, reg. 834/2007 o equivalente.`;
+
+const CATALOG_ANALYSIS_PROMPT = (rawText, fileName, defaultBrand = "Bottos") => `Analizza un catalogo commerciale prato/giardino e estrai TUTTI i prodotti commerciali citati con nome distinto.
+
+File: ${fileName}
+Marca di default (se non indicata in scheda): ${defaultBrand}
+
+Testo:
+---
+${rawText.slice(0, 14000)}
+---
+
+Per ogni prodotto distinto (fitofarmaco, concime, biostimolante, semente, correttivo, ammendante, umettante) estrai quanto dichiarato. Non inventare percentuali.
+Se il produttore non è scritto, usa "${defaultBrand}".
+
+Rispondi SOLO JSON:
+{
+  "prodotti": [
+    {
+      "prodotto": "Nome commerciale",
+      "produttore": "${defaultBrand} o altra azienda se indicata",
+      "categoria_agronomica": "una tra: Biostimolante, Concime NPK, Correttivo, Fungicida, Diserbante, Insetticido, Bagnante, Semente, Altro",
+      "composizione_molecolare_dichiarata": ["principio attivo o NPK se noto"],
+      "target_fisiologico": ["uso indicato"],
+      "is_bio": false,
+      "confidence_score": 0.7
+    }
+  ]
+}
+
+Massimo 50 prodotti in questo blocco, senza duplicati. Se il testo non contiene prodotti, "prodotti": [].`;
+
+function isCatalogFileName(fileName) {
+  return /calendario|bottos|verde|faceb|herbatech|catalogo/i.test(fileName);
+}
+
+function splitCatalogChunks(rawText, chunkSize = 12000, overlap = 1500) {
+  const t = rawText.replace(/\r\n/g, "\n").trim();
+  if (t.length <= chunkSize) return [t];
+  const chunks = [];
+  let start = 0;
+  while (start < t.length) {
+    let end = Math.min(start + chunkSize, t.length);
+    if (end < t.length) {
+      const slice = t.slice(start, end);
+      const br = slice.lastIndexOf("\n\n");
+      if (br > chunkSize * 0.5) end = start + br;
+    }
+    chunks.push(t.slice(start, end));
+    if (end >= t.length) break;
+    start = Math.max(0, end - overlap);
+  }
+  return chunks;
+}
+
+function dedupeCatalogProducts(products) {
+  const seen = new Map();
+  for (const p of products) {
+    const key = `${(p.produttore || "").toLowerCase()}|${p.prodotto.toLowerCase()}`;
+    if (!seen.has(key)) seen.set(key, p);
+  }
+  return [...seen.values()];
+}
 
 // ---------------------------------------------------------------------------
 // 1. Ingestion
@@ -236,11 +298,77 @@ export async function ingestFile(filePath, apiKey) {
 // 2. Gemini Analysis
 // ---------------------------------------------------------------------------
 
+function parseCatalogJson(out) {
+  const attempts = [
+    () => JSON.parse(out),
+    () => {
+      const m = out.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("no object");
+      return JSON.parse(m[0]);
+    },
+    () => {
+      const m = out.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error("no object");
+      const fixed = m[0].replace(/,\s*([\]}])/g, "$1");
+      return JSON.parse(fixed);
+    },
+  ];
+  for (const fn of attempts) {
+    try {
+      const parsed = fn();
+      if (Array.isArray(parsed?.prodotti)) return parsed;
+    } catch {
+      /* next */
+    }
+  }
+  throw new Error("JSON catalogo non parsabile");
+}
+
 /**
  * @param {string} rawText
  * @param {string} fileName
  * @param {string} apiKey
  */
+export async function analyzeCatalogText(rawText, fileName, apiKey, defaultBrand = "Bottos") {
+  let lastErr;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const out = await geminiGenerate(
+        apiKey,
+        [{ text: CATALOG_ANALYSIS_PROMPT(rawText, fileName, defaultBrand) }],
+        { json: true, maxOutputTokens: 8192 },
+      );
+      const parsed = parseCatalogJson(out);
+      const list = Array.isArray(parsed?.prodotti) ? parsed.prodotti : [];
+      return list
+        .map((p) => normalizeProductJson(p))
+        .map((p) => prepareProductFromWeb(p, defaultBrand))
+        .filter((p) => p.prodotto?.length >= 2);
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await sleep(2000);
+    }
+  }
+  throw lastErr;
+}
+
+export async function analyzeCatalogTextChunked(rawText, fileName, apiKey, defaultBrand = "Bottos") {
+  const chunks = splitCatalogChunks(rawText);
+  const all = [];
+  for (let c = 0; c < chunks.length; c++) {
+    console.log(`  [Gemini] blocco catalogo ${c + 1}/${chunks.length} (${chunks[c].length} car.)`);
+    try {
+      await sleep(GEMINI_SLEEP_MS);
+      const part = await analyzeCatalogText(chunks[c], `${fileName}#chunk${c + 1}`, apiKey, defaultBrand);
+      all.push(...part);
+      console.log(`  [Gemini] +${part.length} (tot grezzo ${all.length})`);
+    } catch (e) {
+      console.warn(`  [Warn] blocco ${c + 1}/${chunks.length} saltato: ${e.message}`);
+    }
+  }
+  return dedupeCatalogProducts(all);
+}
+
 export async function analyzeLabelText(rawText, fileName, apiKey) {
   const out = await geminiGenerate(
     apiKey,
@@ -319,6 +447,8 @@ export function validateProduct(product) {
   }
   if (!product.composizione_molecolare_dichiarata?.length) {
     notes.push("Composizione molecolare dichiarata vuota");
+  } else if (product.composizione_molecolare_dichiarata.length === 1 && /^Prodotto:/i.test(product.composizione_molecolare_dichiarata[0])) {
+    /* catalogo legacy: accettato come warning implicito */
   }
   if (!product.target_fisiologico?.length) {
     notes.push("Target fisiologico non dedotto");
@@ -463,28 +593,27 @@ export function toDbRow(product, meta) {
   };
 }
 
-/**
- * Pipeline completa su un file.
- */
-export async function runPipeline(filePath, { admin, apiKey, dryRun = false, ingestBatchId = null }) {
-  const fileName = basename(filePath);
-  console.log(`\n── ${fileName} ──`);
+export function prepareProductFromWeb(product, defaultBrand) {
+  const p = { ...product };
+  if (!p.produttore?.trim() && defaultBrand) p.produttore = defaultBrand;
+  if (!p.composizione_molecolare_dichiarata?.length && p.prodotto) {
+    p.composizione_molecolare_dichiarata = [`Scheda commerciale: ${p.prodotto}`];
+  }
+  if (!p.target_fisiologico?.length) {
+    p.target_fisiologico = ["Manutenzione prato e tappeto erboso"];
+  }
+  return p;
+}
 
-  const { rawText, sourceType, buffer } = await ingestFile(filePath, apiKey);
-  console.log(`  [Ingestion] ${sourceType}, ${rawText.length} caratteri`);
-
-  await sleep(GEMINI_SLEEP_MS);
-  const product = await analyzeLabelText(rawText, fileName, apiKey);
-  console.log(`  [Gemini] ${product.prodotto} — ${product.categoria_agronomica}`);
+export async function persistProduct(product, ctx) {
+  const { admin, dryRun, ingestBatchId, sourceType, sourceFile, sourceHash, rawTextExcerpt, interventi } = ctx;
 
   const { status, notes } = validateProduct(product);
-  console.log(`  [Validation] ${status}${notes.length ? `: ${notes.join("; ")}` : ""}`);
-
   if (status === "rejected") {
-    return { ok: false, fileName, status, notes, product };
+    console.log(`  [Reject] ${product.prodotto}: ${notes.join("; ")}`);
+    return { ok: false, status, notes, product };
   }
 
-  const sourceHash = sha256(buffer);
   if (!dryRun && admin) {
     const { data: existing } = await admin
       .from("prodotti_mercato")
@@ -492,19 +621,17 @@ export async function runPipeline(filePath, { admin, apiKey, dryRun = false, ing
       .eq("source_hash", sourceHash)
       .maybeSingle();
     if (existing?.id) {
-      console.log(`  [Skip] già in DB: ${existing.prodotto} (${existing.id})`);
+      console.log(`  [Skip] ${product.prodotto} (hash esistente)`);
       return { ok: true, skipped: true, id: existing.id, product, status };
     }
   }
 
-  const interventi = dryRun || !admin ? [] : await fetchInterventiTemplate(admin);
   const matches = matchInterventi(product, interventi);
-
   const row = toDbRow(product, {
     sourceType,
-    sourceFile: fileName,
+    sourceFile,
     sourceHash,
-    rawTextExcerpt: rawText.slice(0, 2000),
+    rawTextExcerpt,
     extractedJson: product,
     validationStatus: status,
     validationNotes: notes,
@@ -512,8 +639,7 @@ export async function runPipeline(filePath, { admin, apiKey, dryRun = false, ing
   });
 
   if (dryRun) {
-    console.log(`  [Dry-run] insert + ${matches.length} match interventi`);
-    return { ok: true, dryRun: true, row, matches, product, status };
+    return { ok: true, dryRun: true, matches, product, status };
   }
 
   const { data: inserted, error } = await admin.from("prodotti_mercato").insert(row).select("id").single();
@@ -528,12 +654,79 @@ export async function runPipeline(filePath, { admin, apiKey, dryRun = false, ing
       match_auto: true,
     }));
     const { error: linkErr } = await admin.from("prodotti_mercato_intervento").insert(links);
-    if (linkErr) console.warn(`  [Warn] link interventi: ${linkErr.message}`);
-    else console.log(`  [DB] ${matches.length} collegamenti intervento`);
+    if (linkErr) console.warn(`  [Warn] link: ${linkErr.message}`);
   }
 
-  console.log(`  [DB] id=${inserted.id}`);
+  console.log(`  [DB] ${product.prodotto} (${status})`);
   return { ok: true, id: inserted.id, matches, product, status };
+}
+
+/**
+ * Pipeline completa su un file.
+ */
+export async function runPipeline(
+  filePath,
+  { admin, apiKey, dryRun = false, ingestBatchId = null, catalogMode = false, defaultBrand = "Bottos" },
+) {
+  const fileName = basename(filePath);
+  const useCatalog = catalogMode || isCatalogFileName(fileName);
+  console.log(`\n── ${fileName}${useCatalog ? " [catalogo]" : ""} ──`);
+
+  const { rawText, sourceType, buffer } = await ingestFile(filePath, apiKey);
+  console.log(`  [Ingestion] ${sourceType}, ${rawText.length} caratteri`);
+
+  const interventi = dryRun || !admin ? [] : await fetchInterventiTemplate(admin);
+  const fileHash = sha256(buffer);
+
+  if (useCatalog) {
+    const products =
+      rawText.length > 15000
+        ? await analyzeCatalogTextChunked(rawText, fileName, apiKey, defaultBrand)
+        : await (async () => {
+            await sleep(GEMINI_SLEEP_MS);
+            return analyzeCatalogText(rawText, fileName, apiKey, defaultBrand);
+          })();
+    console.log(`  [Gemini] ${products.length} prodotti estratti (unici)`);
+    if (!products.length) return { ok: false, fileName, inserted: 0, rejected: 1, catalog: true };
+
+    let inserted = 0;
+    let rejected = 0;
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      const sourceHash = sha256(`${fileHash}:${i}:${product.prodotto}`);
+      const r = await persistProduct(product, {
+        admin,
+        dryRun,
+        ingestBatchId,
+        sourceType: "pdf",
+        sourceFile: `${fileName}#${i + 1}`,
+        sourceHash,
+        rawTextExcerpt: rawText.slice(0, 800),
+        interventi,
+      });
+      if (r.ok && !r.skipped) inserted++;
+      if (r.status === "rejected") rejected++;
+      await sleep(Math.min(GEMINI_SLEEP_MS, 2500));
+    }
+    return { ok: true, fileName, inserted, rejected, catalog: true };
+  }
+
+  await sleep(GEMINI_SLEEP_MS);
+  const product = await analyzeLabelText(rawText, fileName, apiKey);
+  console.log(`  [Gemini] ${product.prodotto} — ${product.categoria_agronomica}`);
+
+  const r = await persistProduct(product, {
+    admin,
+    dryRun,
+    ingestBatchId,
+    sourceType,
+    sourceFile: fileName,
+    sourceHash: fileHash,
+    rawTextExcerpt: rawText.slice(0, 2000),
+    interventi,
+  });
+  if (!r.ok) return { ok: false, fileName, ...r };
+  return { ok: true, fileName, inserted: r.skipped ? 0 : 1, ...r };
 }
 
 async function listFiles(dir) {
@@ -550,6 +743,9 @@ async function listFiles(dir) {
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+  const catalogMode = args.includes("--catalog");
+  const brandIdx = args.indexOf("--brand");
+  const defaultBrand = brandIdx >= 0 ? args[brandIdx + 1] : "Bottos";
   const fileIdx = args.indexOf("--file");
   const dirIdx = args.indexOf("--dir");
 
@@ -594,9 +790,16 @@ async function main() {
   let rejected = 0;
   for (const f of supported) {
     try {
-      const r = await runPipeline(f, { admin, apiKey, dryRun, ingestBatchId: batchId });
-      if (r.ok && !r.skipped) ok++;
-      if (r.status === "rejected") rejected++;
+      const r = await runPipeline(f, {
+        admin,
+        apiKey,
+        dryRun,
+        ingestBatchId: batchId,
+        catalogMode: catalogMode || isCatalogFileName(basename(f)),
+        defaultBrand,
+      });
+      if (r.ok) ok += r.inserted ?? (r.skipped ? 0 : 1);
+      if (r.status === "rejected" || r.rejected) rejected += r.rejected ?? 1;
       await sleep(GEMINI_SLEEP_MS);
     } catch (e) {
       console.error(`  [ERR] ${basename(f)}: ${e.message}`);
