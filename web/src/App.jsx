@@ -5,7 +5,6 @@ import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import CalendarioLavori from "./pages/CalendarioLavori";
-import Farmacia from "./pages/Farmacia";
 function ChatRedirect() {
   const { search } = useLocation();
   return <Navigate to={`/dashboard${search}#carica-foto-prato`} replace />;
@@ -148,7 +147,7 @@ export default function App() {
           ) : profileReady && needsOnboarding ? (
             <Navigate to="/onboarding" replace />
           ) : (
-            <Farmacia profile={profile} session={session} />
+            <Navigate to="/calendario" replace state={{ tab: "dispensa" }} />
           )
         }
       />

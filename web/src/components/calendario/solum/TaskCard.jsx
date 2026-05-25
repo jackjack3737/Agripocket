@@ -1,14 +1,16 @@
 import { useId, useState } from "react";
 import ScienzaPanel from "./ScienzaPanel.jsx";
+import PrescrizioneProdottoCard from "./PrescrizioneProdottoCard.jsx";
 
 const cardShadow = "shadow-[0_8px_30px_rgb(0,0,0,0.02)]";
 
-export default function TaskCard({ task, onComplete, completingId }) {
+export default function TaskCard({ task, onComplete, completingId, userMq = 150 }) {
   const [scienzaOpen, setScienzaOpen] = useState(false);
   const panelId = useId();
   const done = task.stato === "completato";
   const busy = completingId === task.id;
   const haScienza = !!(task.fabbisogno_fisiologico || task.titolo_tecnico);
+  const mq = Math.max(1, Number(userMq) || 150);
 
   return (
     <article
@@ -35,25 +37,6 @@ export default function TaskCard({ task, onComplete, completingId }) {
             {task.descrizione_semplice}
           </p>
 
-          {task.prodotti?.length ? (
-            <ul className="mt-5 space-y-2.5" aria-label="Prodotti consigliati">
-              {task.prodotti.slice(0, 3).map((p, idx) => (
-                <li
-                  key={p.id ?? `${p.nome_commerciale}-${idx}`}
-                  className="text-sm text-slate-600 flex gap-2 min-w-0"
-                >
-                  <span className="shrink-0 text-slate-300" aria-hidden>
-                    ·
-                  </span>
-                  <span className="min-w-0 break-words">
-                    <span className="font-medium text-slate-800">{p.nome_commerciale}</span>
-                    {p.marca ? <span className="text-slate-400"> — {p.marca}</span> : null}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
           {haScienza ? (
             <button
               type="button"
@@ -75,6 +58,20 @@ export default function TaskCard({ task, onComplete, completingId }) {
           </div>
         </div>
       </div>
+
+      {task.prodotti?.length ? (
+        <div className="mt-6 space-y-3" aria-label="Prescrizione prodotti">
+          {task.prodotti.slice(0, 3).map((p, idx) => (
+            <PrescrizioneProdottoCard
+              key={p.id ?? `${p.nome_commerciale}-${idx}`}
+              prodotto={p}
+              perIntervento={task.titolo_semplice}
+              userMq={mq}
+              compact
+            />
+          ))}
+        </div>
+      ) : null}
 
       {!done && onComplete ? (
         <div className="mt-6 pt-5 border-t border-slate-100/60 flex justify-end">

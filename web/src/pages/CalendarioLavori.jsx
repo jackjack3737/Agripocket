@@ -215,6 +215,8 @@ export default function CalendarioLavori({ profile, session }) {
           onAggiornaPiano={handleGeneraPiano}
           generatingPiano={generatingPiano}
           canAggiornaPiano={!!profile?.localita}
+          userMq={profile?.superficie_mq ?? 150}
+          initialTab={location.state?.tab}
         />
       </section>
     </div>

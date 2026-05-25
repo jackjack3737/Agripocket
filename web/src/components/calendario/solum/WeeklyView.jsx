@@ -43,6 +43,7 @@ export default function WeeklyView({
   prossimoTask = null,
   onComplete,
   completingId,
+  userMq = 150,
 }) {
   const totale = giorni.reduce((n, g) => n + g.tasks.length, 0);
 
@@ -60,7 +61,12 @@ export default function WeeklyView({
           <ul className="space-y-4">
             {inRitardo.map((task) => (
               <li key={task.id}>
-                <TaskCard task={task} onComplete={onComplete} completingId={completingId} />
+                <TaskCard
+                  task={task}
+                  onComplete={onComplete}
+                  completingId={completingId}
+                  userMq={userMq}
+                />
               </li>
             ))}
           </ul>
@@ -76,7 +82,12 @@ export default function WeeklyView({
             <ul className="space-y-4">
               {giorno.tasks.map((task) => (
                 <li key={task.id}>
-                  <TaskCard task={task} onComplete={onComplete} completingId={completingId} />
+                  <TaskCard
+                  task={task}
+                  onComplete={onComplete}
+                  completingId={completingId}
+                  userMq={userMq}
+                />
                 </li>
               ))}
             </ul>

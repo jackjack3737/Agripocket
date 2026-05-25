@@ -22,6 +22,8 @@ const tabClass = (active) =>
       : "text-slate-400 hover:text-slate-600 transition-colors",
   ].join(" ");
 
+const DEFAULT_MQ = 150;
+
 export default function CalendarioSolum({
   interventi = [],
   onComplete,
@@ -29,8 +31,12 @@ export default function CalendarioSolum({
   onAggiornaPiano = null,
   generatingPiano = false,
   canAggiornaPiano = true,
+  userMq = DEFAULT_MQ,
+  initialTab = null,
 }) {
-  const [tab, setTab] = useState(TAB_SETTIMANA);
+  const [tab, setTab] = useState(
+    initialTab === TAB_DISPENSA ? TAB_DISPENSA : TAB_SETTIMANA,
+  );
   const [completingId, setCompletingId] = useState(null);
   const [pianoFuturoOpen, setPianoFuturoOpen] = useState(false);
   const oggi = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -121,6 +127,7 @@ export default function CalendarioSolum({
                   prossimoTask={prossimoTask}
                   onComplete={handleComplete}
                   completingId={completingId}
+                  userMq={userMq}
                 />
                 {haPianoFuturo ? (
                   <div className="mt-14 text-center">
@@ -135,7 +142,7 @@ export default function CalendarioSolum({
                 ) : null}
               </>
             ) : (
-              <DispensaView mesi={dispensa} />
+              <DispensaView mesi={dispensa} userMq={userMq} />
             )}
           </div>
         )}

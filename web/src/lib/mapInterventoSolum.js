@@ -215,6 +215,8 @@ export function dispensaPerMese(interventi, oggiIso = new Date().toISOString().s
       const key = `${p.marca || ""}|${nome}`.toLowerCase();
       if (!bucket.prodotti.has(key)) {
         bucket.prodotti.set(key, {
+          key,
+          prodotto: p,
           nome,
           marca: p.marca || null,
           perIntervento: task.titolo_semplice,
@@ -230,7 +232,9 @@ export function dispensaPerMese(interventi, oggiIso = new Date().toISOString().s
       meseKey,
       meseLabel: formatMeseDispensa(meseKey),
       interventi: v.interventi,
-      prodotti: [...v.prodotti.values()].sort((a, b) => a.nome.localeCompare(b.nome, "it")),
+      prodotti: [...v.prodotti.values()].sort((a, b) =>
+        (a.nome || "").localeCompare(b.nome || "", "it"),
+      ),
     }));
 }
 
