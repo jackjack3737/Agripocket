@@ -3100,6 +3100,109 @@
   margin-bottom: 0.35rem;
 }
 
+.cal-dettaglio__btn-scienza {
+  margin-top: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid rgba(46, 125, 50, 0.35);
+  border-radius: 999px;
+  background: #f4faf6;
+  color: #1b5e20;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.cal-dettaglio__btn-scienza:hover:not(:disabled) {
+  background: #e8f5e9;
+  border-color: var(--accent, #2e7d32);
+}
+
+.cal-dettaglio__btn-scienza:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.cal-dettaglio__scienza-kb {
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #f8faf8 0%, #eef6ff 100%);
+  border: 1px solid rgba(46, 125, 50, 0.12);
+}
+
+.cal-dettaglio__scienza-body {
+  margin-bottom: 0.5rem;
+}
+
+.cal-dettaglio__scienza-p {
+  margin: 0 0 0.65rem;
+}
+
+.cal-dettaglio__scienza--breve {
+  opacity: 0.95;
+}
+
+.cal-dettaglio__hint-scienza {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cal-dettaglio__fonti {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.cal-dettaglio__fonti summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #2e5c40;
+}
+
+.cal-dettaglio__fonti-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cal-dettaglio__fonte-item {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border, #e8e8e8);
+}
+
+.cal-dettaglio__fonte-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5d4037;
+}
+
+.cal-dettaglio__fonte-titolo {
+  margin: 0.35rem 0 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.cal-dettaglio__fonte-testo {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+  max-height: 6rem;
+  overflow: hidden;
+}
+
 .cal-dettaglio__nota {
   margin: 0.65rem 0 0;
   font-size: 0.78rem;
