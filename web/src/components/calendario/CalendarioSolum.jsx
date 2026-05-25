@@ -9,6 +9,7 @@ import {
 import WeeklyView from "./solum/WeeklyView.jsx";
 import DispensaView from "./solum/DispensaView.jsx";
 import PianoFuturoPanel from "./solum/PianoFuturoPanel.jsx";
+import { formatOggiIt } from "../../lib/oggiSimulato.js";
 import "../../styles/calendario-solum.css";
 
 const TAB_SETTIMANA = "settimana";
@@ -33,13 +34,18 @@ export default function CalendarioSolum({
   canAggiornaPiano = true,
   userMq = DEFAULT_MQ,
   initialTab = null,
+  oggiIso = null,
+  oggiSimulato = false,
 }) {
   const [tab, setTab] = useState(
     initialTab === TAB_DISPENSA ? TAB_DISPENSA : TAB_SETTIMANA,
   );
   const [completingId, setCompletingId] = useState(null);
   const [pianoFuturoOpen, setPianoFuturoOpen] = useState(false);
-  const oggi = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const oggi = useMemo(
+    () => oggiIso || new Date().toISOString().slice(0, 10),
+    [oggiIso],
+  );
 
   const giorni = useMemo(() => gruppiSettimanaCorrente(interventi, oggi), [interventi, oggi]);
   const dispensa = useMemo(() => dispensaPerMese(interventi, oggi), [interventi, oggi]);
@@ -61,6 +67,14 @@ export default function CalendarioSolum({
   return (
     <div className="calendario-solum min-h-full bg-slate-50/50">
       <div className="max-w-lg mx-auto px-6 sm:px-8 py-10 sm:py-14">
+        {oggiSimulato ? (
+          <p
+            className="mb-6 text-center text-[11px] font-medium text-amber-800/90 bg-amber-50/90 border border-amber-100/80 rounded-full px-4 py-2"
+            role="status"
+          >
+            Vista simulata — oggi è il {formatOggiIt(oggi)}
+          </p>
+        ) : null}
         <header className="flex items-start justify-between gap-6 mb-12">
           <div className="min-w-0">
             <h2 className="text-2xl sm:text-[1.65rem] font-semibold text-slate-900 tracking-tight">
