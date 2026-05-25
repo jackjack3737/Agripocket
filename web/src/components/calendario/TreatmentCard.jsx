@@ -287,6 +287,7 @@ export function treatmentFromIntervento(item) {
       prodotti_consigliati: det.prodotti_consigliati ?? [],
       contesto_meteo: det.contesto_meteo ?? null,
       adattamento_dinamico: adattamento,
+      prescrizione_kb: det.prescrizione_kb ?? item.prescrizione_kb ?? null,
       stato: item.stato,
     };
   }

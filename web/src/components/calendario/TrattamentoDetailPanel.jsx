@@ -26,6 +26,7 @@ export default function TrattamentoDetailPanel({
   const task = interventoToSolum(item);
   const treatment = treatmentFromIntervento(item);
   const prodotti = treatment?.prodotti_consigliati ?? task.prodotti ?? [];
+  const checklist = treatment?.prescrizione_kb?.checklist_operativa ?? [];
   const done = item.stato === "completato";
   const dataLabel =
     item.isRitardo && item.data_originale
@@ -63,6 +64,19 @@ export default function TrattamentoDetailPanel({
           <h3 className="cal-dettaglio__label">Cosa fare</h3>
           <p className="cal-dettaglio__testo">{task.descrizione_semplice}</p>
         </section>
+
+        {checklist.length ? (
+          <section className="cal-dettaglio__sezione" aria-labelledby="checklist-panel-title">
+            <h3 id="checklist-panel-title" className="cal-dettaglio__label">
+              Checklist greenkeeper
+            </h3>
+            <ul className="cal-dettaglio__checklist">
+              {checklist.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {task.fabbisogno_fisiologico || task.titolo_tecnico ? (
           <section className="cal-dettaglio__sezione cal-dettaglio__scienza">

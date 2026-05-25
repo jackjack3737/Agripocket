@@ -3088,6 +3088,18 @@
   gap: 0.65rem;
 }
 
+.cal-dettaglio__checklist {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.cal-dettaglio__checklist li {
+  margin-bottom: 0.35rem;
+}
+
 .cal-dettaglio__nota {
   margin: 0.65rem 0 0;
   font-size: 0.78rem;

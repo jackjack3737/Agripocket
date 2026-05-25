@@ -54,6 +54,7 @@ export function applicaSolumVoceADettaglio(interventi) {
       nota_scelta_prodotti: detBase.nota_scelta_prodotti ?? null,
       contesto_meteo: detBase.contesto_meteo ?? null,
       adattamento_dinamico: detBase.adattamento_dinamico ?? i.adattamento_dinamico ?? null,
+      prescrizione_kb: i.prescrizione_kb ?? detBase.prescrizione_kb ?? null,
     };
 
     const {

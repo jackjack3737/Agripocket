@@ -25,6 +25,7 @@ import { generaCalendarioDeterministico } from "./calendarioBase.mjs";
 import { loadProdotti } from "./prodottiCatalogo.mjs";
 import { loadIndiceProdottiPerIntervento, loadProdottiMercatoRows } from "./prodottiMercato.mjs";
 import { applicaSolumVoceADettaglio } from "./solumVoce.mjs";
+import { applicaPrescrizioneKbGuidata } from "./prescrizioneKbGuidata.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -131,25 +132,27 @@ async function arricchisciVoceBiochimica(matrice, profilo, env, { admin, vision,
   const cfgLivello = configLivelloImpegno(profilo);
   const interventiBase = matrice.interventi.slice(0, cfgLivello.maxInterventi);
 
-  const searchText = [
-    "fisiologia tappeto erboso GDD ET0 osmoprotezione",
-    profilo?.note,
-    profilo?.localita,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  let kb = matrice.prescrizione_kb?.kb_block || "";
+  if (!kb) {
+    const searchText = [
+      "fisiologia tappeto erboso GDD ET0 osmoprotezione",
+      profilo?.note,
+      profilo?.localita,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-  let kb = "";
-  try {
-    const emb = await geminiEmbed(searchText.slice(0, 4000), geminiKey);
-    const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
-      matchCount: 4,
-      fetchCount: 16,
-      minLibri: 2,
-    });
-    kb = chunks.map((c, i) => `[${i + 1}] ${c.soluzione || ""}`).join("\n\n");
-  } catch {
-    kb = "";
+    try {
+      const emb = await geminiEmbed(searchText.slice(0, 4000), geminiKey);
+      const chunks = await queryKnowledgeBasePrioritized(admin, emb, {
+        matchCount: 4,
+        fetchCount: 16,
+        minLibri: 2,
+      });
+      kb = chunks.map((c, i) => `[${i + 1}] ${c.soluzione || ""}`).join("\n\n");
+    } catch {
+      kb = "";
+    }
   }
 
   const weatherBlock = weatherBundle ? formatWeatherForPrompt(weatherBundle) : "";
@@ -167,6 +170,7 @@ Il tuo compito è separare DRASTICAMENTE linguaggio operativo (per l'utente) da 
 - NON mescolare gergo tecnico nel titolo_semplice_azione né nel messaggio_operativo_breve.
 - \`prodotti_consigliati\`: solo nomi generici o categorie (es. "Concime NP-K", "Biostimolante alghe"), mai marchi registrati.
 - data_prevista, categoria, priorita, esigenze_molecolari: non alterare il significato agronomico dell'input.
+- Le regole KB/precrizione già applicate (es. no azoto luglio-agosto, priorità potassio estivo) sono vincolanti: non contraddirle.
 
 Profilo:
 ${formatProfileForPrompt(profilo)}
@@ -289,8 +293,14 @@ export async function buildPianoInterventi(
   }
 
   const matrice = await generaCalendarioDeterministico(profilo, bundle, { admin });
+  const matriceKb = await applicaPrescrizioneKbGuidata(matrice, {
+    profilo,
+    admin,
+    geminiKey: env.GEMINI_API_KEY?.trim(),
+    parametriRag,
+  });
   const { interventi: conVoce, timeline_bisogni: timelineLlm } = await arricchisciVoceBiochimica(
-    matrice,
+    matriceKb,
     profilo,
     env,
     { admin, vision, parametriRag, weatherBundle: bundle },
@@ -338,9 +348,10 @@ export async function buildPianoInterventi(
   parsedList = applicaRegolaTrasemina(parsedList);
   parsedList._timelineLlm = timelineLlm;
   parsedList._matriceDeterministica = {
-    zona_climatica: matrice.zona_climatica,
-    delta_meteo: matrice.delta_meteo,
-    template_count: matrice.template_count,
+    zona_climatica: matriceKb.zona_climatica,
+    delta_meteo: matriceKb.delta_meteo,
+    template_count: matriceKb.template_count,
+    prescrizione_kb: matriceKb.prescrizione_kb ?? null,
   };
 
   return parsedList;
