@@ -1,23 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci --prefix web",
+  "installCommand": "npm ci && npm ci --prefix web",
   "buildCommand": "npm run build --prefix web",
   "outputDirectory": "web/dist",
   "framework": "vite",
-  "functions": {
-    "api/analizza-prato.js": { "maxDuration": 120 },
-    "api/genera-piano.js": { "maxDuration": 120 },
-    "api/chat-zona.js": { "maxDuration": 120 },
-    "api/job-status.js": { "maxDuration": 10 },
-    "api/reset-profilo.js": { "maxDuration": 30 },
-    "api/enrich-prodotti-calendario.js": { "maxDuration": 120 },
-    "api/raccomandazione-semina.js": { "maxDuration": 60 },
-    "api/adatta-calendario-meteo.js": { "maxDuration": 60 },
-    "api/irrigazione-giornaliera.js": { "maxDuration": 60 },
-    "api/irrigazione-registra.js": { "maxDuration": 30 },
-    "api/meteo.js": { "maxDuration": 30 },
-    "api/foto-url.js": { "maxDuration": 30 }
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

@@ -1,5 +1,5 @@
 ﻿import { waitUntil } from "@vercel/functions";
-import { analizzaPrato } from "../web/server/analizzaPratoCore.mjs";
+import { generaPianoStagionale } from "../web/server/pianoStagionale.mjs";
 import { loadServerEnv } from "../web/server/serverEnv.mjs";
 import { createJob, updateJob, adminClient } from "../web/server/jobs.mjs";
 import { checkRateLimit } from "../web/server/rateLimit.mjs";
@@ -9,20 +9,11 @@ export const config = {
   maxDuration: 120,
 };
 
-async function runAnalizzaJob(jobId, body, authHeader, env) {
+async function runGeneraPianoJob(jobId, authHeader, env) {
   const admin = adminClient(env);
   try {
     await updateJob(admin, jobId, { status: "processing" });
-    const result = await analizzaPrato({
-      imageBase64: body.imageBase64,
-      mimeType: body.mimeType || "image/jpeg",
-      authHeader,
-      env,
-      modalita: body?.modalita || "prato",
-      zonaId: body?.zonaId,
-      zonaNome: body?.zonaNome,
-      notaUtente: body?.notaUtente,
-    });
+    const result = await generaPianoStagionale({ authHeader, env });
     await updateJob(admin, jobId, {
       status: "completed",
       result,
@@ -57,7 +48,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
     const env = loadServerEnv();
     const supabaseUser = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: auth } },
@@ -68,44 +58,33 @@ export default async function handler(req, res) {
       return;
     }
 
-    const rl = checkRateLimit(userData.user.id, "analizza_foto");
+    const rl = checkRateLimit(userData.user.id, "genera_piano");
     if (!rl.ok) {
       res.status(429).json({
-        error: `Troppe analisi foto. Riprova tra ${Math.ceil((rl.retryAfterSec || 300) / 60)} minuti.`,
+        error: `Tropo spesso. Rigenera il piano tra ${Math.ceil((rl.retryAfterSec || 600) / 60)} minuti.`,
       });
       return;
     }
 
     const admin = adminClient(env);
-    const { job, tablesMissing } = await createJob(admin, userData.user.id, "analizza_foto", {
-      mimeType: body?.mimeType,
-    });
+    const { job, tablesMissing } = await createJob(admin, userData.user.id, "genera_piano", {});
 
     if (tablesMissing || !job) {
-      const result = await analizzaPrato({
-        imageBase64: body?.imageBase64,
-        mimeType: body?.mimeType || "image/jpeg",
-        authHeader: auth,
-        env,
-        modalita: body?.modalita || "prato",
-        zonaId: body?.zonaId,
-        zonaNome: body?.zonaNome,
-        notaUtente: body?.notaUtente,
-      });
+      const result = await generaPianoStagionale({ authHeader: auth, env });
       res.status(200).json({ ...result, async: false });
       return;
     }
 
-    waitUntil(runAnalizzaJob(job.id, body, auth, env));
+    waitUntil(runGeneraPianoJob(job.id, auth, env));
 
     res.status(202).json({
       async: true,
       jobId: job.id,
       status: "pending",
-      message: "Analisi foto avviata. Attendiâ€¦",
+      message: "Generazione calendario avviata. AttendiÔÇª",
     });
   } catch (e) {
-    console.error("[analizza-prato]", e);
+    console.error("[genera-piano]", e);
     res.status(500).json({ error: e.message || String(e) });
   }
 }

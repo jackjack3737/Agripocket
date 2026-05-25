@@ -1,4 +1,4 @@
-import { waitUntil } from "@vercel/functions";
+﻿import { waitUntil } from "@vercel/functions";
 import { generaPianoStagionale } from "../server/pianoStagionale.mjs";
 import { loadServerEnv } from "../server/serverEnv.mjs";
 import { createJob, updateJob, adminClient } from "../server/jobs.mjs";
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       async: true,
       jobId: job.id,
       status: "pending",
-      message: "Generazione calendario avviata. Attendi…",
+      message: "Generazione calendario avviata. AttendiÔÇª",
     });
   } catch (e) {
     console.error("[genera-piano]", e);
