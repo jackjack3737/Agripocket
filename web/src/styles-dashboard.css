@@ -2883,3 +2883,197 @@
 .calendario-mensile {
   width: 100%;
 }
+
+/* Calendario: lista mesi + pannello dettaglio affiancato */
+.cal-layout {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 899px) {
+  .cal-layout:has(.cal-dettaglio:not(.cal-dettaglio--vuoto)) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cal-layout:has(.cal-dettaglio:not(.cal-dettaglio--vuoto)) .cal-dettaglio {
+    order: -1;
+  }
+}
+
+@media (min-width: 900px) {
+  .cal-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    gap: 1.5rem;
+  }
+
+  .cal-layout__dettaglio,
+  .cal-dettaglio {
+    position: sticky;
+    top: 0.75rem;
+    max-height: calc(100vh - 6rem);
+  }
+}
+
+.cal-trattamento-riga--selected {
+  border-color: var(--accent, #2e7d32);
+  background: #f4faf6;
+  box-shadow: 0 0 0 1px rgba(46, 125, 50, 0.15);
+}
+
+.cal-trattamento-riga__badge--dup {
+  color: #5d4037;
+  background: #fff3e0;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+}
+
+.cal-dettaglio {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  min-height: 280px;
+}
+
+.cal-dettaglio--vuoto {
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  background: #fafafa;
+}
+
+.cal-dettaglio__vuoto-titolo {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cal-dettaglio__vuoto-testo {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.cal-dettaglio__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid var(--border, #eee);
+  flex-shrink: 0;
+}
+
+.cal-dettaglio__kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.cal-dettaglio__dup {
+  font-weight: 600;
+  color: #e65100;
+}
+
+.cal-dettaglio__titolo {
+  margin: 0.35rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cal-dettaglio__chiudi {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.cal-dettaglio__scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.cal-dettaglio__sezione {
+  margin: 0;
+}
+
+.cal-dettaglio__scienza {
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: #f8faf8;
+}
+
+.cal-dettaglio__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.cal-dettaglio__testo {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.cal-dettaglio__muted {
+  color: var(--muted);
+}
+
+.cal-dettaglio__prodotti {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.cal-dettaglio__nota {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.cal-dettaglio__foot {
+  padding: 0.85rem 1.1rem 1rem;
+  border-top: 1px solid var(--border, #eee);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.cal-dettaglio__link {
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.cal-dettaglio__link:hover {
+  color: var(--text);
+}

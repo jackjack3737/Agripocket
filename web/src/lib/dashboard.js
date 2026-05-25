@@ -215,6 +215,59 @@ export function interventiInRitardo(list) {
   ).map((i) => ({ ...i, isRitardo: true, data_originale: i.data_prevista }));
 }
 
+function titoloCalendarioKey(item) {
+  let det = item?.dettaglio_trattamento;
+  if (typeof det === "string") {
+    try {
+      det = JSON.parse(det);
+    } catch {
+      det = null;
+    }
+  }
+  const simple =
+    det?.titolo_semplice_azione ||
+    det?.tipo_intervento ||
+    item?.titolo_semplice_azione ||
+    item?.titolo ||
+    "";
+  const cat = String(item?.categoria || "").toLowerCase();
+  return `${cat}|${String(simple).toLowerCase().replace(/\s+/g, " ").trim().slice(0, 96)}`;
+}
+
+function scoreProdottiIntervento(item) {
+  let det = item?.dettaglio_trattamento;
+  if (typeof det === "string") {
+    try {
+      det = JSON.parse(det);
+    } catch {
+      return 0;
+    }
+  }
+  return det?.prodotti_consigliati?.length ?? 0;
+}
+
+/** Stesso giorno + stesso titolo/categoria → una sola riga in UI (evita 5× concimazione potassica). */
+export function dedupeInterventiStessoGiorno(items) {
+  const map = new Map();
+  for (const item of items) {
+    const key = titoloCalendarioKey(item);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { item, ids: [item.id] });
+      continue;
+    }
+    prev.ids.push(item.id);
+    if (scoreProdottiIntervento(item) > scoreProdottiIntervento(prev.item)) {
+      prev.item = item;
+    }
+  }
+  return [...map.values()].map(({ item, ids }) => ({
+    ...item,
+    duplicati_ids: ids,
+    duplicati_uniti: ids.length > 1 ? ids.length : 0,
+  }));
+}
+
 /** Raggruppa interventi pianificati per data_prevista (giorno per giorno). */
 export function groupInterventiPerGiorno(list, { maxGiorni = 365, oggiIso } = {}) {
   const oggi = oggiIso || new Date().toISOString().slice(0, 10);
@@ -239,7 +292,9 @@ export function groupInterventiPerGiorno(list, { maxGiorni = 365, oggiIso } = {}
   const giorni = [...byDay.entries()].map(([data, items]) => ({
     data,
     items: sortInterventiCronologico(
-      [...items].sort((a, b) => (b.isRitardo ? 1 : 0) - (a.isRitardo ? 1 : 0)),
+      dedupeInterventiStessoGiorno(
+        [...items].sort((a, b) => (b.isRitardo ? 1 : 0) - (a.isRitardo ? 1 : 0)),
+      ),
     ),
   }));
 

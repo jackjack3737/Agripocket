@@ -10,19 +10,26 @@ import {
 } from "../../lib/dashboard.js";
 import { interventoToSolum } from "../../lib/mapInterventoSolum.js";
 import { CalendarioFiltri } from "./CalendarioInterventi.jsx";
-import TrattamentoDetailSheet from "./TrattamentoDetailSheet.jsx";
+import TrattamentoDetailPanel from "./TrattamentoDetailPanel.jsx";
 import "../../styles-dashboard.css";
 
-function TrattamentoRiga({ item, onSelect }) {
+function TrattamentoRiga({ item, selected, onSelect }) {
   const task = interventoToSolum(item);
   const done = item.stato === "completato";
+  const isSelected = selected?.id === item.id;
 
   return (
     <li>
       <button
         type="button"
-        className={`cal-trattamento-riga w-full text-left${item.isRitardo ? " cal-trattamento-riga--ritardo" : ""}${done ? " cal-trattamento-riga--done" : ""}`}
+        className={[
+          "cal-trattamento-riga w-full text-left",
+          item.isRitardo ? " cal-trattamento-riga--ritardo" : "",
+          done ? " cal-trattamento-riga--done" : "",
+          isSelected ? " cal-trattamento-riga--selected" : "",
+        ].join("")}
         onClick={() => onSelect(item)}
+        aria-current={isSelected ? "true" : undefined}
       >
         <span className="cal-trattamento-riga__icon" aria-hidden>
           {task.icona}
@@ -35,19 +42,21 @@ function TrattamentoRiga({ item, onSelect }) {
                 : formatDataIt(item.data_prevista)}
             </time>
             {item.isRitardo ? <span className="cal-trattamento-riga__badge">In ritardo</span> : null}
+            {item.duplicati_uniti > 1 ? (
+              <span className="cal-trattamento-riga__badge cal-trattamento-riga__badge--dup">
+                ×{item.duplicati_uniti} uniti
+              </span>
+            ) : null}
           </span>
           <span className="cal-trattamento-riga__titolo">{task.titolo_semplice}</span>
           <span className="cal-trattamento-riga__hint line-clamp-1">{task.descrizione_semplice}</span>
-        </span>
-        <span className="cal-trattamento-riga__cta" aria-hidden>
-          →
         </span>
       </button>
     </li>
   );
 }
 
-function MeseAccordionClick({ mese, open, onToggle, onSelect }) {
+function MeseAccordionClick({ mese, open, onToggle, selected, onSelect }) {
   return (
     <section className={`dash-month${open ? " dash-month--open" : ""}`}>
       <button
@@ -77,7 +86,12 @@ function MeseAccordionClick({ mese, open, onToggle, onSelect }) {
               </h4>
               <ul className="cal-trattamento-list">
                 {items.map((item) => (
-                  <TrattamentoRiga key={item.id} item={item} onSelect={onSelect} />
+                  <TrattamentoRiga
+                    key={item.id}
+                    item={item}
+                    selected={selected}
+                    onSelect={onSelect}
+                  />
                 ))}
               </ul>
             </section>
@@ -141,11 +155,14 @@ export default function CalendarioMensile({
     });
   }
 
-  async function handleComplete(id) {
-    if (!onComplete) return;
-    setCompletingId(id);
+  async function handleComplete(item) {
+    if (!onComplete || !item) return;
+    const ids = item.duplicati_ids?.length ? item.duplicati_ids : [item.id];
+    setCompletingId(item.id);
     try {
-      await onComplete(id, true);
+      for (const id of ids) {
+        await onComplete(id, true);
+      }
       setSelected(null);
     } finally {
       setCompletingId(null);
@@ -159,8 +176,8 @@ export default function CalendarioMensile({
           <div>
             <h2>Il tuo calendario</h2>
             <p className="dash-calendar__lead">
-              Apri ogni mese e tocca un trattamento per vedere i prodotti consigliati e le dosi sul tuo
-              prato.
+              Scegli un mese e un trattamento a sinistra: a destra compaiono prodotti e dosi per il
+              tuo prato.
             </p>
           </div>
           {onAggiornaPiano ? (
@@ -185,35 +202,40 @@ export default function CalendarioMensile({
         onAmbito={setAmbito}
       />
 
-      {loading ? (
-        <p className="dash-calendar-section__empty">Caricamento calendario…</p>
-      ) : mesi.length ? (
-        <div className="dash-month-timeline">
-          {mesi.map((mese) => (
-            <MeseAccordionClick
-              key={mese.monthKey}
-              mese={mese}
-              open={openMonths.has(mese.monthKey)}
-              onToggle={() => toggleMonth(mese.monthKey)}
-              onSelect={setSelected}
-            />
-          ))}
+      <div className="cal-layout">
+        <div className="cal-layout__lista">
+          {loading ? (
+            <p className="dash-calendar-section__empty">Caricamento calendario…</p>
+          ) : mesi.length ? (
+            <div className="dash-month-timeline">
+              {mesi.map((mese) => (
+                <MeseAccordionClick
+                  key={mese.monthKey}
+                  mese={mese}
+                  open={openMonths.has(mese.monthKey)}
+                  onToggle={() => toggleMonth(mese.monthKey)}
+                  selected={selected}
+                  onSelect={setSelected}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="dash-calendar__empty-block">
+              Nessun trattamento in questo periodo. Usa «Sincronizza piano» per generare il programma
+              annuale.
+            </p>
+          )}
         </div>
-      ) : (
-        <p className="dash-calendar__empty-block">
-          Nessun trattamento in questo periodo. Usa «Sincronizza piano» per generare il programma annuale.
-        </p>
-      )}
 
-      <TrattamentoDetailSheet
-        item={selected}
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        userMq={userMq}
-        onComplete={handleComplete}
-        onPin={onPin}
-        completing={completingId === selected?.id}
-      />
+        <TrattamentoDetailPanel
+          item={selected}
+          userMq={userMq}
+          onClose={() => setSelected(null)}
+          onComplete={handleComplete}
+          onPin={onPin}
+          completing={completingId === selected?.id}
+        />
+      </div>
     </div>
   );
 }

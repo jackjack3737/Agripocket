@@ -216,7 +216,7 @@ export default function CalendarioLavori({ profile, session }) {
         </p>
       ) : null}
 
-      <section className="dash-calendar px-4 sm:px-6 pb-12 max-w-3xl mx-auto">
+      <section className="dash-calendar px-4 sm:px-6 pb-12 max-w-6xl mx-auto">
         <CalendarioMensile
           interventi={interventiCalendario}
           onComplete={toggleIntervento}
