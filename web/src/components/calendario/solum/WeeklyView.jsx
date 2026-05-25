@@ -1,20 +1,37 @@
+import { formatDataIt } from "../../../lib/dashboard.js";
 import TaskCard from "./TaskCard.jsx";
 
-export default function WeeklyView({ giorni, inRitardo = [], onComplete, completingId }) {
+function SettimanaTranquilla({ prossimoTask }) {
+  return (
+    <div className="bg-green-50 rounded-2xl p-6 text-center border border-green-100">
+      <h3 className="text-xl font-bold text-gray-800">Settimana tranquilla 🌿</h3>
+      <p className="text-gray-600 mt-2 max-w-sm mx-auto">
+        Il tuo prato al momento non ha bisogno di interventi. Goditi il risultato!
+      </p>
+      {prossimoTask ? (
+        <div className="mt-6 p-4 bg-white rounded-xl shadow-sm border border-green-100 text-left">
+          <span className="text-xs font-bold text-solum-green uppercase tracking-wide">
+            In programma il {formatDataIt(prossimoTask.data_prevista)}
+          </span>
+          <h4 className="font-bold text-gray-800 mt-1">{prossimoTask.titolo_semplice}</h4>
+          <p className="text-sm text-gray-500 mt-1">{prossimoTask.descrizione_semplice}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default function WeeklyView({
+  giorni,
+  inRitardo = [],
+  prossimoTask = null,
+  onComplete,
+  completingId,
+}) {
   const totale = giorni.reduce((n, g) => n + g.tasks.length, 0);
 
   if (!totale && !inRitardo.length) {
-    return (
-      <div className="rounded-3xl bg-white border border-gray-100 p-8 text-center shadow-sm">
-        <p className="text-4xl mb-3" aria-hidden>
-          🌿
-        </p>
-        <p className="text-gray-800 font-medium">Settimana tranquilla</p>
-        <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto">
-          Nessun intervento nei prossimi 7 giorni. Controlla la dispensa per prepararti al mese prossimo.
-        </p>
-      </div>
-    );
+    return <SettimanaTranquilla prossimoTask={prossimoTask} />;
   }
 
   return (

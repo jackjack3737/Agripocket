@@ -262,10 +262,25 @@ export function treatmentFromIntervento(item) {
     (typeof det === "object" && det?.adattamento_dinamico) ||
     null;
 
-  if (det?.tipo_intervento || det?.spiegazione_semplice) {
+  if (
+    det?.tipo_intervento ||
+    det?.titolo_semplice_azione ||
+    det?.messaggio_operativo_breve ||
+    det?.spiegazione_semplice
+  ) {
+    const titoloSemplice =
+      det.titolo_semplice_azione || det.tipo_intervento || item.titolo;
+    const messaggioOperativo =
+      det.messaggio_operativo_breve ||
+      det.spiegazione_semplice ||
+      item.messaggio_ux ||
+      item.spiegazione_semplice;
     return {
-      tipo_intervento: det.tipo_intervento || item.titolo,
-      spiegazione_semplice: det.spiegazione_semplice || item.spiegazione_semplice || item.messaggio_ux,
+      tipo_intervento: titoloSemplice,
+      titolo_semplice_azione: det.titolo_semplice_azione || titoloSemplice,
+      messaggio_operativo_breve: det.messaggio_operativo_breve || messaggioOperativo,
+      titolo_tecnico: det.titolo_tecnico || null,
+      spiegazione_semplice: messaggioOperativo,
       fabbisogno_fisiologico: det.fabbisogno_fisiologico || item.fabbisogno_fisiologico,
       esigenze_molecolari: det.esigenze_molecolari ?? item.esigenze_molecolari ?? [],
       nota_scelta_prodotti: det.nota_scelta_prodotti ?? null,

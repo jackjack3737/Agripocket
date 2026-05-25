@@ -24,6 +24,7 @@ import {
 import { generaCalendarioDeterministico } from "./calendarioBase.mjs";
 import { loadProdotti } from "./prodottiCatalogo.mjs";
 import { loadIndiceProdottiPerIntervento } from "./prodottiMercato.mjs";
+import { applicaSolumVoceADettaglio } from "./solumVoce.mjs";
 
 const EMBED_MODEL = "gemini-embedding-001";
 const CHAT_MODEL = "gemini-2.5-flash";
@@ -154,17 +155,18 @@ async function arricchisciVoceBiochimica(matrice, profilo, env, { admin, vision,
   const weatherBlock = weatherBundle ? formatWeatherForPrompt(weatherBundle) : "";
   const delta = matrice.delta_meteo;
 
-  const prompt = `Sei un biochimico del tappeto erboso (tono accademico, severo, italiano).
+  const prompt = `Sei un biochimico del tappeto erboso e un copywriter UX per app di giardinaggio (italiano).
 
 ## RUOLO
-NON inventare interventi, date, dosi o prodotti commerciali.
+NON inventare interventi, date, dosi o marchi commerciali.
 Ricevi una MATRICE DETERMINISTICA già calcolata da Solum (DB + adattamento meteo).
-Il tuo compito è SOLO arricchire la "descrizione" operativa e la "timeline_bisogni" narrando la matrice.
+Il tuo compito è separare DRASTICAMENTE linguaggio operativo (per l'utente) da linguaggio scientifico (dietro un tap in app).
 
 ## VINCOLI ASSOLUTI
-- Ogni data_prevista nell'output DEVE essere IDENTICA all'input (stesso ordine, stesso numero di righe).
-- titolo, fabbisogno_fisiologico, esigenze_molecolari, categoria, priorita: NON modificare il significato; puoi rifinire descrizione.
-- Vietati marchi commerciali.
+- Stesso numero di righe in output e input; ogni riga deve avere lo stesso \`id_riferimento\` dell'input.
+- NON mescolare gergo tecnico nel titolo_semplice_azione né nel messaggio_operativo_breve.
+- \`prodotti_consigliati\`: solo nomi generici o categorie (es. "Concime NP-K", "Biostimolante alghe"), mai marchi registrati.
+- data_prevista, categoria, priorita, esigenze_molecolari: non alterare il significato agronomico dell'input.
 
 Profilo:
 ${formatProfileForPrompt(profilo)}
@@ -183,33 +185,37 @@ ${kb || "(nessun chunk)"}
 
 MATRICE INPUT (${interventiBase.length} righe):
 ${JSON.stringify(
-  interventiBase.map((i) => ({
+  interventiBase.map((i, idx) => ({
+    id_riferimento: String(idx),
+    data_prevista: i.data_prevista,
     titolo: i.titolo,
     fabbisogno_fisiologico: i.fabbisogno_fisiologico,
     esigenze_molecolari: i.esigenze_molecolari,
     categoria: i.categoria,
     priorita: i.priorita,
-    data_prevista: i.data_prevista,
     adattamento_dinamico: i.adattamento_dinamico,
   })),
 )}
 
+Genera un output JSON rigoroso con questa esatta struttura per ogni intervento.
+NON mescolare il linguaggio tecnico con quello semplice.
+
 Rispondi SOLO JSON:
 {
   "timeline_bisogni": {
-    "oggi": "sintesi emergenza da delta meteo e prossimi interventi",
+    "oggi": "sintesi emergenza da delta meteo e prossimi interventi (linguaggio semplice)",
     "prossimo_mese": "bisogni entro 30 giorni",
     "finestre_stagionali": [{ "periodo": "MESE", "esigenza": "..." }]
   },
   "interventi": [
     {
-      "data_prevista": "YYYY-MM-DD (identica input)",
-      "titolo": "identico input",
-      "fabbisogno_fisiologico": "identico input",
-      "esigenze_molecolari": ["identico input"],
-      "categoria": "identico input",
-      "priorita": "identico input",
-      "descrizione": "2-4 frasi accademiche che spiegano il razionale fisiologico"
+      "id_riferimento": "ID originale passato in input (stringa)",
+      "data_prevista": "YYYY-MM-DD identica input",
+      "titolo_semplice_azione": "Breve e orientato all'azione (es. 'Rinforzo Estivo' o 'Taglio e Pulizia'). MAX 4 parole.",
+      "messaggio_operativo_breve": "Istruzione pratica per l'utente (es. 'Spargi il prodotto su prato asciutto prima di sera'). NIENTE gergo. MAX 120 caratteri.",
+      "titolo_tecnico": "L'esigenza molecolare o fenologica (es. 'Mitigazione stress da ROS').",
+      "fabbisogno_fisiologico": "La spiegazione accademica dettagliata del PERCHÉ facciamo questo intervento. Tono scientifico e autorevole.",
+      "prodotti_consigliati": ["Nome generico 1", "Nome generico 2"]
     }
   ]
 }`;
@@ -222,15 +228,38 @@ Rispondi SOLO JSON:
     return { interventi: interventiBase, timeline_bisogni: null };
   }
 
+  const llmById = new Map(
+    (parsed.interventi || []).map((i) => [String(i.id_riferimento ?? ""), i]),
+  );
   const llmByDate = new Map(
     (parsed.interventi || []).map((i) => [String(i.data_prevista), i]),
   );
 
   const merged = interventiBase.map((base, idx) => {
-    const llm = llmByDate.get(base.data_prevista) || {};
+    const llm = llmById.get(String(idx)) || llmByDate.get(base.data_prevista) || {};
+    const titoloSemplice = String(llm.titolo_semplice_azione || "").trim();
+    const messaggioOperativo = String(llm.messaggio_operativo_breve || "").trim();
+    const titoloTecnico = String(llm.titolo_tecnico || "").trim();
+    const fabbisognoLlm = String(llm.fabbisogno_fisiologico || "").trim();
+
     return {
       ...base,
-      descrizione: String(llm.descrizione || base.fabbisogno_fisiologico || "").trim(),
+      titolo: titoloSemplice || base.titolo,
+      messaggio_ux: messaggioOperativo || base.messaggio_ux,
+      messaggio_operativo_breve: messaggioOperativo,
+      titolo_semplice_azione: titoloSemplice,
+      titolo_tecnico_solum: titoloTecnico,
+      fabbisogno_fisiologico: fabbisognoLlm || base.fabbisogno_fisiologico,
+      descrizione: fabbisognoLlm || base.fabbisogno_fisiologico || base.descrizione,
+      solum_voce: {
+        titolo_semplice_azione: titoloSemplice,
+        messaggio_operativo_breve: messaggioOperativo,
+        titolo_tecnico: titoloTecnico,
+        fabbisogno_fisiologico: fabbisognoLlm,
+        prodotti_consigliati_gemini: Array.isArray(llm.prodotti_consigliati)
+          ? llm.prodotti_consigliati.map(String)
+          : [],
+      },
       ordine: idx,
     };
   });
@@ -468,7 +497,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     loadProdotti(admin),
     loadIndiceProdottiPerIntervento(admin),
   ]);
-  const sanitizzati = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
+  const sanitizzatiRaw = await sanitizzaPianoCompleto(conControlli, profilo, oggi, {
     storico,
     prodotti,
     vision,
@@ -476,6 +505,7 @@ export async function generaPianoStagionale({ authHeader, env }) {
     pureAgronomy: false,
     indiceProdottiIntervento,
   });
+  const sanitizzati = applicaSolumVoceADettaglio(sanitizzatiRaw);
   const timeline_bisogni = buildTimelineBisogni(sanitizzati, oggi, {
     llmTimeline: timelineLlm,
     weatherBundle,

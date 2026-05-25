@@ -3,9 +3,12 @@ import {
   dispensaPerMese,
   gruppiSettimanaCorrente,
   interventiInRitardoSolum,
+  prossimoInterventoSolum,
+  timelineFuturoSolum,
 } from "../../lib/mapInterventoSolum.js";
 import WeeklyView from "./solum/WeeklyView.jsx";
 import DispensaView from "./solum/DispensaView.jsx";
+import PianoFuturoPanel from "./solum/PianoFuturoPanel.jsx";
 import "../../styles/calendario-solum.css";
 
 const TAB_SETTIMANA = "settimana";
@@ -20,11 +23,15 @@ export default function CalendarioSolum({
 }) {
   const [tab, setTab] = useState(TAB_SETTIMANA);
   const [completingId, setCompletingId] = useState(null);
+  const [pianoFuturoOpen, setPianoFuturoOpen] = useState(false);
   const oggi = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const giorni = useMemo(() => gruppiSettimanaCorrente(interventi, oggi), [interventi, oggi]);
   const dispensa = useMemo(() => dispensaPerMese(interventi, oggi), [interventi, oggi]);
   const inRitardo = useMemo(() => interventiInRitardoSolum(interventi, oggi), [interventi, oggi]);
+  const prossimoTask = useMemo(() => prossimoInterventoSolum(interventi, oggi), [interventi, oggi]);
+  const timelineFuturo = useMemo(() => timelineFuturoSolum(interventi, oggi), [interventi, oggi]);
+  const haPianoFuturo = timelineFuturo.some((m) => m.tasks.length > 0);
 
   async function handleComplete(id) {
     if (!onComplete) return;
@@ -88,18 +95,38 @@ export default function CalendarioSolum({
         ) : (
           <div role="tabpanel">
             {tab === TAB_SETTIMANA ? (
-              <WeeklyView
-                giorni={giorni}
-                inRitardo={inRitardo}
-                onComplete={handleComplete}
-                completingId={completingId}
-              />
+              <>
+                <WeeklyView
+                  giorni={giorni}
+                  inRitardo={inRitardo}
+                  prossimoTask={prossimoTask}
+                  onComplete={handleComplete}
+                  completingId={completingId}
+                />
+                {haPianoFuturo ? (
+                  <div className="mt-8 text-center">
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-solum-green hover:text-solum-green/80 transition-colors px-4 py-2 rounded-xl hover:bg-solum-green-light/50"
+                      onClick={() => setPianoFuturoOpen(true)}
+                    >
+                      Vedi tutti gli interventi futuri
+                    </button>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <DispensaView mesi={dispensa} />
             )}
           </div>
         )}
       </div>
+
+      <PianoFuturoPanel
+        mesi={timelineFuturo}
+        open={pianoFuturoOpen}
+        onClose={() => setPianoFuturoOpen(false)}
+      />
     </div>
   );
 }
