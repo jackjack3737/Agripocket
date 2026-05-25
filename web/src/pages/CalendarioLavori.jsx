@@ -7,7 +7,6 @@ import {
   saveTimelineBisogni,
   timelineDaInterventi,
 } from "../lib/timelineBisogni";
-import { abitudiniDaProfilo } from "../lib/abitudiniPrato.js";
 import {
   filtraInterventiPerCalendario,
   haCalendarioStagionale,
@@ -19,32 +18,6 @@ import {
 import { generaPianoAnnuale } from "../lib/generaPiano";
 import { CALENDARIO_REFRESH_EVENT } from "../lib/calendarioMeteoClient";
 import { supabase } from "../lib/supabase";
-
-function AbitudiniPratoCard({ profile }) {
-  const abitudini = useMemo(() => abitudiniDaProfilo(profile), [profile]);
-  if (!abitudini.length) return null;
-  return (
-    <section className="dash-card dash-abitudini">
-      <h2 className="dash-card__title">Le tue abitudini</h2>
-      <p className="dash-card__lead">
-        Taglio e irrigazione non compaiono nel calendario lavori: segui queste routine dal profilo.
-      </p>
-      <ul className="dash-abitudini__list">
-        {abitudini.map((a) => (
-          <li key={a.id} className="dash-abitudini__item">
-            <span className="dash-abitudini__icon" aria-hidden>
-              {a.icon}
-            </span>
-            <div className="dash-abitudini__body">
-              <strong>{a.titolo}</strong>
-              <p>{a.descrizione}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 export default function CalendarioLavori({ profile, session }) {
   const location = useLocation();
@@ -206,8 +179,6 @@ export default function CalendarioLavori({ profile, session }) {
       ) : null}
 
       {error ? <p className="form-msg form-msg--error">{error}</p> : null}
-
-      <AbitudiniPratoCard profile={profile} />
 
       {soloControlliFoto ? (
         <p className="dash-calendar__warn dash-calendar__warn--piano" role="status">
