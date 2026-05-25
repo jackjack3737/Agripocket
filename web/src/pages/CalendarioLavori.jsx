@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import DashPageHeader from "../components/DashPageHeader";
-import CalendarioSolum from "../components/calendario/CalendarioSolum";
+import CalendarioMensile from "../components/calendario/CalendarioMensile";
 import {
   loadTimelineBisogni,
   saveTimelineBisogni,
@@ -13,6 +13,7 @@ import {
   loadInterventi,
   syncControlliMensili,
   setInterventoCompletato,
+  setInterventoManualOverride,
   sortInterventiCronologico,
 } from "../lib/dashboard";
 import { generaPianoAnnuale } from "../lib/generaPiano";
@@ -51,10 +52,7 @@ export default function CalendarioLavori({ profile, session }) {
   );
   const meseCorrente = oggiIso.slice(0, 7);
 
-  const interventiCalendario = useMemo(
-    () => filtraInterventiPerCalendario(interventi, { tipo: "tutti", ambito: "anno", meseCorrente }),
-    [interventi, meseCorrente],
-  );
+  const interventiCalendario = interventi;
 
   const soloControlliFoto =
     !hasPiano && interventi.some((i) => i.fonte === "controllo_mensile" && i.stato === "pianificato");
@@ -154,6 +152,17 @@ export default function CalendarioLavori({ profile, session }) {
     }
   }
 
+  async function togglePin(id, manualOverride) {
+    try {
+      await setInterventoManualOverride(id, manualOverride);
+      setInterventi((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, manual_override: !!manualOverride } : i)),
+      );
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   async function toggleIntervento(id, completato) {
     try {
       await setInterventoCompletato(id, completato);
@@ -212,18 +221,19 @@ export default function CalendarioLavori({ profile, session }) {
         </p>
       ) : null}
 
-      <section className="dash-calendar dash-calendar--solum bg-slate-50/50">
-        <CalendarioSolum
+      <section className="dash-calendar px-4 sm:px-6 pb-12 max-w-3xl mx-auto">
+        <CalendarioMensile
           interventi={interventiCalendario}
           onComplete={toggleIntervento}
+          onPin={togglePin}
           loading={loading || generatingPiano}
           onAggiornaPiano={handleGeneraPiano}
           generatingPiano={generatingPiano}
           canAggiornaPiano={!!profile?.localita}
           userMq={profile?.superficie_mq ?? 150}
-          initialTab={location.state?.tab}
           oggiIso={oggiIso}
           oggiSimulato={oggiSimulato}
+          meseCorrente={meseCorrente}
         />
       </section>
     </div>

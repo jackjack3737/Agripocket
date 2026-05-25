@@ -216,8 +216,8 @@ export function interventiInRitardo(list) {
 }
 
 /** Raggruppa interventi pianificati per data_prevista (giorno per giorno). */
-export function groupInterventiPerGiorno(list, { maxGiorni = 365 } = {}) {
-  const oggi = new Date().toISOString().slice(0, 10);
+export function groupInterventiPerGiorno(list, { maxGiorni = 365, oggiIso } = {}) {
+  const oggi = oggiIso || new Date().toISOString().slice(0, 10);
   const pianificati = sortInterventiCronologico(
     filtraCalendarioStrategico(
       list.filter((i) => i.stato === "pianificato" && i.data_prevista),
@@ -323,8 +323,8 @@ export function formatMeseIt(yyyyMm) {
 }
 
 /** Raggruppa per mese (YYYY-MM) con giorni al interno. */
-export function groupInterventiPerMese(list) {
-  const giorni = groupInterventiPerGiorno(list);
+export function groupInterventiPerMese(list, opts = {}) {
+  const giorni = groupInterventiPerGiorno(list, opts);
   const byMonth = new Map();
 
   for (const day of giorni) {
