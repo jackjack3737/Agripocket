@@ -12,23 +12,32 @@ import { interventoToSolum } from "../../lib/mapInterventoSolum.js";
 import { CalendarioFiltri } from "./CalendarioInterventi.jsx";
 import TrattamentoDetailPanel from "./TrattamentoDetailPanel.jsx";
 
-function TrattamentoRiga({ item, selected, onSelect }) {
+function TrattamentoRiga({
+  item,
+  selected,
+  onSelect,
+  userMq,
+  onComplete,
+  onPin,
+  completing,
+}) {
   const task = interventoToSolum(item);
   const done = item.stato === "completato";
-  const isSelected = selected?.id === item.id;
+  const isOpen = selected?.id === item.id;
 
   return (
-    <li>
+    <li className={`cal-trattamento-item${isOpen ? " cal-trattamento-item--open" : ""}`}>
       <button
         type="button"
         className={[
           "cal-trattamento-riga w-full text-left",
           item.isRitardo ? " cal-trattamento-riga--ritardo" : "",
           done ? " cal-trattamento-riga--done" : "",
-          isSelected ? " cal-trattamento-riga--selected" : "",
+          isOpen ? " cal-trattamento-riga--selected" : "",
         ].join("")}
-        onClick={() => onSelect(item)}
-        aria-current={isSelected ? "true" : undefined}
+        onClick={() => onSelect(isOpen ? null : item)}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? `dettaglio-${item.id}` : undefined}
       >
         <span className="cal-trattamento-riga__icon" aria-hidden>
           {task.icona}
@@ -50,12 +59,38 @@ function TrattamentoRiga({ item, selected, onSelect }) {
           <span className="cal-trattamento-riga__titolo">{task.titolo_semplice}</span>
           <span className="cal-trattamento-riga__hint line-clamp-1">{task.descrizione_semplice}</span>
         </span>
+        <span className="cal-trattamento-riga__chev" aria-hidden>
+          {isOpen ? "−" : "+"}
+        </span>
       </button>
+      {isOpen ? (
+        <div id={`dettaglio-${item.id}`} className="cal-trattamento-item__dettaglio">
+          <TrattamentoDetailPanel
+            layout="inline"
+            item={item}
+            userMq={userMq}
+            onClose={() => onSelect(null)}
+            onComplete={onComplete}
+            onPin={onPin}
+            completing={completing}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }
 
-function MeseAccordionClick({ mese, open, onToggle, selected, onSelect }) {
+function MeseAccordionClick({
+  mese,
+  open,
+  onToggle,
+  selected,
+  onSelect,
+  userMq,
+  onComplete,
+  onPin,
+  completingId,
+}) {
   return (
     <section className={`dash-month${open ? " dash-month--open" : ""}`}>
       <button
@@ -90,6 +125,10 @@ function MeseAccordionClick({ mese, open, onToggle, selected, onSelect }) {
                     item={item}
                     selected={selected}
                     onSelect={onSelect}
+                    userMq={userMq}
+                    onComplete={onComplete}
+                    onPin={onPin}
+                    completing={completingId === item.id}
                   />
                 ))}
               </ul>
@@ -175,8 +214,8 @@ export default function CalendarioMensile({
           <div>
             <h2>Il tuo calendario</h2>
             <p className="dash-calendar__lead">
-              Scegli un mese e un trattamento a sinistra: a destra compaiono prodotti e dosi per il
-              tuo prato.
+              Tocca un trattamento per aprire sotto di esso prodotti, dosi e scienza. Tocca di nuovo
+              per chiudere e riportare su la lista.
             </p>
           </div>
           {onAggiornaPiano ? (
@@ -201,41 +240,32 @@ export default function CalendarioMensile({
         onAmbito={setAmbito}
       />
 
-      <div className="cal-layout">
-        <div className="cal-layout__lista">
-          {loading ? (
-            <p className="dash-calendar-section__empty">Caricamento calendario…</p>
-          ) : mesi.length ? (
-            <div className="dash-month-timeline">
-              {mesi.map((mese) => (
-                <MeseAccordionClick
-                  key={mese.monthKey}
-                  mese={mese}
-                  open={openMonths.has(mese.monthKey)}
-                  onToggle={() => toggleMonth(mese.monthKey)}
-                  selected={selected}
-                  onSelect={setSelected}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="dash-calendar__empty-block">
-              Nessun trattamento in questo periodo. Usa «Sincronizza piano» per generare il programma
-              annuale.
-            </p>
-          )}
-        </div>
-
-        <div className="cal-layout__dettaglio">
-          <TrattamentoDetailPanel
-            item={selected}
-            userMq={userMq}
-            onClose={() => setSelected(null)}
-            onComplete={handleComplete}
-            onPin={onPin}
-            completing={completingId === selected?.id}
-          />
-        </div>
+      <div className="cal-layout cal-layout--inline">
+        {loading ? (
+          <p className="dash-calendar-section__empty">Caricamento calendario…</p>
+        ) : mesi.length ? (
+          <div className="dash-month-timeline">
+            {mesi.map((mese) => (
+              <MeseAccordionClick
+                key={mese.monthKey}
+                mese={mese}
+                open={openMonths.has(mese.monthKey)}
+                onToggle={() => toggleMonth(mese.monthKey)}
+                selected={selected}
+                onSelect={setSelected}
+                userMq={userMq}
+                onComplete={handleComplete}
+                onPin={onPin}
+                completingId={completingId}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="dash-calendar__empty-block">
+            Nessun trattamento in questo periodo. Usa «Sincronizza piano» per generare il programma
+            annuale.
+          </p>
+        )}
       </div>
     </div>
   );

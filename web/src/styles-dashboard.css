@@ -2906,55 +2906,55 @@
   width: 100%;
 }
 
-/* Calendario: lista mesi (sinistra) + pannello prodotti (destra) */
+/* Calendario: lista unica con dettaglio espandibile sotto ogni riga */
 .cal-layout {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  align-items: stretch;
-}
-
-.cal-layout__lista {
-  flex: 1 1 auto;
-  min-width: 0;
   width: 100%;
 }
 
-.cal-layout__dettaglio {
-  flex: 0 0 auto;
-  width: 100%;
-  min-width: 0;
+.cal-layout--inline {
+  max-width: 52rem;
 }
 
-@media (max-width: 767px) {
-  .cal-dettaglio--vuoto {
-    display: none;
+.cal-trattamento-item {
+  list-style: none;
+}
+
+.cal-trattamento-item--open .cal-trattamento-riga {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+.cal-trattamento-item__dettaglio {
+  margin: 0 0 0.65rem;
+  animation: cal-dettaglio-in 0.22s ease-out;
+}
+
+@keyframes cal-dettaglio-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@media (min-width: 768px) {
-  .cal-layout {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 1.5rem;
-  }
+.cal-trattamento-riga__chev {
+  flex-shrink: 0;
+  align-self: center;
+  width: 1.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--muted);
+  margin-left: 0.25rem;
+}
 
-  .cal-layout__lista {
-    flex: 1 1 58%;
-    min-width: 0;
-  }
-
-  .cal-layout__dettaglio {
-    flex: 0 0 340px;
-    width: 340px;
-    max-width: 42%;
-  }
-
-  .cal-layout__dettaglio .cal-dettaglio {
-    position: sticky;
-    top: 0.75rem;
-    max-height: calc(100vh - 6rem);
-  }
+.cal-trattamento-riga--selected .cal-trattamento-riga__chev {
+  color: var(--accent, #2e7d32);
+  font-weight: 600;
 }
 
 .dash-calendar--wide {
@@ -2987,6 +2987,36 @@
   background: #fff;
   overflow: hidden;
   min-height: 280px;
+}
+
+.cal-dettaglio--inline {
+  min-height: 0;
+  border: 1px solid rgba(46, 125, 50, 0.22);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: #f8faf8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.cal-dettaglio--inline .cal-dettaglio__head {
+  padding-top: 0.65rem;
+  padding-bottom: 0.5rem;
+}
+
+.cal-dettaglio--inline .cal-dettaglio__chiudi {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #dde5dd;
+  background: #fff;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.cal-dettaglio--inline .cal-dettaglio__scroll {
+  max-height: none;
+  overflow: visible;
 }
 
 .cal-dettaglio--vuoto {

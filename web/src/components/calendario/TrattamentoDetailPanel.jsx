@@ -69,7 +69,9 @@ export default function TrattamentoDetailPanel({
   onComplete,
   onPin,
   completing = false,
+  layout = "panel",
 }) {
+  const inline = layout === "inline";
   const [prodottiOpen, setProdottiOpen] = useState(false);
   const [scienzaOpen, setScienzaOpen] = useState(false);
   const [scienzaLoading, setScienzaLoading] = useState(false);
@@ -85,6 +87,7 @@ export default function TrattamentoDetailPanel({
   }, [item?.id]);
 
   if (!item) {
+    if (inline) return null;
     return (
       <div className="cal-dettaglio cal-dettaglio--vuoto">
         <p className="cal-dettaglio__vuoto-titolo">Dettaglio trattamento</p>
@@ -141,8 +144,14 @@ export default function TrattamentoDetailPanel({
     ? `${prodotti.length} ${prodotti.length === 1 ? "prodotto" : "prodotti"}`
     : "—";
 
+  const Wrapper = inline ? "div" : "aside";
+  const accPrefix = `acc-${item.id}`;
+
   return (
-    <aside className="cal-dettaglio" aria-labelledby="trattamento-panel-title">
+    <Wrapper
+      className={`cal-dettaglio${inline ? " cal-dettaglio--inline" : ""}`}
+      aria-labelledby={inline ? undefined : "trattamento-panel-title"}
+    >
       <header className="cal-dettaglio__head">
         <div className="min-w-0 flex-1">
           <p className="cal-dettaglio__kicker">
@@ -151,25 +160,27 @@ export default function TrattamentoDetailPanel({
               <span className="cal-dettaglio__dup"> · {item.duplicati_uniti} uniti in agenda</span>
             ) : null}
           </p>
-          <h2 id="trattamento-panel-title" className="cal-dettaglio__titolo">
-            {task.titolo_semplice}
-          </h2>
+          {!inline ? (
+            <h2 id="trattamento-panel-title" className="cal-dettaglio__titolo">
+              {task.titolo_semplice}
+            </h2>
+          ) : null}
         </div>
         {onClose ? (
           <button
             type="button"
             className="cal-dettaglio__chiudi"
             onClick={onClose}
-            aria-label="Deseleziona"
+            aria-label="Chiudi dettaglio"
           >
-            ✕
+            {inline ? "Chiudi" : "✕"}
           </button>
         ) : null}
       </header>
 
       <div className="cal-dettaglio__accordions">
         <AccordionToggle
-          id="acc-prodotti"
+          id={`${accPrefix}-prodotti`}
           title={`Prodotti consigliati · ${userMq} m²`}
           badge={prodottiBadge}
           open={prodottiOpen}
@@ -196,7 +207,7 @@ export default function TrattamentoDetailPanel({
         </AccordionToggle>
 
         <AccordionToggle
-          id="acc-scienza"
+          id={`${accPrefix}-scienza`}
           title="Guarda la scienza"
           badge={scienza?.chunk_count ? `${scienza.chunk_count} fonti` : null}
           open={scienzaOpen}
@@ -292,6 +303,6 @@ export default function TrattamentoDetailPanel({
           </button>
         ) : null}
       </footer>
-    </aside>
+    </Wrapper>
   );
 }
