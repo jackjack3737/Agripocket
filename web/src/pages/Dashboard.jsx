@@ -124,7 +124,13 @@ export default function Dashboard({ profile, session, onProfileUpdate }) {
 
   return (
     <div className="page dashboard">
-      <DashPageHeader active="dashboard" profile={profile} onLogout={logout} />
+      <DashPageHeader
+        active="dashboard"
+        profile={profile}
+        session={session}
+        onLogout={logout}
+        onAgronomoAnalisiComplete={() => refresh()}
+      />
 
       {banner ? (
         <p className="dash-banner">

@@ -1,6 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "./AppNav";
+import ConsulenteZonaFoto from "./ConsulenteZonaFoto";
+import { loadZonaDefault } from "../lib/zonePrato";
 
 const TAGLINE_WORDS = ["la", "scienza", "sotto", "il", "verde"];
 
@@ -12,9 +14,38 @@ function taglineGiaVista() {
   }
 }
 
-/** Header app: logo + tagline + nav sempre visibili su dashboard, analisi foto, calendario. */
-export default function DashPageHeader({ active, onLogout, profile }) {
+const PAGINE_CON_AGRONOMO = new Set(["dashboard", "calendario"]);
+
+/** Header app: logo + tagline + nav + Chiedi all'agronomo (dashboard/calendario). */
+export default function DashPageHeader({
+  active,
+  onLogout,
+  profile,
+  session,
+  onAgronomoAnalisiComplete,
+}) {
   const taglineReady = useMemo(() => taglineGiaVista(), []);
+  const userId = session?.user?.id;
+  const mostraAgronomo = PAGINE_CON_AGRONOMO.has(active) && Boolean(userId);
+  const [zonaDefault, setZonaDefault] = useState(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setZonaDefault(null);
+      return undefined;
+    }
+    let cancelled = false;
+    loadZonaDefault(userId)
+      .then((z) => {
+        if (!cancelled) setZonaDefault(z);
+      })
+      .catch(() => {
+        if (!cancelled) setZonaDefault(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (taglineReady) return undefined;
@@ -76,6 +107,18 @@ export default function DashPageHeader({ active, onLogout, profile }) {
         </div>
       </div>
       <AppNav active={active} profile={profile} />
+      {mostraAgronomo ? (
+        <div className="dash-header__agronomo">
+          <ConsulenteZonaFoto
+            variant="google"
+            profile={profile}
+            userId={userId}
+            zonaId={zonaDefault?.id}
+            zonaNome={zonaDefault?.nome_zona}
+            onAnalisiComplete={onAgronomoAnalisiComplete}
+          />
+        </div>
+      ) : null}
     </header>
   );
 }

@@ -188,7 +188,13 @@ export default function CalendarioLavori({ profile, session }) {
 
   return (
     <div className="page dashboard dashboard--calendario">
-      <DashPageHeader active="calendario" profile={profile} onLogout={logout} />
+      <DashPageHeader
+        active="calendario"
+        profile={profile}
+        session={session}
+        onLogout={logout}
+        onAgronomoAnalisiComplete={() => refresh()}
+      />
 
       {banner ? (
         <p className="dash-banner">
