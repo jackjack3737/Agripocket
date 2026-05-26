@@ -342,6 +342,7 @@ function catalogoRigaAConsigliato(p, profilo, intervento) {
     id: p.id,
     nome_commerciale: p.nome,
     marca: p.marca || "",
+    composizione: p.composizione || null,
     principio_attivo: p.principio_attivo || p.composizione?.slice(0, 120) || null,
     macro_categoria: inferMacroCategoriaProdotto(p, intervento),
     a_cosa_serve: edu?.a_cosa_serve ?? target ?? p.descrizione?.slice(0, 160) ?? null,
@@ -364,6 +365,9 @@ function catalogoRigaAConsigliato(p, profilo, intervento) {
     match_score: p._match_score ?? null,
     match_score_punti: p._match_score_punti ?? null,
     motivo_suggerimento: p._match_reason ?? null,
+    target_fisiologico: target,
+    is_bio: Boolean(p.is_bio),
+    composizione_molecolare: p.composizione_molecolare_dichiarata ?? null,
   };
 }
 

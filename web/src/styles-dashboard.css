@@ -3118,6 +3118,63 @@
   display: none;
 }
 
+/* Scheda prodotto espandibile (click sul nome commerciale) */
+.cal-prod__nome-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+
+.cal-prod__chev {
+  width: 1.25rem;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: #6b7c6f;
+  font-weight: 400;
+}
+
+.cal-prod__scheda {
+  margin-top: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e8ece8;
+}
+
+.cal-prod__scheda-riga {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cal-prod__scheda-riga:last-child {
+  margin-bottom: 0;
+}
+
+.cal-prod__scheda-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a8f;
+  margin-bottom: 0.15rem;
+}
+
+.cal-prod__scheda-value {
+  display: block;
+  color: #334155;
+  word-break: break-word;
+}
+
+.cal-prod__scheda-muted {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .cal-dettaglio__chiudi {
   border: none;
   background: transparent;
