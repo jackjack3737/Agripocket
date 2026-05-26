@@ -1,11 +1,38 @@
+import { useMemo } from "react";
 import { formatDataIt } from "../../../lib/dashboard.js";
 import TaskCard from "./TaskCard.jsx";
+
+const MESI_IT = [
+  "Gennaio",
+  "Febbraio",
+  "Marzo",
+  "Aprile",
+  "Maggio",
+  "Giugno",
+  "Luglio",
+  "Agosto",
+  "Settembre",
+  "Ottobre",
+  "Novembre",
+  "Dicembre",
+];
+
+function partiData(iso) {
+  const d = new Date(`${iso}T12:00:00`);
+  const weekday = d.toLocaleDateString("it-IT", { weekday: "long" });
+  const month = MESI_IT[d.getMonth()] || d.toLocaleDateString("it-IT", { month: "long" });
+  return {
+    weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+    dayNum: d.getDate(),
+    month: month.charAt(0).toUpperCase() + month.slice(1),
+  };
+}
 
 function TeaserProssimoIntervento({ task }) {
   const dataLabel = formatDataIt(task.data_prevista);
 
   return (
-    <div className="mt-16 pt-10 border-t border-slate-100/80 max-w-sm mx-auto text-left">
+    <div className="mt-16 pt-10 border-t border-slate-100 max-w-sm mx-auto text-left">
       <p className="text-[10px] tracking-widest text-slate-400 font-bold uppercase">
         In programma il {dataLabel}
       </p>
@@ -34,8 +61,72 @@ function SettimanaTranquilla({ prossimoTask }) {
   );
 }
 
-const sectionLabelClass =
-  "text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-5";
+function ColonnaData({ iso, isOggi, ritardo }) {
+  const { weekday, dayNum, month } = partiData(iso);
+
+  return (
+    <div
+      className={[
+        "w-16 shrink-0 flex flex-col items-end text-right pt-1 pr-0.5",
+        isOggi ? "relative" : "",
+      ].join(" ")}
+    >
+      {ritardo ? (
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+          Ritardo
+        </span>
+      ) : (
+        <span
+          className={[
+            "text-xs uppercase tracking-wide",
+            isOggi ? "text-[#2d6a4f] font-medium" : "text-slate-500",
+          ].join(" ")}
+        >
+          {weekday}
+        </span>
+      )}
+      <span
+        className={[
+          "text-2xl leading-none mt-0.5 tabular-nums",
+          isOggi ? "font-semibold text-[#2d6a4f]" : "font-light text-slate-800",
+        ].join(" ")}
+      >
+        {dayNum}
+      </span>
+      <span className={["text-xs mt-0.5", isOggi ? "text-[#2d6a4f]/80" : "text-slate-500"].join(" ")}>
+        {month}
+      </span>
+      {isOggi ? (
+        <span
+          className="mt-2 mr-1 w-1.5 h-1.5 rounded-full bg-[#2d6a4f]"
+          aria-hidden
+          title="Oggi"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function RigaTimeline({ iso, tasks, isOggi, ritardo, onComplete, completingId, userMq }) {
+  if (!tasks.length) return null;
+
+  return (
+    <div className="flex gap-4 sm:gap-6">
+      <ColonnaData iso={iso} isOggi={isOggi} ritardo={ritardo} />
+      <div className="flex-1 min-w-0 flex flex-col gap-4">
+        {tasks.map((task) => (
+          <TaskCard
+            key={task.id}
+            task={task}
+            onComplete={onComplete}
+            completingId={completingId}
+            userMq={userMq}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function WeeklyView({
   giorni,
@@ -45,55 +136,55 @@ export default function WeeklyView({
   completingId,
   userMq = 150,
 }) {
+  const oggiIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const totale = giorni.reduce((n, g) => n + g.tasks.length, 0);
 
   if (!totale && !inRitardo.length) {
     return <SettimanaTranquilla prossimoTask={prossimoTask} />;
   }
 
+  const giorniConTask = giorni.filter((g) => g.tasks.length > 0);
+
   return (
-    <div className="space-y-12">
-      {inRitardo.length ? (
-        <section aria-labelledby="solum-ritardo">
-          <h3 id="solum-ritardo" className={`${sectionLabelClass} text-amber-600/90`}>
+    <div className="space-y-10 sm:space-y-12">
+      {inRitardo.length > 0 ? (
+        <section aria-labelledby="solum-ritardo" className="space-y-8">
+          <h3
+            id="solum-ritardo"
+            className="text-[10px] font-bold uppercase tracking-widest text-amber-600/90 pl-[4.5rem] sm:pl-[5.5rem]"
+          >
             Da recuperare
           </h3>
-          <ul className="space-y-4">
+          <div className="space-y-10 sm:space-y-12">
             {inRitardo.map((task) => (
-              <li key={task.id}>
-                <TaskCard
-                  task={task}
-                  onComplete={onComplete}
-                  completingId={completingId}
-                  userMq={userMq}
-                />
-              </li>
+              <RigaTimeline
+                key={task.id}
+                iso={task.data_prevista || oggiIso}
+                tasks={[task]}
+                isOggi={task.data_prevista === oggiIso}
+                ritardo
+                onComplete={onComplete}
+                completingId={completingId}
+                userMq={userMq}
+              />
             ))}
-          </ul>
+          </div>
         </section>
       ) : null}
-      {giorni.map((giorno) => {
-        if (!giorno.tasks.length) return null;
-        return (
-          <section key={giorno.data} aria-labelledby={`giorno-${giorno.data}`}>
-            <h3 id={`giorno-${giorno.data}`} className={sectionLabelClass}>
-              {giorno.etichetta}
-            </h3>
-            <ul className="space-y-4">
-              {giorno.tasks.map((task) => (
-                <li key={task.id}>
-                  <TaskCard
-                  task={task}
-                  onComplete={onComplete}
-                  completingId={completingId}
-                  userMq={userMq}
-                />
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+
+      <div className="space-y-10 sm:space-y-12" aria-label="Interventi della settimana">
+        {giorniConTask.map((giorno) => (
+          <RigaTimeline
+            key={giorno.data}
+            iso={giorno.data}
+            tasks={giorno.tasks}
+            isOggi={giorno.data === oggiIso}
+            onComplete={onComplete}
+            completingId={completingId}
+            userMq={userMq}
+          />
+        ))}
+      </div>
     </div>
   );
 }
