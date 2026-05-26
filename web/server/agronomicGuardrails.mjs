@@ -216,6 +216,21 @@ export function valutaInterventoGuardrail(intervento, ctx) {
     return { ok: false, motivo: "Azoto non raccomandato in estate (stress termico).", macro };
   }
 
+  const cat = String(intervento.categoria || "").toLowerCase();
+  const titolo = String(intervento.titolo || "");
+  if (
+    stagione === "estate" &&
+    (cat === "arieggiatura" ||
+      /^(arieggiat|scarific|decompattazione|core aerat|aerazione)/i.test(titolo.trim()))
+  ) {
+    return {
+      ok: false,
+      motivo:
+        "Arieggiatura/scarifica in estate: rischio stress termico. Preferisci marzo–aprile o settembre.",
+      macro,
+    };
+  }
+
   return { ok: true, macro };
 }
 

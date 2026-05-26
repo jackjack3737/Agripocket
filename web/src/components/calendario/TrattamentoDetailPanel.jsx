@@ -31,6 +31,37 @@ function renderTestoScienza(testo) {
   ));
 }
 
+function AccordionToggle({ id, title, badge, open, onToggle, disabled, children }) {
+  return (
+    <div className={`cal-acc${open ? " cal-acc--open" : ""}`}>
+      <button
+        type="button"
+        id={`${id}-trigger`}
+        className="cal-acc__trigger"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={onToggle}
+        disabled={disabled}
+      >
+        <span className="cal-acc__title">{title}</span>
+        {badge != null ? <span className="cal-acc__badge">{badge}</span> : null}
+        <span className="cal-acc__chev" aria-hidden>
+          {open ? "−" : "+"}
+        </span>
+      </button>
+      <div
+        id={id}
+        className="cal-acc__panel"
+        role="region"
+        aria-labelledby={`${id}-trigger`}
+        hidden={!open}
+      >
+        {open ? children : null}
+      </div>
+    </div>
+  );
+}
+
 export default function TrattamentoDetailPanel({
   item,
   userMq,
@@ -39,12 +70,14 @@ export default function TrattamentoDetailPanel({
   onPin,
   completing = false,
 }) {
+  const [prodottiOpen, setProdottiOpen] = useState(false);
   const [scienzaOpen, setScienzaOpen] = useState(false);
   const [scienzaLoading, setScienzaLoading] = useState(false);
   const [scienzaError, setScienzaError] = useState("");
   const [scienza, setScienza] = useState(null);
 
   useEffect(() => {
+    setProdottiOpen(false);
     setScienzaOpen(false);
     setScienza(null);
     setScienzaError("");
@@ -77,34 +110,36 @@ export default function TrattamentoDetailPanel({
     messaggioOperativoPerUi(item, det, treatment) || task.descrizione_semplice;
   const prodotti = treatment?.prodotti_consigliati ?? task.prodotti ?? [];
   const checklist = treatment?.prescrizione_kb?.checklist_operativa ?? [];
+  const haScienzaBreve = !!(task.fabbisogno_fisiologico || task.titolo_tecnico);
   const done = item.stato === "completato";
   const dataLabel =
     item.isRitardo && item.data_originale
       ? `Era il ${formatDataIt(item.data_originale)}`
       : formatDataIt(item.data_prevista);
 
-  async function handleGuardaScienza() {
-    if (scienzaOpen && scienza) {
+  async function toggleScienza() {
+    if (scienzaOpen) {
       setScienzaOpen(false);
       return;
     }
-    if (scienza) {
-      setScienzaOpen(true);
-      return;
-    }
+    setScienzaOpen(true);
+    if (scienza) return;
+
     setScienzaLoading(true);
     setScienzaError("");
     try {
       const data = await fetchScienzaTrattamento(item);
       setScienza(data);
-      setScienzaOpen(true);
     } catch (e) {
       setScienzaError(e.message || "Errore");
-      setScienzaOpen(true);
     } finally {
       setScienzaLoading(false);
     }
   }
+
+  const prodottiBadge = prodotti.length
+    ? `${prodotti.length} ${prodotti.length === 1 ? "prodotto" : "prodotti"}`
+    : "—";
 
   return (
     <aside className="cal-dettaglio" aria-labelledby="trattamento-panel-title">
@@ -132,89 +167,14 @@ export default function TrattamentoDetailPanel({
         ) : null}
       </header>
 
-      <div className="cal-dettaglio__scroll">
-        <section className="cal-dettaglio__sezione">
-          <h3 className="cal-dettaglio__label">Cosa fare</h3>
-          <p className="cal-dettaglio__testo cal-dettaglio__cosa-fare">{cosaFare}</p>
-          <button
-            type="button"
-            className="cal-dettaglio__btn-scienza"
-            onClick={handleGuardaScienza}
-            disabled={scienzaLoading}
-            aria-expanded={scienzaOpen}
-          >
-            {scienzaLoading
-              ? "Interrogo la knowledge…"
-              : scienzaOpen
-                ? "Nascondi la scienza"
-                : "Guarda la scienza"}
-          </button>
-        </section>
-
-        {scienzaOpen ? (
-          <section className="cal-dettaglio__sezione cal-dettaglio__scienza-kb" aria-live="polite">
-            <h3 className="cal-dettaglio__label">La scienza dietro questo trattamento</h3>
-            {scienzaError ? (
-              <p className="cal-dettaglio__testo cal-dettaglio__muted">{scienzaError}</p>
-            ) : scienza?.sintesi ? (
-              <div className="cal-dettaglio__scienza-body">{renderTestoScienza(scienza.sintesi)}</div>
-            ) : (
-              <p className="cal-dettaglio__testo cal-dettaglio__muted">Nessun contenuto disponibile.</p>
-            )}
-            {scienza?.estratti?.length ? (
-              <details className="cal-dettaglio__fonti">
-                <summary>Fonti dalla knowledge ({scienza.chunk_count})</summary>
-                <ul className="cal-dettaglio__fonti-list">
-                  {scienza.estratti.map((e) => (
-                    <li key={e.indice} className="cal-dettaglio__fonte-item">
-                      <span className="cal-dettaglio__fonte-badge">
-                        {e.fonte}
-                        {e.somiglianza != null ? ` · ${e.somiglianza}%` : ""}
-                      </span>
-                      {e.titolo ? <p className="cal-dettaglio__fonte-titolo">{e.titolo}</p> : null}
-                      <p className="cal-dettaglio__fonte-testo">{e.testo}</p>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </section>
-        ) : null}
-
-        {checklist.length ? (
-          <section className="cal-dettaglio__sezione" aria-labelledby="checklist-panel-title">
-            <h3 id="checklist-panel-title" className="cal-dettaglio__label">
-              Checklist greenkeeper
-            </h3>
-            <ul className="cal-dettaglio__checklist">
-              {checklist.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {!scienzaOpen && (task.fabbisogno_fisiologico || task.titolo_tecnico) ? (
-          <section className="cal-dettaglio__sezione cal-dettaglio__scienza cal-dettaglio__scienza--breve">
-            <h3 className="cal-dettaglio__label">Sintesi rapida</h3>
-            {task.titolo_tecnico ? (
-              <p className="cal-dettaglio__testo font-medium">{task.titolo_tecnico}</p>
-            ) : null}
-            {task.fabbisogno_fisiologico ? (
-              <p className="cal-dettaglio__testo whitespace-pre-line line-clamp-6">
-                {task.fabbisogno_fisiologico}
-              </p>
-            ) : null}
-            <p className="cal-dettaglio__hint-scienza">
-              Per estratti da libri e Calendario Verde, usa «Guarda la scienza».
-            </p>
-          </section>
-        ) : null}
-
-        <section className="cal-dettaglio__sezione" aria-labelledby="prodotti-panel-title">
-          <h3 id="prodotti-panel-title" className="cal-dettaglio__label">
-            Prodotti · {userMq} m²
-          </h3>
+      <div className="cal-dettaglio__accordions">
+        <AccordionToggle
+          id="acc-prodotti"
+          title={`Prodotti consigliati · ${userMq} m²`}
+          badge={prodottiBadge}
+          open={prodottiOpen}
+          onToggle={() => setProdottiOpen((v) => !v)}
+        >
           {prodotti.length ? (
             <ul className="cal-dettaglio__prodotti">
               {prodotti.map((p, idx) => (
@@ -233,7 +193,78 @@ export default function TrattamentoDetailPanel({
               {treatment.nota_scelta_prodotti}
             </p>
           ) : null}
+        </AccordionToggle>
+
+        <AccordionToggle
+          id="acc-scienza"
+          title="Guarda la scienza"
+          badge={scienza?.chunk_count ? `${scienza.chunk_count} fonti` : null}
+          open={scienzaOpen}
+          onToggle={toggleScienza}
+          disabled={scienzaLoading}
+        >
+          {scienzaLoading ? (
+            <p className="cal-dettaglio__testo cal-dettaglio__muted">Interrogo la knowledge…</p>
+          ) : null}
+          {scienzaError ? (
+            <p className="cal-dettaglio__testo cal-dettaglio__muted">{scienzaError}</p>
+          ) : null}
+          {!scienzaLoading && !scienza?.sintesi && haScienzaBreve ? (
+            <div className="cal-dettaglio__scienza cal-dettaglio__scienza--breve">
+              {task.titolo_tecnico ? (
+                <p className="cal-dettaglio__testo font-medium">{task.titolo_tecnico}</p>
+              ) : null}
+              {task.fabbisogno_fisiologico ? (
+                <p className="cal-dettaglio__testo whitespace-pre-line">{task.fabbisogno_fisiologico}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {scienza?.sintesi ? (
+            <div className="cal-dettaglio__scienza-kb">
+              <div className="cal-dettaglio__scienza-body">{renderTestoScienza(scienza.sintesi)}</div>
+              {scienza.estratti?.length ? (
+                <details className="cal-dettaglio__fonti">
+                  <summary>Fonti dalla knowledge ({scienza.chunk_count})</summary>
+                  <ul className="cal-dettaglio__fonti-list">
+                    {scienza.estratti.map((e) => (
+                      <li key={e.indice} className="cal-dettaglio__fonte-item">
+                        <span className="cal-dettaglio__fonte-badge">
+                          {e.fonte}
+                          {e.somiglianza != null ? ` · ${e.somiglianza}%` : ""}
+                        </span>
+                        {e.titolo ? <p className="cal-dettaglio__fonte-titolo">{e.titolo}</p> : null}
+                        <p className="cal-dettaglio__fonte-testo">{e.testo}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
+          {!scienzaLoading && !scienza?.sintesi && !haScienzaBreve && !scienzaError ? (
+            <p className="cal-dettaglio__testo cal-dettaglio__muted">Nessun contenuto disponibile.</p>
+          ) : null}
+        </AccordionToggle>
+      </div>
+
+      <div className="cal-dettaglio__scroll">
+        <section className="cal-dettaglio__sezione">
+          <h3 className="cal-dettaglio__label">Cosa fare</h3>
+          <p className="cal-dettaglio__testo cal-dettaglio__cosa-fare">{cosaFare}</p>
         </section>
+
+        {checklist.length ? (
+          <section className="cal-dettaglio__sezione" aria-labelledby="checklist-panel-title">
+            <h3 id="checklist-panel-title" className="cal-dettaglio__label">
+              Checklist greenkeeper
+            </h3>
+            <ul className="cal-dettaglio__checklist">
+              {checklist.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
 
       <footer className="cal-dettaglio__foot">

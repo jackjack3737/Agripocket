@@ -182,6 +182,7 @@ export async function sanitizzaPianoCompleto(interventi, profilo, oggi, opts = {
   const prodottiById = new Map((opts.prodotti || []).map((p) => [p.id, p]));
   let list = [...interventi];
   list = rimuoviRoutineCalendario(list);
+  list = rimuoviArieggiaturaEstate(list);
   list = bloccoTermicoEstivo(list);
   list = applicaTankMix(list);
   list = ensureMatriceNPKObbligatoria(list, oggi, prodottiById);
@@ -275,6 +276,37 @@ export function buildInterventiPatologiaEmergenza(vision, profilo, oggi) {
 }
 
 const MESE_AEREGG = /ariegg|scarific|svasatur|feltro|thatch/i;
+const TITOLO_AEREGG_ESTATE = /^(arieggiat|scarific|decompattazione|core aerat|aerazione|svasatur)/i;
+
+/** Giugno–agosto: arieggiatura/scarifica stressano il tappeto in pieno caldo (finestre primavera/settembre). */
+export function isArieggiaturaMeccanicaEstiva(intervento) {
+  const mese = new Date(`${intervento?.data_prevista || ""}T12:00:00`).getMonth() + 1;
+  if (mese < 6 || mese > 8) return false;
+  const cat = String(intervento?.categoria || "").toLowerCase();
+  if (cat === "arieggiatura") return true;
+  const titolo = String(intervento?.titolo || "").trim();
+  if (TITOLO_AEREGG_ESTATE.test(titolo)) return true;
+  if (MESE_AEREGG.test(titolo) && !/surfact|umett|irrig/i.test(titolo)) return true;
+  return false;
+}
+
+export function rimuoviArieggiaturaEstate(interventi) {
+  const out = [];
+  let rimossi = 0;
+  for (const i of interventi) {
+    if (isArieggiaturaMeccanicaEstiva(i)) {
+      rimossi += 1;
+      continue;
+    }
+    out.push(i);
+  }
+  if (rimossi > 0) {
+    console.info(
+      `[sanitizza] rimossi ${rimossi} interventi arieggiatura/scarifica in estate (finestra ideale: mar–apr o set)`,
+    );
+  }
+  return out;
+}
 
 function meseKey(iso) {
   return (iso || "").slice(0, 7);

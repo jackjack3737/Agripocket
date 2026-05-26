@@ -5,7 +5,7 @@
 
 import { queryKnowledgeBasePrioritized } from "./kbQuery.mjs";
 import { geminiEmbedQuery } from "./ragParametriAgronomici.mjs";
-import { bloccoTermicoEstivo } from "./sanitizzaCalendario.mjs";
+import { bloccoTermicoEstivo, rimuoviArieggiaturaEstate } from "./sanitizzaCalendario.mjs";
 import { macroIntervento } from "./link_prodotti_calendario.mjs";
 import { normalizzaLivelloImpegno } from "./livelloImpegno.mjs";
 
@@ -231,6 +231,7 @@ export async function applicaPrescrizioneKbGuidata(matrice, opts = {}) {
   let interventi = [...(matrice.interventi || [])];
 
   interventi = filtraInterventiKb(interventi, regole);
+  interventi = rimuoviArieggiaturaEstate(interventi);
   interventi = bloccoTermicoEstivo(interventi);
 
   interventi = interventi.map((item) => {
